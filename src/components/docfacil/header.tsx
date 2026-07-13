@@ -4,22 +4,24 @@ import { useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { Menu, X } from "lucide-react";
-import { Selo } from "./selo";
+import { Logo } from "./logo";
+import { useNav, type View } from "./nav-context";
 import { cn } from "@/lib/utils";
 
 gsap.registerPlugin(useGSAP);
 
-const NAV = [
-  { label: "Início", href: "#topo" },
-  { label: "Modelos", href: "#modelos" },
-  { label: "Meus Documentos", href: "#dashboard" },
-  { label: "Planos", href: "#planos" },
+const NAV: { label: string; view: View }[] = [
+  { label: "Início", view: "home" },
+  { label: "Modelos", view: "modelos" },
+  { label: "Meus Documentos", view: "dashboard" },
+  { label: "Planos", view: "planos" },
 ];
 
 export function Header() {
   const root = useRef<HTMLElement>(null);
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const { view, navigate } = useNav();
 
   useGSAP(
     () => {
@@ -30,7 +32,6 @@ export function Header() {
       const onScroll = () => {
         const y = window.scrollY;
         setScrolled(y > 24);
-        // hide-on-scroll-down micro behavior (only after threshold)
         if (y > 160 && y > last + 4 && !hidden) {
           gsap.to(el, { yPercent: -100, duration: 0.4, ease: "power2.out" });
           hidden = true;
@@ -46,6 +47,11 @@ export function Header() {
     { scope: root }
   );
 
+  const go = (v: View) => {
+    navigate(v);
+    setOpen(false);
+  };
+
   return (
     <header
       ref={root}
@@ -56,43 +62,48 @@ export function Header() {
       )}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between gap-4">
-        {/* Logo */}
-        <a href="#topo" className="flex items-center gap-2.5 shrink-0">
-          <Selo variant="mark" className="w-7 h-7" />
-          <span className="font-[family-name:var(--font-jakarta)] text-[1.35rem] font-extrabold tracking-tight text-ink">
-            Doc<span className="text-[var(--blue-royal)]">Facil</span>
-          </span>
-        </a>
+        {/* Logo — PNG is the "D" */}
+        <button
+          onClick={() => go("home")}
+          className="flex items-center shrink-0 hover:opacity-90 transition-opacity"
+          aria-label="DocFacil — início"
+        >
+          <Logo variant="header" />
+        </button>
 
         {/* Center nav */}
         <nav className="hidden md:flex items-center gap-1">
           {NAV.map((n) => (
-            <a
-              key={n.label}
-              href={n.href}
-              className="px-3.5 py-2 rounded-lg text-[0.975rem] font-medium text-ink/75 hover:text-ink hover:bg-[var(--blue-soft)]/60 transition-colors"
+            <button
+              key={n.view}
+              onClick={() => go(n.view)}
+              className={cn(
+                "px-3.5 py-2 rounded-lg text-[0.975rem] font-medium transition-colors",
+                view === n.view
+                  ? "text-ink bg-[var(--blue-soft)]/70"
+                  : "text-ink/70 hover:text-ink hover:bg-[var(--blue-soft)]/60"
+              )}
             >
               {n.label}
-            </a>
+            </button>
           ))}
         </nav>
 
         {/* Right actions */}
         <div className="flex items-center gap-2.5">
-          <a
-            href="#login"
+          <button
+            onClick={() => go("login")}
             className="hidden sm:inline-flex items-center justify-center h-10 px-4 rounded-lg border border-[var(--blue-royal)]/30 text-[var(--blue-royal)] font-semibold text-[0.925rem] hover:bg-[var(--blue-soft)] transition-colors"
           >
             Entrar
-          </a>
-          <a
-            href="#criar"
+          </button>
+          <button
+            onClick={() => go("modelos")}
             className="inline-flex items-center justify-center h-10 px-4 sm:px-5 rounded-lg bg-[var(--blue-royal)] text-white font-semibold text-[0.925rem] hover:bg-[#1e44a8] active:scale-[0.98] transition-all shadow-[0_6px_18px_-8px_rgba(37,84,199,0.7)]"
           >
             Criar Documento Grátis
-          </a>
+          </button>
 
-          {/* Mobile menu toggle */}
           <button
             type="button"
             aria-label={open ? "Fechar menu" : "Abrir menu"}
@@ -109,27 +120,28 @@ export function Header() {
       <div
         className={cn(
           "md:hidden overflow-hidden border-t border-[var(--border)] bg-surface transition-[max-height,opacity] duration-300",
-          open ? "max-h-80 opacity-100" : "max-h-0 opacity-0"
+          open ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
         )}
       >
         <nav className="px-4 py-3 flex flex-col">
           {NAV.map((n) => (
-            <a
-              key={n.label}
-              href={n.href}
-              onClick={() => setOpen(false)}
-              className="py-3 px-2 rounded-lg text-ink/80 font-medium border-b border-[var(--border)]/60 last:border-0"
+            <button
+              key={n.view}
+              onClick={() => go(n.view)}
+              className={cn(
+                "py-3 px-2 rounded-lg text-left font-medium border-b border-[var(--border)]/60 last:border-0",
+                view === n.view ? "text-[var(--blue-royal)]" : "text-ink/80"
+              )}
             >
               {n.label}
-            </a>
+            </button>
           ))}
-          <a
-            href="#login"
-            onClick={() => setOpen(false)}
-            className="mt-2 py-2.5 px-2 rounded-lg text-[var(--blue-royal)] font-semibold"
+          <button
+            onClick={() => go("login")}
+            className="mt-2 py-2.5 px-2 rounded-lg text-left text-[var(--blue-royal)] font-semibold"
           >
             Entrar
-          </a>
+          </button>
         </nav>
       </div>
     </header>

@@ -5,11 +5,13 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { Sparkles, ArrowRight } from "lucide-react";
+import { useNav } from "./nav-context";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 export function AIBanner() {
   const root = useRef<HTMLElement>(null);
+  const { navigate } = useNav();
 
   useGSAP(
     () => {
@@ -79,6 +81,7 @@ export function AIBanner() {
               <a
                 data-ia="cta"
                 href="#ia"
+                onClick={(e) => { e.preventDefault(); navigate("ia"); }}
                 className="mt-7 inline-flex items-center gap-2 h-12 px-6 rounded-xl bg-[var(--blue-royal)] text-white font-semibold hover:bg-[#1e44a8] active:scale-[0.98] transition-all shadow-[0_10px_28px_-10px_rgba(37,84,199,0.8)]"
               >
                 Experimentar Gerador com IA

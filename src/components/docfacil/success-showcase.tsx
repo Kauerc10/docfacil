@@ -6,6 +6,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { Download, Share2, Mail, MessageCircle } from "lucide-react";
 import { Selo } from "./selo";
+import { useNav } from "./nav-context";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -17,6 +18,7 @@ gsap.registerPlugin(useGSAP, ScrollTrigger);
  */
 export function SuccessShowcase() {
   const root = useRef<HTMLElement>(null);
+  const { navigate } = useNav();
 
   useGSAP(
     () => {
@@ -177,7 +179,7 @@ export function SuccessShowcase() {
 
               <p data-ss="upsell" className="mt-7 text-sm text-ink/60">
                 Quer editar isso depois?{" "}
-                <a href="#login" className="text-[var(--blue-royal)] font-semibold hover:underline">
+                <a href="#login" onClick={(e) => { e.preventDefault(); navigate("login"); }} className="text-[var(--blue-royal)] font-semibold hover:underline">
                   Crie uma conta grátis
                 </a>
               </p>

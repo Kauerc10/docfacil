@@ -1,26 +1,44 @@
 "use client";
 
-import { Selo } from "./selo";
+import { Logo } from "./logo";
+import { useNav, type View } from "./nav-context";
 import { COMPANY } from "@/lib/company";
 
-const COLS = [
+const COLS: { title: string; links: { label: string; view?: View }[] }[] = [
   {
     title: "Produto",
-    links: ["Modelos", "Gerador com IA", "Planos", "Meus Documentos"],
+    links: [
+      { label: "Modelos", view: "modelos" },
+      { label: "Gerador com IA", view: "ia" },
+      { label: "Planos", view: "planos" },
+      { label: "Meus Documentos", view: "dashboard" },
+    ],
   },
   {
     title: "Empresa",
-    links: [`Sobre o ${COMPANY.productName}`, "Blog", "Carreiras", "Imprensa"],
+    links: [
+      { label: `Sobre o ${COMPANY.productName}` },
+      { label: "Blog" },
+      { label: "Carreiras" },
+      { label: "Imprensa" },
+    ],
   },
   {
     title: "Suporte",
-    links: ["Central de ajuda", "Falar com atendente", "Status", "Termos"],
+    links: [
+      { label: "Central de ajuda", view: "ajuda" },
+      { label: "Falar com atendente" },
+      { label: "Status" },
+      { label: "Termos" },
+    ],
   },
 ];
 
 export function Footer() {
+  const { navigate } = useNav();
+
   return (
-    <footer id="planos" className="relative bg-[var(--navy)] text-white mt-auto">
+    <footer className="relative bg-[var(--navy)] text-white mt-auto">
       {/* Big "talk to a human" band — the DocFacil differentiator */}
       <div className="border-b border-white/10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
@@ -52,12 +70,13 @@ export function Footer() {
       {/* Link columns */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-2 md:grid-cols-5 gap-8">
         <div className="col-span-2">
-          <a href="#topo" className="flex items-center gap-2.5">
-            <Selo variant="mark" className="w-7 h-7 [&_*]:!text-white" />
-            <span className="font-[family-name:var(--font-jakarta)] text-xl font-extrabold tracking-tight">
-              Doc<span className="text-[var(--blue-soft)]">Facil</span>
-            </span>
-          </a>
+          <button
+            onClick={() => navigate("home")}
+            className="hover:opacity-90 transition-opacity"
+            aria-label="DocFacil — início"
+          >
+            <Logo variant="footer" />
+          </button>
           <p className="mt-4 text-white/60 text-sm max-w-xs leading-relaxed">
             Documentos legais prontos como numa conversa. Sem juridiquês, com
             gente de verdade por trás.
@@ -71,13 +90,13 @@ export function Footer() {
             </h4>
             <ul className="mt-3 space-y-2.5">
               {c.links.map((l) => (
-                <li key={l}>
-                  <a
-                    href="#"
-                    className="text-white/60 hover:text-white text-sm transition-colors"
+                <li key={l.label}>
+                  <button
+                    onClick={() => l.view && navigate(l.view)}
+                    className="text-white/60 hover:text-white text-sm transition-colors text-left"
                   >
-                    {l}
-                  </a>
+                    {l.label}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -94,9 +113,9 @@ export function Footer() {
               {COMPANY.tagline}
             </p>
             <div className="flex items-center gap-4">
-              <a href="#" className="hover:text-white/80 transition-colors">Privacidade</a>
-              <a href="#" className="hover:text-white/80 transition-colors">Termos</a>
-              <a href="#" className="hover:text-white/80 transition-colors">Cookies</a>
+              <button className="hover:text-white/80 transition-colors">Privacidade</button>
+              <button className="hover:text-white/80 transition-colors">Termos</button>
+              <button className="hover:text-white/80 transition-colors">Cookies</button>
             </div>
           </div>
 

@@ -5,19 +5,16 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { Search, ArrowRight, ShieldCheck } from "lucide-react";
 import { Selo } from "./selo";
+import { useNav } from "./nav-context";
+import { MODELOS } from "@/lib/modelos";
 
 gsap.registerPlugin(useGSAP);
 
-const POPULAR_TAGS = [
-  "Contrato de Locação",
-  "Declaração de Residência",
-  "Comodato",
-  "Compra e Venda",
-  "União Estável",
-];
+const POPULAR_TAGS = MODELOS.filter((m) => m.popular).map((m) => m.nome);
 
 export function Hero() {
   const root = useRef<HTMLElement>(null);
+  const { navigate } = useNav();
 
   useGSAP(
     () => {
@@ -165,14 +162,15 @@ export function Hero() {
           <span className="text-sm text-ink/50 font-medium mr-1">
             Mais buscados:
           </span>
-          {POPULAR_TAGS.map((t) => (
+          {MODELOS.filter((m) => m.popular).map((m) => (
             <button
-              key={t}
+              key={m.slug}
               data-hero="tag"
               type="button"
+              onClick={() => navigate("modelo-detalhe", { slug: m.slug })}
               className="px-3.5 py-1.5 rounded-full bg-[var(--blue-soft)]/70 text-[var(--blue-royal)] text-sm font-semibold border border-[var(--blue-royal)]/15 hover:bg-[var(--blue-soft)] hover:border-[var(--blue-royal)]/30 transition-colors"
             >
-              {t}
+              {m.nome}
             </button>
           ))}
         </div>
