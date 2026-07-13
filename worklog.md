@@ -44,3 +44,32 @@ Stage Summary:
 - Production-ready DocFacil home page built with GSAP scroll-triggered reveals, a hand-drawn selo/carimbo brand signature, paper-texture background, dog-ear document cards, live split-screen preview demo, and the stamp-strike success climax.
 - Robust against reduced-motion, headless capture, and Strict Mode double-invoke.
 - All 7 sections verified via Agent Browser + VLM; mobile responsive verified; interactivity (mobile menu) verified.
+
+---
+Task ID: 2
+Agent: main (Z.ai Code)
+Task: Preparar repositório para push — LICENSE, README, branding K-HUB
+
+Work Log:
+- Criado LICENSE comercial fechado e proprietário (K-HUB Soluções Digitais),
+  com seções de marca comercial, confidencialidade e aviso a colaboradores.
+- Criado README.md completo em PT-BR (stack, setup, estrutura, design system,
+  acessibilidade, fluxo de contribuição, contato K-HUB).
+- Atualizado package.json: name="docfacil", version="0.1.0", author K-HUB,
+  license="UNLICENSED", repository, bugs, keywords, homepage.
+- Criado src/lib/company.ts — single source of truth dos dados comerciais
+  (nome, domínio, email, WhatsApp, foundedYear, copyrightRange()).
+- Footer atualizado: adiciona "Powered by K-HUB" com badge "K" gradiente
+  + "DocFacil é um produto da K-HUB Soluções Digitais" + copyright dinâmico.
+- Layout metadata: authors/creator/publisher/copyright = K-HUB, locale pt_BR,
+  twitter card, metadataBase, applicationName.
+- WhatsAppButton passa a usar COMPANY.whatsapp.
+- Criado .env.example (template para novos devs).
+- .gitignore: adicionada exceção !.env.example.
+- REMOVIDO .env do tracking do git (estava commitado desde Initial commit).
+- Commit final: e30001d
+
+Stage Summary:
+- Repositório pronto para push: working tree clean, LICENSE + README + .env.example presentes, .env não tracked, package.json corrigido, branding K-HUB centralizado em src/lib/company.ts e visível no footer + metadata.
+- Verificado via Agent Browser + VLM: "Powered by K-HUB", copyright K-HUB e menção comercial todos renderizando corretamente no rodapé.
+- Próximo passo do usuário: criar repo vazio no GitHub + git remote add origin + git push -u origin main.
