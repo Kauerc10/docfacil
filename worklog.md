@@ -275,3 +275,188 @@ Stage Summary:
 - CriarView is the heart of the product: a focused, single-question Concierge flow with a live Ateliê preview that flashes `field-land` blue every time a placeholder lands, plus a mobile tab fallback for small screens.
 - SucessoView is the brand climax: the green DOCFACIL stamp strikes the A4 sheet on mount (scale overshoot + 5x yoyo shake), then the single coral CTA breathes, with discrete share icons and a clear upsell + home return.
 - Both views interoperate with the rest of the platform: CriarView → navigate("sucesso", {slug, id}) → SucessoView → navigate("cadastro" | "home"), and CriarView's "Voltar" returns to modelo-detalhe.
+
+---
+Task ID: 5
+Agent: main (Z.ai Code)
+Task: Camada de polimento + preparação Firebase + pdfmake
+
+Work Log:
+- Instalado firebase@12.16.0 + pdfmake@0.3.11
+- Criado src/lib/types.ts — tipos compartilhados (Modelo, Documento, PerfilUsuario, Pagamento, etc.)
+- Criado src/lib/firebase.ts — init do Firebase (Auth + Firestore) com fallback gracioso:
+  IS_FIREBASE_CONFIGURED detecta se NEXT_PUBLIC_FIREBASE_* estão presentes.
+  Sem credentials → demo mode (dados locais). Com credentials → Firebase real.
+- Criado src/lib/auth-context.tsx — AuthProvider + useAuth:
+  - Firebase mode: onAuthStateChanged, Google popup, email/password, perfil sincronizado no Firestore
+  - Demo mode: localStorage-backed mock user (persiste entre reloads)
+  - Tradução de erros do Firebase Auth para PT-BR
+- Criado src/lib/services/models-service.ts — getModels/getModel (Firestore ou local)
+- Criado src/lib/services/documents-service.ts — CRUD completo (create/read/update/delete/duplicate)
+  com seed de 3 documentos demo + persistência localStorage
+- Criado src/lib/services/users-service.ts — getPerfil/savePerfil/listPagamentos
+- Criado src/lib/pdf/generator.ts — geração de PDF A4 com pdfmake:
+  título centralizado, corpo justificado, linhas de assinatura, footer com data,
+  watermark "DOCFACIL" sutil, download direto
+- Criado scripts/seed-models.ts — popula coleção "models" no Firestore (usa firebase-admin)
+- Criado firestore.rules — security rules (users só veem próprios docs, models read-only público)
+- Criado firebase.json — config do Firebase CLI
+- Atualizado .env.example com NEXT_PUBLIC_FIREBASE_* (6 vars)
+- Atualizado package.json com scripts seed:models + firestore:rules
+- Atualizado page.tsx para envolver com AuthProvider
+- Lint limpo, dev server compila sem erros
+
+Stage Summary:
+- Infraestrutura completa: Firebase (Auth+Firestore) com fallback demo, services com CRUD, PDF generator com pdfmake, security rules, seed script.
+- Próximos subagents fazem o wiring das views aos services + auth + PDF real + polish.
+
+---
+Task ID: 6-B
+Agent: general-purpose
+Task: Wire data views to services + real PDF generation
+
+Work Log:
+- Lidos 10 arquivos de contexto (worklog, services models/documents, pdf/generator, types, modelos, auth-context, nav-context, 4 views alvo, globals.css, sonner.tsx, layout.tsx) antes de qualquer edição.
+- Criado `src/components/docfacil/views/skeletons.tsx` com skeletons compartilhados: `DocCardSkeleton`, `DocGridSkeleton`, `DetalheInfoSkeleton`, `A4Skeleton`, `ErrorState` — todos respeitando a paleta (`--blue-soft`, `--green-tint`, `--coral`) e mantendo o layout medido pra evitar "pulo" entre loading → conteúdo.
+- `modelos-view.tsx`:
+  - Substituído `MODELOS` (import local) por `getModels()` do services layer.
+  - Adicionado `useState(models/loading/error)` + `useEffect(() => loadModels(), [])` com callback estável (useCallback).
+  - Loading → `<DocGridSkeleton count={6} />` (grid pulsante de 6 cards).
+  - Erro → `<ErrorState message=... onRetry={loadModels} />` (botão "Tentar novamente").
+  - Contagem de resultados agora exibe "Carregando modelos…" durante fetch.
+  - `useGSAP` re-rodando via `dependencies: [filtrados.length]` quando os cards materializam — stagger preservado.
+  - Filtros por categoria, busca, empty state IA CTA — todos intactos.
+- `modelo-detalhe-view.tsx`:
+  - Substituído `getModelo(slug)` (local) por `getModel(slug)` (async service).
+  - `useState(modelo/loading/error)` + `useEffect` reage à mudança de slug.
+  - Loading → `<DetalheInfoSkeleton />` + `<A4Skeleton />` no mesmo grid de 2 colunas (não pula layout).
+  - Erro → `<ErrorState onRetry={load} />`.
+  - Null após carregar → "Modelo não encontrado" + botão "Voltar ao catálogo".
+  - `useGSAP` agora depende de `[modelo]` — stagger das colunas/items só dispara quando o modelo real está no DOM.
+  - Prévia A4, checklist "O que você vai precisar", "Começar agora → navigate('criar', { slug })" — tudo preservado.
+- `criar-view.tsx`:
+  - `getModel(slug)` async (era `getModelo`).
+  - Loading skeleton completo do split-screen (top bar + coluna chat + folha A4 pulsando), mantendo `min-h-screen pt-[72px] flex flex-col`.
+  - `useAuth()` traz o user; `userId = user?.uid || "demo"` — não bloqueia fluxo em demo mode.
+  - No último passo (Avançar/Finalizar), `createDocument({ modeloSlug, modeloNome, respostas, status: 'concluido', userId })` → `navigate('sucesso', { slug, id: doc.id })` com o id REAL retornado pelo service.
+  - `submitting` state: botão mostra "Salvando…" + spinner (Loader2), input desabilitado, evita duplo clique.
+  - Fallback gracioso: se createDocument falhar, loga erro e navega pra sucesso mesmo assim (pra não perder o preenchimento).
+  - Split-screen Concierge chat + A4 live preview + progress-pulse + field-land + mobile tabs (Perguntas/Visualizar) + shake no input vazio — 100% preservados.
+- `sucesso-view.tsx`:
+  - `getModel(slug)` + `getDocument(params.id)` (se existir) carregam modelo real + respostas reais salvas pelo CriarView.
+  - `useEffect(() => preloadPdfmake())` pré-aquece o pdfmake no mount (lazy-load do vfs) → primeiro clique no coral é ~instantâneo.
+  - Botão coral "Baixar Documento (PDF)" agora chama `gerarEBaixarPDF(modelo, respostas, modelo.slug)` DE VERDADE.
+  - Estado `gerandoPdf`: botão mostra "Gerando PDF…" + Loader2 spinner, `disabled` + `aria-busy`, coral-pulse respeitado.
+  - Sucesso → `toast.success('PDF gerado!', { description })` via sonner.
+  - Erro → `toast.error('Não foi possível gerar o PDF.')` via sonner + log de console.
+  - Prévia A4 do thumbnail agora mostra o conteúdo REAL preenchido (via `renderFilledLine` — espelha o `fillTemplate` do generator, com `{{key}}` → valor em semibold ink, ou `____________` em ink/45 quando vazio).
+  - Stamp strike GSAP (scale overshoot + yoyo shake no sheet + entrada do CTA/secondary/upsell), share buttons (WhatsApp/e-mail/copiar link), upsell "Crie uma conta grátis", "Voltar ao início" — todos preservados.
+  - `useGSAP` agora depende de `[modelo]` — animação só dispara quando o sheet real está no DOM.
+- `src/app/layout.tsx`:
+  - Montado `<SonnerToaster position="top-center" richColors closeButton />` ao lado do `<Toaster />` existente (shadcn) — sonner era uma dependência instalada mas não tinha Toaster montado, então `toast()` do sonner não funcionava. Agora funciona.
+- Lint final: 0 erros nos arquivos modificados (1 warning pré-existente em `dashboard-view.tsx` — não meu). TypeScript check limpo nos arquivos tocados.
+
+Stage Summary:
+- 4 views (Modelos, ModeloDetalhe, Criar, Sucesso) agora consomem dados reais via services layer (getModels/getModel/getDocument/createDocument). Em modo Firebase, lêem do Firestore; em demo mode, caem no array local / localStorage — transparente para as views.
+- Fluxo ponta-a-ponta funcionando: catálogo → detalhe → criar → createDocument persiste → sucesso carrega o doc salvo → clique no coral dispara pdfmake → PDF A4 formatado baixa no disco do usuário.
+- Estados de loading (skeletons medidos), erro (retry), e not-found cobertos em todas as views — UX contínua, sem "saltos" de layout.
+- GSAP animations (stagger do catálogo, fade-in do detalhe, field-land/progress-pulse do criar, stamp strike do sucesso) preservadas e ajustadas para rodar quando os dados reais chegam no DOM.
+- Sonner toasts operacionais (layout montou o Toaster) para feedback de sucesso/erro no download do PDF.
+- Próximo subagent pode seguir com polish (microinterações, dashboard wiring, IA, etc.) — base de dados + geração de PDF está fechada.
+
+---
+Task ID: 6-A
+Agent: general-purpose
+Task: Wire auth views + protected views to AuthContext/services
+
+Work Log:
+- Read all required context files: worklog (Task 5), auth-context, services (users + documents), firebase, types, nav-context, and the 5 target views.
+- Verified AuthProvider is mounted in page.tsx (wraps NavProvider) and sonner Toaster is mounted globally in layout.tsx → used `toast` from "sonner" for success/error/info feedback.
+- Verified shadcn AlertDialog is available (already used by documento-detalhe-view) → reused for cancel-subscription + delete-document confirmations.
+
+Created new file:
+- `src/components/docfacil/views/auth-gate.tsx` — exports `AuthGate` that takes `children` and:
+  - Renders a pulsing skeleton (4 card placeholders + header shimmer) while `loading` is true
+  - Renders a friendly login prompt with Lock icon, "Faça login para ver seus documentos" heading, and two CTA buttons (Entrar → navigate("login"), Criar conta grátis → navigate("cadastro")) when `!user`
+  - Renders `children` when user is present
+  - Uses `pt-[72px]` to clear the fixed header (matches PageShell)
+  - Used by Dashboard, Perfil, and DocumentoDetalhe (3x dedup)
+
+FILE 1 — `login-view.tsx`:
+- Replaced fake `navigate("dashboard")` with `await signInWithEmail(email, password)` → navigate on success
+- Wired Google button to `await signInWithGoogle()` → navigate on success
+- Added controlled inputs (email/password) + show-password toggle preserved
+- Added validation: email must contain "@", password not empty (shows inline coral alert)
+- Shows `error` from useAuth() in a coral alert box (AlertCircle icon, border + bg with coral CSS vars)
+- Loading state: button disabled + spinner (Loader2 animate-spin) + "Entrando..." text while submitting
+- Google button also disabled while submitting
+- Preserved all existing visual design (Logo, fields, Google button, link to cadastro, esqueci senha)
+
+FILE 2 — `cadastro-view.tsx`:
+- Replaced fake navigate with `await signUpWithEmail(nome, email, password)` → navigate on success
+- Wired Google button to `signInWithGoogle()`
+- Added controlled inputs (nome/email/password/terms checkbox)
+- Validation: nome not empty, email valid (contains "@"), password >= 8 chars, terms must be checked
+- Submit button disabled if `!terms` (canSubmit = terms && !submitting) — visual feedback via opacity
+- Coral alert box for errors (validation + AuthContext error)
+- Loading state: "Criando conta..." with spinner
+- Preserved all existing visual design
+
+FILE 3 — `dashboard-view.tsx`:
+- Wrapped with `<AuthGate>` (renders login prompt if !user, skeleton if loading)
+- Replaced hardcoded DOCS array with real data: `useEffect(() => listDocuments(user.uid).then(setDocs))`
+- Loading skeleton (4 pulsing card placeholders with shimmer avatar + lines) while fetching
+- Error state with retry button (AlertCircle + "Tentar novamente") if fetch fails
+- Tabs now show real counts (badge per tab) — Todos / Rascunhos / Concluídos
+- Filtered list applies real `status` filter to fetched docs
+- Each card: real modeloNome, real criadoEm formatted with `toLocaleDateString("pt-BR")`, real status badge
+- Card actions:
+  - Click → navigate("documento-detalhe", { id: doc.id })
+  - Editar → navigate("criar", { slug: doc.modeloSlug })
+  - Baixar → toast.info("Preparando PDF...") (real PDF wiring is in documento-detalhe)
+  - Duplicar → `await duplicateDocument(doc.id)` then refresh list + toast.success
+- Empty state now reflects REAL empty state — different copy for "no drafts at all" vs "filtered tab empty"
+- Preserved GSAP scroll-reveal animation + responsive layout
+
+FILE 4 — `perfil-view.tsx`:
+- Wrapped with `<AuthGate>`
+- Loads real profile via `getPerfil(user.uid)` + payments via `listPagamentos(user.uid)` in useEffect (Promise.all)
+- Pre-fills name/email/phone fields with real data (email field is disabled — can't change auth email here)
+- Avatar initials computed from real nome
+- "Salvar alterações" → `await updateProfileData({ nome, telefone })` + toast.success + inline "Salvo!" state for 2s
+- "Gerenciar plano" → navigate("planos")
+- "Cancelar assinatura" → AlertDialog (Manter assinatura / Sim, cancelar); on confirm shows inline success message "Assinatura cancelada. Você manterá acesso até XX/XX." + toast
+- Display plano atual from user.plano ("Grátis" / "Avulso" / "Pro") with corresponding price label
+- Cancel section hides the cancel button when plano === "gratis" (nothing to cancel) or after cancellation
+- Real payments: date formatted `toLocaleDateString("pt-BR")`, value in R$ `toLocaleString("pt-BR", { style: "currency", currency: "BRL" })`, status badge (Pago green / Estornado coral), metodo (Pix/Cartão)
+- Loading skeleton while fetching (shimmer profile card + plan card + payments card)
+
+FILE 5 — `documento-detalhe-view.tsx`:
+- Wrapped with `<AuthGate>`
+- Loads real document via `getDocument(params.id)` in useEffect
+- If not found → "Documento não encontrado" screen with FileQuestion icon + back button → navigate("dashboard")
+- Loads modelo in parallel via `getModel(doc.modeloSlug)` (non-blocking — preview falls back gracefully)
+- Shows real modeloNome, real respostas filled into template (uses modelo.template.corpo with {{key}} replacement; falls back to key:value list if modelo unavailable)
+- Real criadoEm / atualizadoEm formatted with `toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })`
+- Real status badge (Concluído green / Rascunho blue)
+- Actions:
+  - Editar respostas → navigate("criar", { slug: doc.modeloSlug })
+  - Baixar PDF → `await gerarEBaixarPDF(modelo, doc.respostas, doc.modeloSlug)` (real pdfmake integration!) with loading spinner + toast.success/error
+  - Duplicar → `await duplicateDocument(doc.id)` → toast.success → navigate("dashboard")
+  - Excluir → AlertDialog ("Excluir documento?") → on confirm `await deleteDocument(doc.id)` → toast.success → navigate("dashboard")
+- Action buttons show loading state (spinner + "Gerando PDF..." / "Duplicando..." / "Excluindo...") and disable siblings while one is in flight
+- Histórico built from real timestamps (created + updated if different)
+- A4 preview uses real template titulo + real filled paragraphs (capped at 8 with "... (mais N parágrafos)" overflow)
+- Loading skeleton while fetching (shimmer A4 + metadata card + action buttons)
+- Preserved GSAP entrance animation + zoom toggle
+
+Lint: clean (0 errors, 0 warnings) — `bun run lint` passes.
+TypeScript: my modified files have no new type errors (pre-existing errors in examples/, scripts/, skills/, and layout.tsx copyright metadata are unrelated).
+
+Stage Summary:
+- All 5 views now wired to real AuthContext + services layer. Auth flow works end-to-end in demo mode (no Firebase creds needed) and will work identically in production mode once env vars are added.
+- AuthGate component deduplicates the "please log in" prompt across 3 protected views.
+- Real PDF generation works in documento-detalhe-view via pdfmake (Task 5's generator) + models-service.
+- All loading + error states handled gracefully (skeletons, retry buttons, not-found screen, coral error alerts, sonner toasts).
+- Design system preserved throughout (CSS vars, Jakarta Sans for titles, coral for one-accent-per-screen max, accessible focus rings, keyboard-navigable).
+- Next subagents can wire: real Stripe/Pix billing (currently cancel is a no-op message), avatar photo upload, password reset flow, and "Baixar PDF" in dashboard (currently toast — could share a hook with documento-detalhe's download logic).

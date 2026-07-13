@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// DocFacil — Firestore Security Rules
+// Deploy: firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // === Users ===
+    // Cada usuário só lê/escreve o próprio perfil.
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update: if request.auth != null && request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    // === Models (catálogo de documentos) ===
+    // Leitura pública (qualquer um pode ver o catálogo, mesmo sem login —
+    // é o que alimenta a home e /modelos). Escrita só via Admin SDK (seed).
+    match /models/{slug} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // === Documents (documentos gerados pelos usuários) ===
+    // Cada usuário só acessa os próprios documentos.
+    match /documents/{id} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // === Payments (histórico de pagamentos) ===
+    // Leitura pelo dono. Escrita só via Admin SDK (webhook de billing).
+    match /payments/{id} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+  }
+}

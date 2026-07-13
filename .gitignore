@@ -55,3 +55,4 @@ server.log
 /skills/
 # uploaded files (user attachments, not part of the project)
 /upload/
+tool-results/

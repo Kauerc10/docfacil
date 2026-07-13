@@ -1,25 +1,67 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { ChevronLeft, User as UserIcon, Mail, Phone, Camera, CreditCard, Check } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import {
+  ChevronLeft,
+  User as UserIcon,
+  Mail,
+  Phone,
+  Camera,
+  CreditCard,
+  Check,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
+
 import { useNav } from "@/components/docfacil/nav-context";
+import { useAuth } from "@/lib/auth-context";
 import { PageShell, PageHeader } from "@/components/docfacil/views/page-shell";
+import { AuthGate } from "@/components/docfacil/views/auth-gate";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { getPerfil, listPagamentos } from "@/lib/services/users-service";
+import type { Pagamento, PerfilUsuario } from "@/lib/types";
+
+const PLANO_LABEL: Record<PerfilUsuario["plano"], string> = {
+  gratis: "Grátis",
+  avulso: "Avulso",
+  pro: "Pro",
+};
+
+const PLANO_PRICE: Record<PerfilUsuario["plano"], string> = {
+  gratis: "Gratuito",
+  avulso: "R$ 19,90 / documento avulso",
+  pro: "R$ 29,90/mês",
+};
 
 /** Helper: a single styled text field with leading icon. */
 function Field({
   id,
   label,
   type = "text",
-  defaultValue,
+  value,
+  onChange,
   autoComplete,
   icon: Icon,
+  disabled,
 }: {
   id: string;
   label: string;
   type?: string;
-  defaultValue?: string;
+  value: string;
+  onChange: (v: string) => void;
   autoComplete?: string;
   icon: React.ComponentType<{ className?: string }>;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -34,37 +76,121 @@ function Field({
         <input
           id={id}
           type={type}
-          defaultValue={defaultValue}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           autoComplete={autoComplete}
-          className="w-full h-12 pl-11 pr-4 text-lg rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition"
+          disabled={disabled}
+          className="w-full h-12 pl-11 pr-4 text-lg rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition disabled:opacity-60 disabled:cursor-not-allowed"
         />
       </div>
     </div>
   );
 }
 
-const PAGAMENTOS = [
-  { date: "15/07/2026", valor: "R$ 29,90", status: "Pago" },
-  { date: "15/06/2026", valor: "R$ 29,90", status: "Pago" },
-  { date: "15/05/2026", valor: "R$ 29,90", status: "Pago" },
-];
-
-/**
- * PerfilView (spec 4.11) — account / profile.
- * Two-column layout: dados pessoais (left) + plano, histórico e cancelamento (right).
- *
- * The cancel-subscription section is intentionally NOT hidden behind menus
- * or confirmations — transparency is brand credibility.
- */
 export function PerfilView() {
-  const { navigate } = useNav();
-  const [saving, setSaving] = useState(false);
+  return (
+    <AuthGate>
+      <PerfilContent />
+    </AuthGate>
+  );
+}
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+function PerfilContent() {
+  const { navigate } = useNav();
+  const { user, updateProfileData } = useAuth();
+
+  const [nome, setNome] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [perfil, setPerfil] = useState<PerfilUsuario | null>(null);
+  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [cancelMsg, setCancelMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!user) return;
+      setLoading(true);
+      try {
+        const [p, pags] = await Promise.all([
+          getPerfil(user.uid),
+          listPagamentos(user.uid),
+        ]);
+        if (cancelled) return;
+        setPerfil(p);
+        setPagamentos(pags);
+        setNome(p?.nome ?? user.nome ?? "");
+        setEmail(p?.email ?? user.email ?? "");
+        setTelefone(p?.telefone ?? "");
+      } catch (e) {
+        console.error(e);
+        toast.error("Não foi possível carregar seu perfil.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // Prototype: simulate a save.
+    if (!user) return;
     setSaving(true);
-    window.setTimeout(() => setSaving(false), 900);
+    try {
+      await updateProfileData({ nome, telefone });
+      setSaved(true);
+      toast.success("Perfil atualizado!");
+      window.setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao salvar perfil.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancelSubscription() {
+    // No real billing integration yet — show a friendly message.
+    const proximaData = new Date();
+    proximaData.setMonth(proximaData.getMonth() + 1);
+    const fmt = proximaData.toLocaleDateString("pt-BR");
+    setCancelMsg(`Assinatura cancelada. Você manterá acesso até ${fmt}.`);
+    toast.success("Assinatura cancelada. Sem multas, sem burocracia.");
+  }
+
+  const plano = perfil?.plano ?? user?.plano ?? "gratis";
+  const initials = (nome || user?.nome || "U")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase() ?? "")
+    .join("");
+
+  if (loading) {
+    return (
+      <PageShell className="bg-paper min-h-screen">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+          <div className="h-8 bg-[var(--blue-soft)]/50 rounded w-32 animate-pulse" />
+          <div className="mt-4 space-y-3 animate-pulse">
+            <div className="h-6 bg-[var(--blue-soft)]/40 rounded w-1/3" />
+            <div className="h-4 bg-[var(--blue-soft)]/30 rounded w-1/2" />
+          </div>
+          <div className="mt-10 grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6 lg:gap-8">
+            <div className="h-96 rounded-2xl bg-[var(--blue-soft)]/25 animate-pulse" />
+            <div className="space-y-6">
+              <div className="h-40 rounded-2xl bg-[var(--blue-soft)]/25 animate-pulse" />
+              <div className="h-48 rounded-2xl bg-[var(--blue-soft)]/25 animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </PageShell>
+    );
   }
 
   return (
@@ -107,11 +233,12 @@ export function PerfilView() {
                 className="w-16 h-16 rounded-full bg-[var(--blue-soft)] text-[var(--blue-royal)] grid place-items-center font-[family-name:var(--font-jakarta)] font-extrabold text-xl select-none"
                 aria-hidden="true"
               >
-                JS
+                {initials || "U"}
               </div>
               <div>
                 <button
                   type="button"
+                  onClick={() => toast.info("Upload de foto em breve.")}
                   className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[var(--border)] bg-paper text-ink text-sm font-semibold hover:bg-[var(--blue-soft)]/60 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)]"
                 >
                   <Camera className="w-4 h-4" />
@@ -125,7 +252,8 @@ export function PerfilView() {
               <Field
                 id="perfil-name"
                 label="Nome completo"
-                defaultValue="João Silva"
+                value={nome}
+                onChange={setNome}
                 autoComplete="name"
                 icon={UserIcon}
               />
@@ -133,15 +261,22 @@ export function PerfilView() {
                 id="perfil-email"
                 label="E-mail"
                 type="email"
-                defaultValue="joao@email.com"
+                value={email}
+                onChange={setEmail}
                 autoComplete="email"
                 icon={Mail}
+                disabled
               />
+              <p className="-mt-3 text-xs text-ink/50">
+                O e-mail não pode ser alterado aqui. Entre em contato com o
+                suporte se precisar.
+              </p>
               <Field
                 id="perfil-phone"
                 label="Telefone"
                 type="tel"
-                defaultValue="(11) 99999-0000"
+                value={telefone}
+                onChange={setTelefone}
                 autoComplete="tel"
                 icon={Phone}
               />
@@ -154,7 +289,12 @@ export function PerfilView() {
                 >
                   {saving ? (
                     <>
-                      <Check className="w-5 h-5" />
+                      <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                      Salvando...
+                    </>
+                  ) : saved ? (
+                    <>
+                      <Check className="w-5 h-5" aria-hidden="true" />
                       Salvo!
                     </>
                   ) : (
@@ -181,17 +321,25 @@ export function PerfilView() {
                     id="perfil-plano-heading"
                     className="mt-1 font-[family-name:var(--font-jakarta)] text-2xl font-extrabold text-ink"
                   >
-                    Plano Pro
+                    Plano {PLANO_LABEL[plano]}
                   </h2>
-                  <p className="mt-1 text-sm text-ink/65">
-                    R$ 29,90/mês · Renova em 15/08/2026
-                  </p>
+                  <p className="mt-1 text-sm text-ink/65">{PLANO_PRICE[plano]}</p>
                 </div>
                 <CreditCard
                   className="w-7 h-7 text-[var(--blue-royal)] shrink-0"
                   aria-hidden="true"
                 />
               </div>
+
+              {cancelMsg && (
+                <div
+                  role="status"
+                  className="mt-4 flex items-start gap-2.5 rounded-lg border border-[var(--selo-green)]/30 bg-[var(--green-tint)]/60 px-3.5 py-3 text-sm text-[var(--selo-green)]"
+                >
+                  <Check className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+                  <span className="leading-relaxed">{cancelMsg}</span>
+                </div>
+              )}
 
               <button
                 type="button"
@@ -213,31 +361,19 @@ export function PerfilView() {
               >
                 Histórico de pagamentos
               </h2>
-              <ul className="mt-4 divide-y divide-[var(--border)]">
-                {PAGAMENTOS.map((p) => (
-                  <li
-                    key={p.date}
-                    className="flex items-center justify-between py-3 gap-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-ink truncate">
-                        {p.date}
-                      </p>
-                      <p className="text-xs text-ink/55">Plano Pro mensal</p>
-                    </div>
-                    <span className="text-sm font-semibold text-ink tabular-nums">
-                      {p.valor}
-                    </span>
-                    <span
-                      className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--green-tint)] text-[var(--selo-green)]"
-                      aria-label={`Status: ${p.status}`}
-                    >
-                      <Check className="w-3 h-3" />
-                      {p.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {pagamentos.length === 0 ? (
+                <p className="mt-4 text-sm text-ink/55">
+                  {plano === "gratis"
+                    ? "Você ainda não tem pagamentos. Faça upgrade para o Pro na aba ao lado."
+                    : "Nenhum pagamento registrado ainda."}
+                </p>
+              ) : (
+                <ul className="mt-4 divide-y divide-[var(--border)]">
+                  {pagamentos.map((p) => (
+                    <PagamentoRow key={p.id} pagamento={p} />
+                  ))}
+                </ul>
+              )}
             </section>
 
             {/* Cancelamento — claro, sem dark pattern */}
@@ -255,16 +391,86 @@ export function PerfilView() {
                 Você manterá acesso até o fim do período já pago. Sem multas,
                 sem burocracia.
               </p>
-              <button
-                type="button"
-                className="mt-4 inline-flex items-center text-sm font-semibold text-[var(--coral)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--coral)] rounded px-1 py-0.5"
-              >
-                Cancelar assinatura
-              </button>
+
+              {plano === "gratis" ? (
+                <p className="mt-4 text-sm text-ink/50 italic">
+                  Você está no plano Grátis — nada para cancelar.
+                </p>
+              ) : cancelMsg ? (
+                <p className="mt-4 text-sm text-[var(--selo-green)] font-medium">
+                  Sua assinatura já foi cancelada.
+                </p>
+              ) : (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="mt-4 inline-flex items-center text-sm font-semibold text-[var(--coral)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--coral)] rounded px-1 py-0.5"
+                    >
+                      Cancelar assinatura
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Cancelar assinatura do Plano {PLANO_LABEL[plano]}?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Você continuará com acesso até o fim do período já
+                        pago. Depois disso, sua conta voltará ao plano Grátis
+                        automaticamente. Sem multas, sem burocracia.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Manter assinatura</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleCancelSubscription}
+                        className="bg-[var(--coral)] text-white hover:bg-[var(--coral-hover)]"
+                      >
+                        Sim, cancelar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </section>
           </div>
         </div>
       </div>
     </PageShell>
+  );
+}
+
+function PagamentoRow({ pagamento }: { pagamento: Pagamento }) {
+  const dataFmt = new Date(pagamento.data).toLocaleDateString("pt-BR");
+  const valorFmt = pagamento.valor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+  const isPago = pagamento.status === "pago";
+  const planoLabel = pagamento.plano === "pro" ? "Plano Pro mensal" : "Documento avulso";
+  const metodoLabel = pagamento.metodo === "pix" ? "Pix" : "Cartão";
+  return (
+    <li className="flex items-center justify-between py-3 gap-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-ink truncate">{dataFmt}</p>
+        <p className="text-xs text-ink/55">
+          {planoLabel} · {metodoLabel}
+        </p>
+      </div>
+      <span className="text-sm font-semibold text-ink tabular-nums">{valorFmt}</span>
+      <span
+        className={[
+          "inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full",
+          isPago
+            ? "bg-[var(--green-tint)] text-[var(--selo-green)]"
+            : "bg-[var(--coral)]/15 text-[var(--coral)]",
+        ].join(" ")}
+        aria-label={`Status: ${pagamento.status}`}
+      >
+        {isPago && <Check className="w-3 h-3" />}
+        {isPago ? "Pago" : "Estornado"}
+      </span>
+    </li>
   );
 }

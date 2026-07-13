@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Eye, EyeOff, Mail, Lock, User } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, Loader2, AlertCircle } from "lucide-react";
 import { useNav } from "@/components/docfacil/nav-context";
+import { useAuth } from "@/lib/auth-context";
 import { Logo } from "@/components/docfacil/logo";
 
 /** The standard 4-color Google "G" mark as inline SVG. */
@@ -31,17 +32,59 @@ function GoogleGIcon({ className }: { className?: string }) {
 
 /**
  * CadastroView (spec 4.8) — sign-up screen.
- * Mirrors the LoginView layout for visual continuity.
+ * Wired to the real AuthContext (signUpWithEmail / signInWithGoogle).
  */
 export function CadastroView() {
   const { navigate } = useNav();
-  const [showPassword, setShowPassword] = useState(false);
+  const { signUpWithEmail, signInWithGoogle, error } = useAuth();
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    // Prototype: no real account creation — hand off to the dashboard.
-    navigate("dashboard");
+  const [nome, setNome] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [terms, setTerms] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  function validate(): string | null {
+    if (!nome.trim()) return "Informe seu nome completo.";
+    if (!email.trim()) return "Informe seu e-mail.";
+    if (!email.includes("@")) return "E-mail inválido.";
+    if (password.length < 8) return "A senha deve ter pelo menos 8 caracteres.";
+    if (!terms) return "Você precisa aceitar os Termos de Uso.";
+    return null;
   }
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const v = validate();
+    if (v) {
+      setValidationError(v);
+      return;
+    }
+    setValidationError(null);
+    setSubmitting(true);
+    try {
+      await signUpWithEmail(nome.trim(), email.trim(), password);
+      navigate("dashboard");
+    } catch {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleGoogle() {
+    setValidationError(null);
+    setSubmitting(true);
+    try {
+      await signInWithGoogle();
+      navigate("dashboard");
+    } catch {
+      setSubmitting(false);
+    }
+  }
+
+  const shownError = validationError || error;
+  const canSubmit = terms && !submitting;
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-paper flex items-center justify-center px-4 py-12">
@@ -78,7 +121,8 @@ export function CadastroView() {
                   id="cad-name"
                   type="text"
                   autoComplete="name"
-                  required
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
                   placeholder="Seu nome"
                   className="w-full h-12 pl-11 pr-4 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
                 />
@@ -102,7 +146,8 @@ export function CadastroView() {
                   id="cad-email"
                   type="email"
                   autoComplete="email"
-                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="voce@email.com"
                   className="w-full h-12 pl-11 pr-4 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
                 />
@@ -126,7 +171,8 @@ export function CadastroView() {
                   id="cad-password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
-                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   minLength={8}
                   placeholder="••••••••"
                   className="w-full h-12 pl-11 pr-12 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
@@ -156,7 +202,8 @@ export function CadastroView() {
               <input
                 id="cad-terms"
                 type="checkbox"
-                required
+                checked={terms}
+                onChange={(e) => setTerms(e.target.checked)}
                 className="mt-0.5 w-5 h-5 rounded border-[var(--border)] accent-[var(--blue-royal)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
               />
               <span className="text-sm text-ink/75 leading-relaxed">
@@ -172,12 +219,34 @@ export function CadastroView() {
               </span>
             </label>
 
+            {/* Error alert */}
+            {shownError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2.5 rounded-lg border border-[var(--coral)]/30 bg-[var(--coral)]/8 px-3.5 py-3 text-sm text-[var(--coral)]"
+              >
+                <AlertCircle
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                  aria-hidden="true"
+                />
+                <span className="leading-relaxed">{shownError}</span>
+              </div>
+            )}
+
             {/* Criar conta */}
             <button
               type="submit"
-              className="w-full h-12 rounded-lg bg-[var(--blue-royal)] text-white font-semibold text-lg hover:bg-[var(--navy)] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)]"
+              disabled={!canSubmit}
+              className="w-full h-12 rounded-lg bg-[var(--blue-royal)] text-white font-semibold text-lg hover:bg-[var(--navy)] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)] disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
             >
-              Criar conta
+              {submitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                  Criando conta...
+                </>
+              ) : (
+                "Criar conta"
+              )}
             </button>
           </form>
 
@@ -191,8 +260,9 @@ export function CadastroView() {
           {/* Google */}
           <button
             type="button"
-            onClick={() => navigate("dashboard")}
-            className="w-full h-12 rounded-lg border border-[var(--border)] bg-surface text-ink font-semibold text-lg hover:bg-paper transition inline-flex items-center justify-center gap-3 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)]"
+            onClick={handleGoogle}
+            disabled={submitting}
+            className="w-full h-12 rounded-lg border border-[var(--border)] bg-surface text-ink font-semibold text-lg hover:bg-paper transition inline-flex items-center justify-center gap-3 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <GoogleGIcon className="w-5 h-5" />
             Continuar com Google

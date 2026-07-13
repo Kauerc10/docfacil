@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import {
@@ -11,9 +11,13 @@ import {
   Trash,
   Clock,
   ZoomIn,
+  Loader2,
+  FileQuestion,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { PageShell } from "@/components/docfacil/views/page-shell";
+import { AuthGate } from "@/components/docfacil/views/auth-gate";
 import { useNav } from "@/components/docfacil/nav-context";
 import { Selo } from "@/components/docfacil/selo";
 import {
@@ -27,25 +31,78 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  getDocument,
+  deleteDocument,
+  duplicateDocument,
+} from "@/lib/services/documents-service";
+import { getModel } from "@/lib/services/models-service";
+import { gerarEBaixarPDF } from "@/lib/pdf/generator";
+import type { Documento, Modelo } from "@/lib/types";
 
 gsap.registerPlugin(useGSAP);
 
-const PREVIEW_TEXT = [
-  "Pelo presente instrumento particular, MARIA APARECIDA DA SILVA, doravante denominado(a) LOCADOR(A), loca para JOÃO PEREIRA SANTOS, doravante LOCATÁRIO(A), o imóvel situado na Rua das Acácias, 145 — Centro, São Paulo/SP.",
-  "A locação tem prazo de 30 (trinta) meses, com início na data da assinatura, e valor mensal de R$ 1.450,00.",
-  "O LOCATÁRIO obriga-se a pagar o aluguel até o dia 5 de cada mês, sob pena de multa de 10% (dez por cento).",
-];
-
-const HISTORICO = [
-  { acao: "Documento criado a partir do modelo Contrato de Locação", quando: "13 de julho de 2026 · 14:22" },
-  { acao: "PDF sem marca d'água baixado", quando: "13 de julho de 2026 · 15:08" },
-];
-
 export function DocumentoDetalheView() {
+  return (
+    <AuthGate>
+      <DocumentoDetalheContent />
+    </AuthGate>
+  );
+}
+
+function DocumentoDetalheContent() {
   const { params, navigate } = useNav();
   const root = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(false);
-  const docId = params.id ?? "doc-1";
+  const [doc, setDoc] = useState<Documento | null>(null);
+  const [modelo, setModelo] = useState<Modelo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [actionLoading, setActionLoading] = useState<
+    "download" | "duplicate" | "delete" | null
+  >(null);
+
+  const docId = params.id ?? "";
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!docId) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setNotFound(false);
+      try {
+        const d = await getDocument(docId);
+        if (cancelled) return;
+        if (!d) {
+          setNotFound(true);
+          setLoading(false);
+          return;
+        }
+        setDoc(d);
+        // Load modelo in parallel — non-blocking: preview can render
+        // without it, but it's nice to show the template's corpo.
+        getModel(d.modeloSlug)
+          .then((m) => {
+            if (!cancelled) setModelo(m);
+          })
+          .catch((e) => console.error("Failed to load modelo:", e));
+      } catch (e) {
+        console.error(e);
+        toast.error("Não foi possível carregar o documento.");
+        setNotFound(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [docId]);
 
   useGSAP(
     () => {
@@ -62,8 +119,130 @@ export function DocumentoDetalheView() {
         }
       );
     },
-    { scope: root }
+    { scope: root, dependencies: [doc?.id] }
   );
+
+  async function handleDownload() {
+    if (!doc) return;
+    if (!modelo) {
+      toast.error("Modelo não encontrado para gerar o PDF.");
+      return;
+    }
+    setActionLoading("download");
+    try {
+      await gerarEBaixarPDF(modelo, doc.respostas, doc.modeloSlug);
+      toast.success("PDF gerado!");
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao gerar PDF. Tente novamente.");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDuplicate() {
+    if (!doc) return;
+    setActionLoading("duplicate");
+    try {
+      const novo = await duplicateDocument(doc.id);
+      if (novo) {
+        toast.success("Documento duplicado!");
+        navigate("dashboard");
+      } else {
+        toast.error("Não foi possível duplicar o documento.");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao duplicar documento.");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDelete() {
+    if (!doc) return;
+    setActionLoading("delete");
+    try {
+      await deleteDocument(doc.id);
+      toast.success("Documento excluído.");
+      navigate("dashboard");
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao excluir documento.");
+      setActionLoading(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <PageShell>
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
+          <DetalheSkeleton />
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (notFound || !doc) {
+    return (
+      <PageShell>
+        <div className="max-w-md mx-auto px-5 sm:px-8 py-16 sm:py-24 text-center">
+          <div
+            className="mx-auto w-16 h-16 rounded-full bg-[var(--blue-soft)] text-[var(--blue-royal)] grid place-items-center"
+            aria-hidden="true"
+          >
+            <FileQuestion className="w-7 h-7" />
+          </div>
+          <h1 className="mt-5 font-[family-name:var(--font-jakarta)] text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">
+            Documento não encontrado
+          </h1>
+          <p className="mt-3 text-ink/65 text-base leading-relaxed">
+            O documento que você procura pode ter sido excluído, ou o link está
+            incorreto.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate("dashboard")}
+            className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[var(--blue-royal)] px-6 py-3 text-sm font-semibold text-white hover:bg-[var(--navy)] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)]"
+          >
+            <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+            Voltar para Meus Documentos
+          </button>
+        </div>
+      </PageShell>
+    );
+  }
+
+  const isDone = doc.status === "concluido";
+  const criadoFmt = new Date(doc.criadoEm).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+  const atualizadoFmt = new Date(doc.atualizadoEm).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  // Build historico entries from real timestamps.
+  const historico: { acao: string; quando: string }[] = [
+    {
+      acao: `Documento criado a partir do modelo ${doc.modeloNome}`,
+      quando: `${criadoFmt}`,
+    },
+  ];
+  if (doc.atualizadoEm !== doc.criadoEm) {
+    historico.unshift({
+      acao: "Documento atualizado",
+      quando: `${atualizadoFmt}`,
+    });
+  }
+
+  // Preview paragraphs: prefer the model's template filled with respostas.
+  const previewParagraphs =
+    modelo?.template.corpo?.map((linha) => fillTemplate(linha, doc.respostas)) ??
+    fallbackPreview(doc);
 
   return (
     <PageShell>
@@ -105,7 +284,11 @@ export function DocumentoDetalheView() {
                 zoom ? "scale-[1.04] origin-top" : "scale-100",
               ].join(" ")}
             >
-              <A4Preview docId={docId} />
+              <A4Preview
+                docId={doc.id}
+                titulo={modelo?.template.titulo ?? doc.modeloNome}
+                paragraphs={previewParagraphs}
+              />
             </div>
 
             <p className="mt-3 text-center text-xs text-ink/45">
@@ -121,7 +304,7 @@ export function DocumentoDetalheView() {
                 Documento
               </p>
               <h1 className="mt-1.5 font-[family-name:var(--font-jakarta)] text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">
-                Contrato de Locação
+                {doc.modeloNome}
               </h1>
             </div>
 
@@ -131,17 +314,29 @@ export function DocumentoDetalheView() {
               className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5"
             >
               <dl className="space-y-3 text-sm">
-                <MetaRow label="Criado em" value="13 de julho de 2026" />
-                <MetaRow label="Última edição" value="há 2 dias" />
+                <MetaRow label="Criado em" value={criadoFmt} />
+                <MetaRow label="Última edição" value={atualizadoFmt} />
                 <div className="flex items-center justify-between gap-3 pt-1">
                   <dt className="text-ink/55">Status</dt>
                   <dd>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--green-tint)] text-[var(--selo-green)] px-2.5 py-1 text-xs font-semibold">
+                    <span
+                      className={[
+                        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold",
+                        isDone
+                          ? "bg-[var(--green-tint)] text-[var(--selo-green)]"
+                          : "bg-[var(--blue-soft)] text-[var(--blue-royal)]",
+                      ].join(" ")}
+                    >
                       <span
-                        className="w-1.5 h-1.5 rounded-full bg-[var(--selo-green)]"
+                        className={[
+                          "w-1.5 h-1.5 rounded-full",
+                          isDone
+                            ? "bg-[var(--selo-green)]"
+                            : "bg-[var(--blue-royal)]",
+                        ].join(" ")}
                         aria-hidden="true"
                       />
-                      Concluído
+                      {isDone ? "Concluído" : "Rascunho"}
                     </span>
                   </dd>
                 </div>
@@ -155,21 +350,40 @@ export function DocumentoDetalheView() {
                 icon={<Pencil className="w-4 h-4" aria-hidden="true" />}
                 label="Editar respostas"
                 onClick={() =>
-                  navigate("criar", { slug: "contrato-locacao" })
+                  navigate("criar", { slug: doc.modeloSlug })
                 }
               />
               <ActionButton
-                icon={<Download className="w-4 h-4" aria-hidden="true" />}
-                label="Baixar PDF"
-                onClick={() => undefined}
+                icon={
+                  actionLoading === "download" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Download className="w-4 h-4" aria-hidden="true" />
+                  )
+                }
+                label={actionLoading === "download" ? "Gerando PDF..." : "Baixar PDF"}
+                onClick={handleDownload}
+                disabled={actionLoading !== null}
               />
               <ActionButton
-                icon={<Copy className="w-4 h-4" aria-hidden="true" />}
-                label="Duplicar"
-                onClick={() => undefined}
+                icon={
+                  actionLoading === "duplicate" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Copy className="w-4 h-4" aria-hidden="true" />
+                  )
+                }
+                label={actionLoading === "duplicate" ? "Duplicando..." : "Duplicar"}
+                onClick={handleDuplicate}
+                disabled={actionLoading !== null}
               />
 
-              <DeleteAction onConfirm={() => navigate("dashboard")} />
+              <DeleteAction
+                docNome={doc.modeloNome}
+                loading={actionLoading === "delete"}
+                disabled={actionLoading !== null && actionLoading !== "delete"}
+                onConfirm={handleDelete}
+              />
             </section>
 
             {/* Histórico */}
@@ -184,7 +398,7 @@ export function DocumentoDetalheView() {
                 </h2>
               </div>
               <ol className="mt-4 space-y-3">
-                {HISTORICO.map((h, i) => (
+                {historico.map((h, i) => (
                   <li key={i} className="relative pl-5">
                     <span
                       className="absolute left-0 top-1.5 w-2 h-2 rounded-full bg-[var(--blue-royal)]"
@@ -203,6 +417,31 @@ export function DocumentoDetalheView() {
   );
 }
 
+/** Substitui {{key}} no template pelos valores das respostas. */
+function fillTemplate(template: string, respostas: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const v = respostas[key];
+    return v && v.trim() ? v : "______________________";
+  });
+}
+
+/** Caso o modelo não esteja disponível, montamos um preview simples das respostas. */
+function fallbackPreview(doc: Documento): string[] {
+  const entries = Object.entries(doc.respostas);
+  if (entries.length === 0) {
+    return [
+      "Este documento ainda não possui respostas preenchidas. Clique em “Editar respostas” para começar.",
+    ];
+  }
+  return entries.map(([key, value]) => `${labelify(key)}: ${value}`);
+}
+
+function labelify(key: string): string {
+  return key
+    .replace(/[_-]/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
@@ -217,18 +456,21 @@ function ActionButton({
   label,
   onClick,
   primary = false,
+  disabled = false,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
   primary?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={[
-        "w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--blue-royal)] focus-visible:ring-offset-[var(--paper)]",
+        "w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--blue-royal)] focus-visible:ring-offset-[var(--paper)] disabled:opacity-60 disabled:cursor-not-allowed",
         primary
           ? "bg-[var(--blue-royal)] text-white hover:bg-[#1f46a8]"
           : "border border-[var(--border)] text-ink bg-[var(--surface)] hover:bg-[var(--blue-soft)] hover:border-[var(--blue-royal)]/40",
@@ -240,25 +482,39 @@ function ActionButton({
   );
 }
 
-function DeleteAction({ onConfirm }: { onConfirm: () => void }) {
+function DeleteAction({
+  docNome,
+  onConfirm,
+  loading,
+  disabled,
+}: {
+  docNome: string;
+  onConfirm: () => void;
+  loading: boolean;
+  disabled: boolean;
+}) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <button
           type="button"
-          className="w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-[var(--coral)] hover:bg-[var(--coral)]/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--coral)]"
+          disabled={disabled}
+          className="w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-[var(--coral)] hover:bg-[var(--coral)]/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--coral)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Trash className="w-4 h-4" aria-hidden="true" />
-          Excluir
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Trash className="w-4 h-4" aria-hidden="true" />
+          )}
+          {loading ? "Excluindo..." : "Excluir"}
         </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
           <AlertDialogDescription>
-            Essa ação não pode ser desfeita. O documento &ldquo;Contrato de
-            Locação&rdquo; e seu histórico serão removidos permanentemente da
-            sua conta.
+            Essa ação não pode ser desfeita. O documento &ldquo;{docNome}&rdquo;
+            e seu histórico serão removidos permanentemente da sua conta.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -275,7 +531,15 @@ function DeleteAction({ onConfirm }: { onConfirm: () => void }) {
   );
 }
 
-function A4Preview({ docId }: { docId: string }) {
+function A4Preview({
+  docId,
+  titulo,
+  paragraphs,
+}: {
+  docId: string;
+  titulo: string;
+  paragraphs: string[];
+}) {
   return (
     <div
       data-doc-id={docId}
@@ -287,23 +551,29 @@ function A4Preview({ docId }: { docId: string }) {
         <p className="text-[10px] sm:text-xs uppercase tracking-[0.18em] text-ink/45">
           DocFacil · ID {docId}
         </p>
-        <h3 className="mt-3 font-[family-name:var(--font-jakarta)] text-base sm:text-lg font-extrabold tracking-tight text-center">
-          CONTRATO DE LOCAÇÃO
+        <h3 className="mt-3 font-[family-name:var(--font-jakarta)] text-base sm:text-lg font-extrabold tracking-tight text-center uppercase">
+          {titulo}
         </h3>
         <div className="mt-2 mx-auto w-12 h-px bg-ink/20" />
 
         <div className="mt-5 space-y-3 text-[11px] sm:text-[13px] leading-relaxed text-ink/85">
-          {PREVIEW_TEXT.map((p, i) => (
+          {paragraphs.slice(0, 8).map((p, i) => (
             <p key={i} className="text-justify">
               {p}
             </p>
           ))}
+          {paragraphs.length > 8 && (
+            <p className="text-center text-ink/40 italic">
+              ... (mais {paragraphs.length - 8} parágrafo
+              {paragraphs.length - 8 !== 1 ? "s" : ""})
+            </p>
+          )}
         </div>
 
         {/* Signature lines */}
         <div className="absolute left-7 right-7 sm:left-9 sm:right-9 bottom-8 sm:bottom-10 grid grid-cols-2 gap-6">
-          <SignatureBlock label="LOCADOR(A)" />
-          <SignatureBlock label="LOCATÁRIO(A)" />
+          <SignatureBlock label="PARTE 1" />
+          <SignatureBlock label="PARTE 2" />
         </div>
       </div>
     </div>
@@ -317,6 +587,29 @@ function SignatureBlock({ label }: { label: string }) {
       <p className="mt-1.5 text-[9px] sm:text-[10px] uppercase tracking-wider text-ink/55">
         {label}
       </p>
+    </div>
+  );
+}
+
+function DetalheSkeleton() {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-8 lg:gap-12" aria-hidden="true">
+      <div className="order-2 lg:order-1">
+        <div className="h-4 bg-[var(--blue-soft)]/50 rounded w-32 animate-pulse mb-3" />
+        <div className="aspect-[1/1.414] max-w-[420px] mx-auto rounded-sm bg-[var(--blue-soft)]/25 animate-pulse" />
+      </div>
+      <div className="order-1 lg:order-2 space-y-6 animate-pulse">
+        <div className="space-y-2">
+          <div className="h-3 bg-[var(--blue-soft)]/50 rounded w-16" />
+          <div className="h-7 bg-[var(--blue-soft)]/50 rounded w-3/4" />
+        </div>
+        <div className="h-32 rounded-2xl bg-[var(--blue-soft)]/25" />
+        <div className="space-y-2.5">
+          <div className="h-11 rounded-xl bg-[var(--blue-soft)]/30" />
+          <div className="h-11 rounded-xl bg-[var(--blue-soft)]/30" />
+          <div className="h-11 rounded-xl bg-[var(--blue-soft)]/30" />
+        </div>
+      </div>
     </div>
   );
 }

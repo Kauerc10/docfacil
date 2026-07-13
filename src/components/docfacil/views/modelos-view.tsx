@@ -1,14 +1,17 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { ArrowRight, Clock, Search, Sparkles, X } from "lucide-react";
-import { CATEGORIAS, MODELOS, type Categoria } from "@/lib/modelos";
+import { CATEGORIAS, type Categoria } from "@/lib/modelos";
+import { getModels } from "@/lib/services/models-service";
+import type { Modelo } from "@/lib/types";
 import { useNav } from "@/components/docfacil/nav-context";
 import { PageHeader, PageShell } from "@/components/docfacil/views/page-shell";
 import { DocIcons } from "@/components/docfacil/catalog";
+import { DocGridSkeleton, ErrorState } from "@/components/docfacil/views/skeletons";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -17,6 +20,9 @@ type Filtro = "Todos" | Categoria;
 /**
  * ModelosView (spec 4.2) — catálogo completo com busca + filtro por categoria.
  * Reaproveita o .doc-card do design system e os DocIcons do Catalog.
+ *
+ * Dados vêm do services layer (getModels): Firestore em produção, fallback
+ * local em demo mode. A view só sabe que `models` é uma Promise.
  */
 export function ModelosView() {
   const root = useRef<HTMLDivElement>(null);
@@ -24,9 +30,31 @@ export function ModelosView() {
   const [query, setQuery] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("Todos");
 
+  const [models, setModels] = useState<Modelo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadModels = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getModels();
+      setModels(data);
+    } catch (e) {
+      console.error("[ModelosView] falha ao carregar modelos:", e);
+      setError("Não foi possível carregar os modelos. Verifique sua conexão.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadModels();
+  }, [loadModels]);
+
   const filtrados = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return MODELOS.filter((m) => {
+    return models.filter((m) => {
       const okCat = filtro === "Todos" || m.categoria === filtro;
       if (!okCat) return false;
       if (!q) return true;
@@ -36,7 +64,7 @@ export function ModelosView() {
         m.quandoUsar.toLowerCase().includes(q)
       );
     });
-  }, [query, filtro]);
+  }, [models, query, filtro]);
 
   // Refresh ScrollTrigger whenever the list changes so the stagger re-runs.
   useGSAP(
@@ -129,14 +157,21 @@ export function ModelosView() {
           aria-live="polite"
           data-modelos="count"
         >
-          {filtrados.length}{" "}
-          {filtrados.length === 1 ? "modelo encontrado" : "modelos encontrados"}
-          {filtro !== "Todos" && ` em ${filtro}`}
-          {query && ` para “${query}”`}
+          {loading
+            ? "Carregando modelos…"
+            : `${filtrados.length} ${
+                filtrados.length === 1 ? "modelo encontrado" : "modelos encontrados"
+              }${filtro !== "Todos" ? ` em ${filtro}` : ""}${
+                query ? ` para “${query}”` : ""
+              }`}
         </p>
 
-        {/* Grid or empty state */}
-        {filtrados.length > 0 ? (
+        {/* Loading / error / grid / empty state */}
+        {loading ? (
+          <DocGridSkeleton count={6} />
+        ) : error ? (
+          <ErrorState message={error} onRetry={loadModels} />
+        ) : filtrados.length > 0 ? (
           <div
             data-modelos="grid"
             className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6"

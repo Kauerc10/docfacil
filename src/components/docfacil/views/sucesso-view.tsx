@@ -1,12 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { ArrowLeft, Check, Copy, Download, Mail, MessageCircle } from "lucide-react";
+import { ArrowLeft, Check, Copy, Download, Loader2, Mail, MessageCircle } from "lucide-react";
+import { toast } from "sonner";
 import { Selo } from "../selo";
 import { useNav } from "../nav-context";
-import { getModelo } from "@/lib/modelos";
+import { getModel } from "@/lib/services/models-service";
+import { getDocument } from "@/lib/services/documents-service";
+import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf/generator";
+import type { Modelo } from "@/lib/types";
 import { PageShell, PageHeader } from "./page-shell";
 
 gsap.registerPlugin(useGSAP);
@@ -19,20 +23,64 @@ gsap.registerPlugin(useGSAP);
  *
  * Distinct from SuccessShowcase (the home-page marketing version): this one
  * fires on mount (not on scroll) and uses the real model the user just filled.
+ *
+ * Wiring pós-Task 5:
+ * - Modelo vem de `getModel(slug)` (Firestore/local via services).
+ * - `params.id` (passado pela CriarView) carrega o documento salvo em si
+ *   via `getDocument(id)`, pra mostrar as respostas reais na prévia A4.
+ * - O botão coral chama `gerarEBaixarPDF(modelo, respostas, slug)` de
+ *   verdade (pdfmake carregado dinamicamente na primeira chamada).
  */
 export function SucessoView() {
   const { params, navigate } = useNav();
   const slug = params.slug ?? "";
-  const modelo = getModelo(slug);
+  const docId = params.id;
 
   const root = useRef<HTMLDivElement | null>(null);
   const [copied, setCopied] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+
+  const [modelo, setModelo] = useState<Modelo | null>(null);
+  const [respostas, setRespostas] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const m = await getModel(slug);
+      setModelo(m);
+      // Se a CriarView passou um id, tentamos carregar as respostas reais.
+      if (m && docId) {
+        const doc = await getDocument(docId);
+        if (doc) setRespostas(doc.respostas);
+      }
+      // Se não há doc (ex.: veio do SuccessShowcase demo da home), segue
+      // com respostas vazias — a prévia mostra ____________, como antes.
+    } catch (e) {
+      console.error("[SucessoView] falha ao carregar:", e);
+      setModelo(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [slug, docId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Pré-aquece o pdfmake (lazy load do vfs) assim que a tela aparece, pra
+  // o clique no botão coral ser instantâneo na maioria dos casos.
+  useEffect(() => {
+    preloadPdfmake().catch(() => {
+      /* silent — o botão ainda vai funcionar, só será mais lento na 1ª vez */
+    });
+  }, []);
 
   // Stamp strike — fires on mount (no ScrollTrigger needed, user just landed).
   useGSAP(
     () => {
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (reduce) {
+      if (reduce || !modelo) {
         // No animation — just place the stamp in its final state.
         gsap.set("[data-suc='stamp']", { scale: 1, opacity: 1, rotation: -8 });
         return;
@@ -71,8 +119,65 @@ export function SucessoView() {
         )
         .from("[data-suc='upsell']", { y: 10, opacity: 0, duration: 0.4 }, "-=0.2");
     },
-    { scope: root }
+    { scope: root, dependencies: [modelo] }
   );
+
+  const handleBaixarPDF = async () => {
+    if (!modelo || gerandoPdf) return;
+    setGerandoPdf(true);
+    try {
+      await gerarEBaixarPDF(modelo, respostas, modelo.slug);
+      toast.success("PDF gerado!", {
+        description: `Seu ${modelo.nome} foi baixado.`,
+      });
+    } catch (e) {
+      console.error("[SucessoView] falha ao gerar PDF:", e);
+      toast.error("Não foi possível gerar o PDF.", {
+        description: "Tente novamente em alguns segundos.",
+      });
+    } finally {
+      setGerandoPdf(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(window.location.href);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard may be blocked — silent */
+    }
+  };
+
+  // --- Loading skeleton ---
+  if (loading) {
+    return (
+      <PageShell className="bg-[var(--green-tint)]/40 min-h-screen">
+        <div
+          className="mx-auto max-w-2xl px-4 sm:px-6 py-10 sm:py-14"
+          role="status"
+          aria-busy="true"
+          aria-label="Carregando documento"
+        >
+          <div className="text-center max-w-2xl mx-auto animate-pulse">
+            <div className="h-4 w-32 mx-auto rounded-full bg-[var(--blue-soft)]/60" />
+            <div className="mt-2 h-9 w-3/4 mx-auto rounded-md bg-[var(--blue-soft)]/60" />
+          </div>
+          <div className="relative mt-10 mx-auto max-w-md animate-pulse">
+            <div className="bg-surface rounded-3xl border border-[var(--border)] shadow-[0_30px_60px_-30px_rgba(14,35,64,0.2)] p-6 sm:p-8">
+              <div className="mx-auto w-full max-w-[280px] aspect-[1/1.414] bg-[var(--blue-soft)]/40 rounded-sm" />
+            </div>
+          </div>
+          <div className="mt-8 text-center animate-pulse">
+            <div className="h-14 w-56 mx-auto rounded-2xl bg-[var(--coral)]/30" />
+          </div>
+        </div>
+      </PageShell>
+    );
+  }
 
   if (!modelo) {
     return (
@@ -99,18 +204,6 @@ export function SucessoView() {
       </PageShell>
     );
   }
-
-  const handleCopyLink = async () => {
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard) {
-        await navigator.clipboard.writeText(window.location.href);
-      }
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard may be blocked — silent */
-    }
-  };
 
   return (
     <PageShell className="bg-[var(--green-tint)]/40 min-h-screen">
@@ -141,7 +234,7 @@ export function SucessoView() {
                       key={i}
                       className="text-[0.58rem] leading-relaxed text-ink/70 text-pretty"
                     >
-                      {line.replace(/\{\{[^}]+\}\}/g, "____________")}
+                      {renderFilledLine(line, respostas)}
                     </p>
                   ))}
                 </div>
@@ -189,10 +282,22 @@ export function SucessoView() {
           <button
             data-suc="cta"
             type="button"
-            className="coral-pulse inline-flex items-center justify-center gap-2.5 h-14 w-full sm:w-auto sm:px-10 rounded-2xl bg-[var(--coral)] text-white font-bold text-lg hover:bg-[var(--coral-hover)] active:scale-[0.99] transition-colors"
+            onClick={handleBaixarPDF}
+            disabled={gerandoPdf}
+            aria-busy={gerandoPdf}
+            className="coral-pulse inline-flex items-center justify-center gap-2.5 h-14 w-full sm:w-auto sm:px-10 rounded-2xl bg-[var(--coral)] text-white font-bold text-lg hover:bg-[var(--coral-hover)] active:scale-[0.99] transition-colors disabled:opacity-80 disabled:cursor-not-allowed"
           >
-            <Download className="w-5 h-5" />
-            Baixar Documento (PDF)
+            {gerandoPdf ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Gerando PDF…
+              </>
+            ) : (
+              <>
+                <Download className="w-5 h-5" />
+                Baixar Documento (PDF)
+              </>
+            )}
           </button>
 
           <div className="mt-5 flex items-center justify-center gap-3">
@@ -255,4 +360,40 @@ export function SucessoView() {
       </div>
     </PageShell>
   );
+}
+
+/**
+ * Substitui `{{key}}` por:
+ *  - o valor real preenchido (destacado em ink/semibold), se existir;
+ *  - `____________` caso contrário (mesma aparência de antes do wiring).
+ *
+ * Espelha a função `fillTemplate` do generator, mas como JSX pra poder
+ * estilizar as partes preenchidas (e mantém o contraste com o cinza do
+ * placeholder no thumbnail A4).
+ */
+function renderFilledLine(
+  line: string,
+  respostas: Record<string, string>
+): React.ReactNode {
+  const parts = line.split(/(\{\{[^}]+\}\})/g);
+  return parts.map((part, i) => {
+    const m = part.match(/^\{\{([^}]+)\}\}$/);
+    if (m) {
+      const key = m[1];
+      const v = respostas[key];
+      if (v && v.trim()) {
+        return (
+          <span key={`${key}-${i}`} className="font-semibold text-ink">
+            {v}
+          </span>
+        );
+      }
+      return (
+        <span key={`${key}-${i}`} className="text-ink/45">
+          ____________
+        </span>
+      );
+    }
+    return <span key={`t-${i}`}>{part}</span>;
+  });
 }

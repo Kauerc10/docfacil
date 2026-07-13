@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { COMPANY } from "@/lib/company";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -77,6 +78,7 @@ export default function RootLayout({
         />
         {children}
         <Toaster />
+        <SonnerToaster position="top-center" richColors closeButton />
       </body>
     </html>
   );

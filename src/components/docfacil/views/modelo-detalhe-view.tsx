@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ArrowLeft, ArrowRight, Check, Clock, FileText } from "lucide-react";
-import { getModelo } from "@/lib/modelos";
+import { getModel } from "@/lib/services/models-service";
+import type { Modelo } from "@/lib/types";
 import { useNav } from "@/components/docfacil/nav-context";
 import { PageShell } from "@/components/docfacil/views/page-shell";
+import { A4Skeleton, DetalheInfoSkeleton, ErrorState } from "@/components/docfacil/views/skeletons";
 import { Selo } from "@/components/docfacil/selo";
 
 gsap.registerPlugin(useGSAP);
@@ -17,16 +19,40 @@ gsap.registerPlugin(useGSAP);
  * O público leigo precisa entender o que está prestes a fazer antes de
  * responder perguntas. Esta tela explica "quando usar", lista o que vai
  * precisar ter em mãos e mostra uma prévia do documento.
+ *
+ * Modelo vem do services layer (getModel): Firestore em prod, local em demo.
  */
 export function ModeloDetalheView() {
   const root = useRef<HTMLDivElement>(null);
   const { params, navigate } = useNav();
   const slug = params.slug ?? "";
-  const modelo = getModelo(slug);
+
+  const [modelo, setModelo] = useState<Modelo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const m = await getModel(slug);
+      setModelo(m);
+    } catch (e) {
+      console.error("[ModeloDetalheView] falha ao carregar modelo:", e);
+      setError("Não foi possível carregar este modelo agora.");
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useGSAP(
     () => {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      if (!modelo) return;
       gsap.from("[data-det='col']", {
         y: 28,
         opacity: 0,
@@ -43,9 +69,56 @@ export function ModeloDetalheView() {
         delay: 0.2,
       });
     },
-    { scope: root }
+    { scope: root, dependencies: [modelo] }
   );
 
+  // --- Loading skeleton (mantém o layout medido de duas colunas) ---
+  if (loading) {
+    return (
+      <PageShell>
+        <div
+          ref={root}
+          className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12"
+          role="status"
+          aria-busy="true"
+          aria-label="Carregando modelo"
+        >
+          <button
+            type="button"
+            onClick={() => navigate("modelos")}
+            className="inline-flex items-center gap-1.5 text-ink/65 hover:text-[var(--blue-royal)] font-medium transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Voltar ao catálogo
+          </button>
+          <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-14">
+            <DetalheInfoSkeleton />
+            <div className="lg:sticky lg:top-24 self-start">
+              <div className="text-xs font-semibold uppercase tracking-wider text-ink/45">
+                Prévia do documento
+              </div>
+              <div className="mt-3 mx-auto max-w-sm">
+                <A4Skeleton />
+              </div>
+            </div>
+          </div>
+        </div>
+      </PageShell>
+    );
+  }
+
+  // --- Erro de fetch (com retry) ---
+  if (error) {
+    return (
+      <PageShell>
+        <div className="mx-auto max-w-2xl px-4 sm:px-6 py-12">
+          <ErrorState message={error} onRetry={load} />
+        </div>
+      </PageShell>
+    );
+  }
+
+  // --- Modelo não encontrado (null após carregar) ---
   if (!modelo) {
     return (
       <PageShell>

@@ -1,57 +1,20 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { FileText, Pencil, Download, Copy, Plus } from "lucide-react";
+import { FileText, Pencil, Download, Copy, Plus, AlertCircle, RotateCw } from "lucide-react";
+import { toast } from "sonner";
 
 import { PageShell, PageHeader } from "@/components/docfacil/views/page-shell";
+import { AuthGate } from "@/components/docfacil/views/auth-gate";
 import { useNav } from "@/components/docfacil/nav-context";
+import { useAuth } from "@/lib/auth-context";
+import { listDocuments, duplicateDocument } from "@/lib/services/documents-service";
+import type { Documento } from "@/lib/types";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
-
-type Status = "concluido" | "rascunho";
-
-type DocItem = {
-  id: string;
-  nome: string;
-  criadoEm: string;
-  status: Status;
-};
-
-const DOCS: DocItem[] = [
-  {
-    id: "doc-1",
-    nome: "Contrato de Locação",
-    criadoEm: "13 de julho de 2026",
-    status: "concluido",
-  },
-  {
-    id: "doc-2",
-    nome: "Declaração de Residência",
-    criadoEm: "8 de julho de 2026",
-    status: "concluido",
-  },
-  {
-    id: "doc-3",
-    nome: "Contrato de Comodato",
-    criadoEm: "2 de julho de 2026",
-    status: "concluido",
-  },
-  {
-    id: "doc-4",
-    nome: "Recibo de Pagamento",
-    criadoEm: "28 de junho de 2026",
-    status: "concluido",
-  },
-  {
-    id: "doc-5",
-    nome: "Procuração Ad Judicia",
-    criadoEm: "20 de junho de 2026",
-    status: "concluido",
-  },
-];
 
 type TabId = "todos" | "rascunhos" | "concluidos";
 
@@ -62,17 +25,47 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 export function DashboardView() {
+  return (
+    <AuthGate>
+      <DashboardContent />
+    </AuthGate>
+  );
+}
+
+function DashboardContent() {
   const { navigate } = useNav();
+  const { user } = useAuth();
   const [tab, setTab] = useState<TabId>("todos");
+  const [docs, setDocs] = useState<Documento[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
-  // Demo logic: "Rascunhos" tab has no drafts → shows empty state.
-  const docs = useMemo<DocItem[]>(() => {
-    if (tab === "rascunhos") return [];
-    if (tab === "concluidos")
-      return DOCS.filter((d) => d.status === "concluido");
-    return DOCS;
-  }, [tab]);
+  const loadDocs = async () => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const list = await listDocuments(user.uid);
+      setDocs(list);
+    } catch (e) {
+      console.error(e);
+      setError("Não foi possível carregar seus documentos. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDocs();
+  }, [user?.uid]);
+
+  const filtered = useMemo<Documento[]>(() => {
+    if (tab === "rascunhos") return docs.filter((d) => d.status === "rascunho");
+    if (tab === "concluidos") return docs.filter((d) => d.status === "concluido");
+    return docs;
+  }, [docs, tab]);
 
   useGSAP(
     () => {
@@ -97,8 +90,26 @@ export function DashboardView() {
       }, root);
       return () => ctx.revert();
     },
-    { scope: root, dependencies: [tab] }
+    { scope: root, dependencies: [tab, filtered.length] }
   );
+
+  async function handleDuplicate(id: string) {
+    setDuplicatingId(id);
+    try {
+      const novo = await duplicateDocument(id);
+      if (novo) {
+        toast.success("Documento duplicado!");
+        await loadDocs();
+      } else {
+        toast.error("Não foi possível duplicar o documento.");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao duplicar o documento.");
+    } finally {
+      setDuplicatingId(null);
+    }
+  }
 
   return (
     <PageShell>
@@ -130,6 +141,12 @@ export function DashboardView() {
         >
           {TABS.map((t) => {
             const active = tab === t.id;
+            const count =
+              t.id === "todos"
+                ? docs.length
+                : t.id === "rascunhos"
+                ? docs.filter((d) => d.status === "rascunho").length
+                : docs.filter((d) => d.status === "concluido").length;
             return (
               <button
                 key={t.id}
@@ -138,13 +155,25 @@ export function DashboardView() {
                 type="button"
                 onClick={() => setTab(t.id)}
                 className={[
-                  "relative px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)] rounded-t-md",
+                  "relative px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)] rounded-t-md inline-flex items-center gap-2",
                   active
                     ? "text-[var(--blue-royal)]"
                     : "text-ink/55 hover:text-ink",
                 ].join(" ")}
               >
                 {t.label}
+                {!loading && (
+                  <span
+                    className={[
+                      "text-xs px-1.5 py-0.5 rounded-full tabular-nums",
+                      active
+                        ? "bg-[var(--blue-soft)] text-[var(--blue-royal)]"
+                        : "bg-[var(--blue-soft)]/50 text-ink/60",
+                    ].join(" ")}
+                  >
+                    {count}
+                  </span>
+                )}
                 {active && (
                   <span
                     aria-hidden="true"
@@ -157,26 +186,32 @@ export function DashboardView() {
         </div>
 
         {/* Content */}
-        {docs.length === 0 ? (
-          <EmptyState onCreate={() => navigate("modelos")} />
+        {loading ? (
+          <DashboardSkeleton />
+        ) : error ? (
+          <ErrorState message={error} onRetry={loadDocs} />
+        ) : filtered.length === 0 ? (
+          <EmptyState onCreate={() => navigate("modelos")} tab={tab} />
         ) : (
-          <ul
-            data-doc-list
-            className="mt-6 grid grid-cols-1 gap-4"
-          >
-            {docs.map((doc) => (
+          <ul data-doc-list className="mt-6 grid grid-cols-1 gap-4">
+            {filtered.map((doc) => (
               <li key={doc.id} data-doc-card>
                 <DocCard
                   doc={doc}
-                  onOpen={() =>
-                    navigate("documento-detalhe", { id: doc.id })
-                  }
+                  onOpen={() => navigate("documento-detalhe", { id: doc.id })}
                   onEdit={(e) => {
                     e.stopPropagation();
-                    navigate("criar", { slug: slugFromName(doc.nome) });
+                    navigate("criar", { slug: doc.modeloSlug });
                   }}
-                  onDownload={(e) => e.stopPropagation()}
-                  onDuplicate={(e) => e.stopPropagation()}
+                  onDownload={(e) => {
+                    e.stopPropagation();
+                    toast.info("Preparando PDF... Abrirá em instantes.");
+                  }}
+                  onDuplicate={(e) => {
+                    e.stopPropagation();
+                    handleDuplicate(doc.id);
+                  }}
+                  duplicating={duplicatingId === doc.id}
                 />
               </li>
             ))}
@@ -187,14 +222,46 @@ export function DashboardView() {
   );
 }
 
-function slugFromName(nome: string): string {
-  // Map common doc names back to slugs used in /criar.
-  const map: Record<string, string> = {
-    "Contrato de Locação": "contrato-locacao",
-    "Declaração de Residência": "declaracao-residencia",
-    "Contrato de Comodato": "comodato",
-  };
-  return map[nome] ?? "contrato-locacao";
+function DashboardSkeleton() {
+  return (
+    <ul className="mt-6 grid grid-cols-1 gap-4" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => (
+        <li
+          key={i}
+          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 flex items-center gap-4 animate-pulse"
+        >
+          <div className="shrink-0 w-12 h-12 rounded-full bg-[var(--blue-soft)]/60" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-[var(--blue-soft)]/50 rounded w-2/5" />
+            <div className="h-3 bg-[var(--blue-soft)]/40 rounded w-1/4" />
+            <div className="h-5 bg-[var(--blue-soft)]/40 rounded-full w-20" />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="mt-10 rounded-2xl border border-[var(--coral)]/30 bg-[var(--coral)]/5 px-6 py-10 text-center">
+      <div
+        className="mx-auto w-12 h-12 rounded-full bg-[var(--coral)]/15 text-[var(--coral)] grid place-items-center"
+        aria-hidden="true"
+      >
+        <AlertCircle className="w-6 h-6" />
+      </div>
+      <p className="mt-4 text-ink/80 font-medium">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-5 inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-surface px-5 py-2.5 text-sm font-semibold text-ink hover:bg-paper transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)]"
+      >
+        <RotateCw className="w-4 h-4" aria-hidden="true" />
+        Tentar novamente
+      </button>
+    </div>
+  );
 }
 
 function DocCard({
@@ -203,14 +270,17 @@ function DocCard({
   onEdit,
   onDownload,
   onDuplicate,
+  duplicating,
 }: {
-  doc: DocItem;
+  doc: Documento;
   onOpen: () => void;
   onEdit: (e: React.MouseEvent) => void;
   onDownload: (e: React.MouseEvent) => void;
   onDuplicate: (e: React.MouseEvent) => void;
+  duplicating: boolean;
 }) {
   const isDone = doc.status === "concluido";
+  const dataFmt = new Date(doc.criadoEm).toLocaleDateString("pt-BR");
   return (
     <article
       onClick={onOpen}
@@ -223,7 +293,7 @@ function DocCard({
         }
       }}
       className="group cursor-pointer rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 flex items-center gap-4 hover:border-[var(--blue-royal)]/40 hover:shadow-[0_10px_24px_-14px_rgba(14,35,64,0.25)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)]"
-      aria-label={`Abrir documento ${doc.nome}, criado em ${doc.criadoEm}, status ${doc.status}`}
+      aria-label={`Abrir documento ${doc.modeloNome}, criado em ${dataFmt}, status ${doc.status}`}
     >
       {/* Icon */}
       <span className="shrink-0 grid place-items-center w-12 h-12 rounded-full bg-[var(--blue-soft)] text-[var(--blue-royal)]">
@@ -233,11 +303,9 @@ function DocCard({
       {/* Middle */}
       <div className="flex-1 min-w-0">
         <h3 className="font-[family-name:var(--font-jakarta)] text-base sm:text-lg font-bold text-ink truncate">
-          {doc.nome}
+          {doc.modeloNome}
         </h3>
-        <p className="mt-0.5 text-sm text-ink/55">
-          Criado em {doc.criadoEm}
-        </p>
+        <p className="mt-0.5 text-sm text-ink/55">Criado em {dataFmt}</p>
         <span
           className={[
             "mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold",
@@ -259,21 +327,16 @@ function DocCard({
 
       {/* Actions */}
       <div className="hidden sm:flex items-center gap-1 shrink-0">
-        <IconAction
-          label={`Editar ${doc.nome}`}
-          onClick={onEdit}
-        >
+        <IconAction label={`Editar ${doc.modeloNome}`} onClick={onEdit}>
           <Pencil className="w-4 h-4" aria-hidden="true" />
         </IconAction>
-        <IconAction
-          label={`Baixar PDF de ${doc.nome}`}
-          onClick={onDownload}
-        >
+        <IconAction label={`Baixar PDF de ${doc.modeloNome}`} onClick={onDownload}>
           <Download className="w-4 h-4" aria-hidden="true" />
         </IconAction>
         <IconAction
-          label={`Duplicar ${doc.nome}`}
+          label={`Duplicar ${doc.modeloNome}`}
           onClick={onDuplicate}
+          disabled={duplicating}
         >
           <Copy className="w-4 h-4" aria-hidden="true" />
         </IconAction>
@@ -286,24 +349,34 @@ function IconAction({
   label,
   onClick,
   children,
+  disabled = false,
 }: {
   label: string;
   onClick: (e: React.MouseEvent) => void;
   children: React.ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="grid place-items-center w-9 h-9 rounded-lg text-ink/60 hover:text-[var(--blue-royal)] hover:bg-[var(--blue-soft)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)]"
+      disabled={disabled}
+      className="grid place-items-center w-9 h-9 rounded-lg text-ink/60 hover:text-[var(--blue-royal)] hover:bg-[var(--blue-soft)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)] disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {children}
     </button>
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function EmptyState({
+  onCreate,
+  tab,
+}: {
+  onCreate: () => void;
+  tab: TabId;
+}) {
+  const isFilteredEmpty = tab !== "todos";
   return (
     <div className="mt-10 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)]/60 py-14 px-6 text-center">
       {/* Hand-drawn-ish folder illustration, not flat generic */}
@@ -383,21 +456,28 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       </div>
 
       <h3 className="mt-6 font-[family-name:var(--font-jakarta)] text-xl font-bold text-ink">
-        Você ainda não criou nenhum documento
+        {isFilteredEmpty
+          ? tab === "rascunhos"
+            ? "Você não tem rascunhos"
+            : "Nenhum documento concluído ainda"
+          : "Você ainda não criou nenhum documento"}
       </h3>
       <p className="mt-2 text-ink/60 max-w-md mx-auto">
-        Escolha um modelo, preencha em conversa com a gente e baixe o PDF em
-        minutos. Sem complicatedês.
+        {isFilteredEmpty
+          ? "Quando você criar ou concluir documentos nesta categoria, eles aparecerão aqui."
+          : "Escolha um modelo, preencha em conversa com a gente e baixe o PDF em minutos. Sem complicatedês."}
       </p>
 
-      <button
-        type="button"
-        onClick={onCreate}
-        className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--blue-royal)] px-6 py-3 text-sm font-semibold text-white hover:bg-[#1f46a8] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--blue-royal)] focus-visible:ring-offset-[var(--paper)]"
-      >
-        <Plus className="w-4 h-4" aria-hidden="true" />
-        Criar meu primeiro documento
-      </button>
+      {!isFilteredEmpty && (
+        <button
+          type="button"
+          onClick={onCreate}
+          className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--blue-royal)] px-6 py-3 text-sm font-semibold text-white hover:bg-[#1f46a8] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--blue-royal)] focus-visible:ring-offset-[var(--paper)]"
+        >
+          <Plus className="w-4 h-4" aria-hidden="true" />
+          Criar meu primeiro documento
+        </button>
+      )}
     </div>
   );
 }

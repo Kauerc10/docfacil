@@ -1,6 +1,7 @@
 "use client";
 
 import { NavProvider, useNav } from "@/components/docfacil/nav-context";
+import { AuthProvider } from "@/lib/auth-context";
 import { Header } from "@/components/docfacil/header";
 import { Hero } from "@/components/docfacil/hero";
 import { Catalog } from "@/components/docfacil/catalog";
@@ -73,16 +74,18 @@ function CurrentView() {
 
 export default function Home() {
   return (
-    <NavProvider>
-      <div className="relative min-h-screen flex flex-col bg-paper">
-        <GsapSafety />
-        <Header />
-        <main className="flex-1">
-          <CurrentView />
-        </main>
-        <Footer />
-        <WhatsAppButton />
-      </div>
-    </NavProvider>
+    <AuthProvider>
+      <NavProvider>
+        <div className="relative min-h-screen flex flex-col bg-paper">
+          <GsapSafety />
+          <Header />
+          <main className="flex-1">
+            <CurrentView />
+          </main>
+          <Footer />
+          <WhatsAppButton />
+        </div>
+      </NavProvider>
+    </AuthProvider>
   );
 }

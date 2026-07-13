@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { Selo } from "../selo";
 import { useNav } from "../nav-context";
-import { getModelo, type CampoModelo } from "@/lib/modelos";
+import { useAuth } from "@/lib/auth-context";
+import { getModel } from "@/lib/services/models-service";
+import { createDocument } from "@/lib/services/documents-service";
+import type { CampoModelo, Modelo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 gsap.registerPlugin(useGSAP);
@@ -22,11 +25,20 @@ gsap.registerPlugin(useGSAP);
  * Desktop = side-by-side; mobile = tabs (Perguntas / Visualizar).
  * Wraps in a custom `min-h-screen pt-[72px] flex flex-col` shell so the
  * split screen can fill the viewport height without PageShell's padding.
+ *
+ * Quando o usuário termina o último passo, persistimos o documento via
+ * `createDocument` (Firestore em prod, localStorage em demo) e navegamos
+ * para a tela de sucesso com o id real — a SucessoView então pode gerar
+ * o PDF de verdade.
  */
 export function CriarView() {
   const { params, navigate } = useNav();
   const slug = params.slug ?? "";
-  const modelo = getModelo(slug);
+  const { user } = useAuth();
+
+  const [modelo, setModelo] = useState<Modelo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const [step, setStep] = useState(0);
   // `answers` holds the live draft for every key — when the user types, the
@@ -39,6 +51,23 @@ export function CriarView() {
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const questionRef = useRef<HTMLDivElement | null>(null);
   const root = useRef<HTMLDivElement | null>(null);
+
+  const loadModel = useCallback(async () => {
+    setLoading(true);
+    try {
+      const m = await getModel(slug);
+      setModelo(m);
+    } catch (e) {
+      console.error("[CriarView] falha ao carregar modelo:", e);
+      setModelo(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    loadModel();
+  }, [loadModel]);
 
   const campos = modelo?.campos ?? [];
   const total = campos.length;
@@ -64,6 +93,54 @@ export function CriarView() {
     { scope: root, dependencies: [step] }
   );
 
+  // --- Loading skeleton — mantém o split-screen medido pra não pular ---
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-[72px] flex flex-col bg-paper">
+        <div className="px-4 sm:px-6 lg:px-8 py-4 border-b border-[var(--border)] bg-paper">
+          <div className="max-w-7xl mx-auto">
+            <div className="h-4 w-24 rounded-md bg-[var(--blue-soft)]/60 animate-pulse" />
+            <div className="mt-3 h-2 w-full rounded-full bg-[var(--blue-soft)] overflow-hidden">
+              <div className="h-full w-0 bg-[var(--selo-green)]" />
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 lg:grid lg:grid-cols-[45%_55%]">
+          <div
+            className="bg-paper p-6 sm:p-8 lg:p-10 flex flex-col gap-5 min-h-[60vh] lg:min-h-0 animate-pulse"
+            role="status"
+            aria-busy="true"
+            aria-label="Carregando modelo"
+          >
+            <div className="mt-auto space-y-4">
+              <div className="flex gap-3">
+                <div className="shrink-0 w-10 h-10 rounded-full bg-[var(--blue-soft)]" />
+                <div className="bg-surface border border-[var(--border)] rounded-2xl px-5 py-3.5 max-w-[85%]">
+                  <div className="h-4 w-56 rounded-md bg-[var(--blue-soft)]/70" />
+                </div>
+              </div>
+              <div className="h-14 w-full rounded-xl bg-[var(--blue-soft)]/50" />
+              <div className="h-12 w-40 rounded-xl bg-[var(--blue-royal)]/40" />
+            </div>
+          </div>
+          <div className="hidden lg:grid bg-[#efe9dd] p-8 place-items-center min-h-[60vh]">
+            <div className="w-full max-w-[340px] aspect-[1/1.414] bg-white rounded-sm shadow-[0_20px_40px_-20px_rgba(14,35,64,0.3)] p-6 animate-pulse space-y-3">
+              <div className="h-3 w-32 mx-auto rounded bg-[var(--blue-soft)]/70" />
+              <div className="h-px bg-ink/10" />
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-2.5 rounded bg-[var(--blue-soft)]/55"
+                  style={{ width: `${70 + ((i * 11) % 25)}%` }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!modelo) {
     return (
       <div className="min-h-[70vh] pt-[72px] grid place-items-center px-4">
@@ -77,6 +154,7 @@ export function CriarView() {
             nosso catálogo completo.
           </p>
           <button
+            type="button"
             onClick={() => navigate("modelos")}
             className="mt-6 inline-flex items-center justify-center h-12 px-6 rounded-xl bg-[var(--blue-royal)] text-white font-semibold hover:bg-[var(--navy)] transition-colors"
           >
@@ -93,7 +171,7 @@ export function CriarView() {
     setAnswers((prev) => ({ ...prev, [current.key]: value }));
   };
 
-  const handleAvancar = () => {
+  const handleAvancar = async () => {
     if (!current) return;
     const value = (answers[current.key] ?? "").trim();
     if (!value) {
@@ -109,15 +187,34 @@ export function CriarView() {
       return;
     }
     // Persist the trimmed value so the preview/history shows a clean string.
-    setAnswers((prev) => ({ ...prev, [current.key]: value }));
+    const trimmedAnswers = { ...answers, [current.key]: value };
+    setAnswers(trimmedAnswers);
 
     // Brief progress-pulse to celebrate the completed step.
     setPulseProgress(true);
     window.setTimeout(() => setPulseProgress(false), 1300);
 
     if (step + 1 >= total) {
-      const id = `${slug}-${Date.now().toString(36)}`;
-      navigate("sucesso", { slug, id });
+      // Final step — persist the document via services layer, then navigate
+      // to SucessoView with the real id so PDF generation works.
+      setSubmitting(true);
+      try {
+        const userId = user?.uid || "demo";
+        const doc = await createDocument({
+          modeloSlug: modelo.slug,
+          modeloNome: modelo.nome,
+          respostas: trimmedAnswers,
+          status: "concluido",
+          userId,
+        });
+        navigate("sucesso", { slug, id: doc.id });
+      } catch (e) {
+        console.error("[CriarView] falha ao salvar documento:", e);
+        // Não bloqueamos o usuário — navegamos mesmo assim com id vazio pra
+        // que ele não perca o preenchimento. A SucessoView lida com fallback.
+        setSubmitting(false);
+        navigate("sucesso", { slug });
+      }
       return;
     }
     setStep(step + 1);
@@ -245,7 +342,8 @@ export function CriarView() {
                     placeholder={current.placeholder}
                     aria-label={current.pergunta}
                     rows={3}
-                    className="w-full min-h-[3.5rem] px-4 py-3 text-xl rounded-xl bg-surface border border-[var(--blue-soft)] focus:border-[var(--blue-royal)] outline-none transition-colors placeholder:text-ink/40 resize-none"
+                    disabled={submitting}
+                    className="w-full min-h-[3.5rem] px-4 py-3 text-xl rounded-xl bg-surface border border-[var(--blue-soft)] focus:border-[var(--blue-royal)] outline-none transition-colors placeholder:text-ink/40 resize-none disabled:opacity-60"
                   />
                 ) : (
                   <input
@@ -259,7 +357,8 @@ export function CriarView() {
                     placeholder={current.placeholder}
                     aria-label={current.pergunta}
                     inputMode={current.tipo === "number" ? "decimal" : "text"}
-                    className="w-full h-14 px-4 text-xl rounded-xl bg-surface border border-[var(--blue-soft)] focus:border-[var(--blue-royal)] outline-none transition-colors placeholder:text-ink/40"
+                    disabled={submitting}
+                    className="w-full h-14 px-4 text-xl rounded-xl bg-surface border border-[var(--blue-soft)] focus:border-[var(--blue-royal)] outline-none transition-colors placeholder:text-ink/40 disabled:opacity-60"
                   />
                 )}
 
@@ -271,10 +370,20 @@ export function CriarView() {
                   <button
                     type="button"
                     onClick={handleAvancar}
-                    className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-xl bg-[var(--blue-royal)] text-white font-semibold hover:bg-[var(--navy)] active:scale-[0.99] transition-all"
+                    disabled={submitting}
+                    className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-xl bg-[var(--blue-royal)] text-white font-semibold hover:bg-[var(--navy)] active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                   >
-                    {isLast ? "Finalizar documento" : "Avançar"}
-                    <ArrowRight className="w-4 h-4" />
+                    {submitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Salvando…
+                      </>
+                    ) : (
+                      <>
+                        {isLast ? "Finalizar documento" : "Avançar"}
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
                   <kbd className="hidden sm:inline-flex text-xs text-ink/45 px-2 py-1.5 rounded border border-[var(--border)]">
                     Enter ↵
