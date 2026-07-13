@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { COMPANY } from "@/lib/company";
 
 /**
  * Floating WhatsApp button — "Sempre existe uma saída para o humano."
@@ -47,7 +48,7 @@ export function WhatsAppButton() {
       </div>
 
       <a
-        href="https://wa.me/5511999990000?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20um%20documento."
+        href={`${COMPANY.whatsapp}?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20um%20documento.`}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Falar com atendente no WhatsApp"

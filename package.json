@@ -1,7 +1,32 @@
 {
-  "name": "nextjs_tailwind_shadcn_ts",
-  "version": "0.2.0",
+  "name": "docfacil",
+  "version": "0.1.0",
   "private": true,
+  "description": "Documentos legais prontos como numa conversa. Sem juridiquês, sem fricção. Produto da K-HUB Soluções Digitais.",
+  "author": "K-HUB Soluções Digitais <contato@khub.com.br>",
+  "license": "UNLICENSED",
+  "homepage": "https://khub.com.br",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khub-solucoes/docfacil.git",
+    "directory": "/"
+  },
+  "bugs": {
+    "url": "https://github.com/khub-solucoes/docfacil/issues",
+    "email": "contato@khub.com.br"
+  },
+  "keywords": [
+    "docfacil",
+    "documentos-legais",
+    "contratos",
+    "declaracoes",
+    "procuracao",
+    "khub",
+    "k-hub",
+    "nextjs",
+    "typescript",
+    "gsap"
+  ],
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",

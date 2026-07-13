@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { COMPANY } from "@/lib/company";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -18,27 +19,40 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "DocFacil — Documentos legais prontos como numa conversa",
+  title: `${COMPANY.productName} — Documentos legais prontos como numa conversa`,
   description:
     "Sem burocracia, sem juridiquês. Responda perguntas simples e veja seu documento ganhar forma. Modelos revisados com base em prática cartorial real.",
+  applicationName: COMPANY.productName,
   keywords: [
-    "DocFacil",
+    COMPANY.productName,
     "documentos legais",
     "contratos",
     "declarações",
     "procuração",
     "documento online",
+    COMPANY.shortName,
   ],
-  authors: [{ name: "DocFacil" }],
+  authors: [{ name: COMPANY.name, url: COMPANY.url }],
+  creator: COMPANY.name,
+  publisher: COMPANY.name,
+  copyright: `© ${COMPANY.copyrightRange()} ${COMPANY.name}`,
   icons: {
     icon: "/logo.svg",
   },
+  metadataBase: new URL(COMPANY.url),
   openGraph: {
-    title: "DocFacil — Documentos legais prontos como numa conversa",
+    title: `${COMPANY.productName} — Documentos legais prontos como numa conversa`,
     description:
       "Sem burocracia, sem juridiquês. Responda perguntas simples e veja seu documento ganhar forma.",
-    siteName: "DocFacil",
+    siteName: COMPANY.productName,
     type: "website",
+    locale: "pt_BR",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${COMPANY.productName} — Documentos legais prontos como numa conversa`,
+    description:
+      "Sem burocracia, sem juridiquês. Responda perguntas simples e veja seu documento ganhar forma.",
   },
 };
 
