@@ -29,7 +29,7 @@ const COLS: { title: string; links: { label: string; view?: View }[] }[] = [
       { label: "Central de ajuda", view: "ajuda" },
       { label: "Falar com atendente" },
       { label: "Status" },
-      { label: "Termos", view: "termos" },
+      { label: "Termos de Uso", view: "termos" },
     ],
   },
 ];
