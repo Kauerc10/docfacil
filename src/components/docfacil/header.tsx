@@ -98,7 +98,7 @@ export function Header() {
               <button
                 onClick={() => go("perfil")}
                 className="hidden sm:inline-flex items-center gap-2 h-10 px-3 rounded-lg hover:bg-[var(--blue-soft)] transition-colors"
-                title={user.email}
+                aria-label={`Perfil de ${user.nome}`} title={user.email}
               >
                 <span className="grid place-items-center w-7 h-7 rounded-full bg-[var(--blue-soft)] text-[var(--blue-royal)] font-bold text-sm">
                   {user.nome.charAt(0).toUpperCase()}
@@ -110,7 +110,7 @@ export function Header() {
               <button
                 onClick={async () => { await signOut(); go("home"); }}
                 className="hidden sm:inline-flex items-center justify-center h-10 px-3 rounded-lg text-ink/60 hover:text-ink hover:bg-[var(--blue-soft)] font-medium text-sm transition-colors"
-                title="Sair"
+                aria-label="Sair da conta" title="Sair"
               >
                 Sair
               </button>
