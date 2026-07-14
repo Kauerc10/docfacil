@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import {
@@ -14,12 +14,17 @@ import {
   Loader2,
   FileQuestion,
 } from "lucide-react";
-import { toast } from "sonner";
 
 import { PageShell } from "@/components/docfacil/views/page-shell";
 import { AuthGate } from "@/components/docfacil/views/auth-gate";
 import { useNav } from "@/components/docfacil/nav-context";
-import { Selo } from "@/components/docfacil/selo";
+import { getDocument } from "@/lib/services/documents-service";
+import { getModel } from "@/lib/services/models-service";
+import { logger } from "@/lib/logger";
+import { useAsync } from "@/hooks/use-async";
+import type { Documento, Modelo } from "@/lib/types";
+import { DetalhePreview } from "./documento/detalhe-preview";
+import { useDocumentoActions } from "./documento/use-documento-actions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,17 +36,22 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  getDocument,
-  deleteDocument,
-  duplicateDocument,
-} from "@/lib/services/documents-service";
-import { getModel } from "@/lib/services/models-service";
-import { gerarEBaixarPDF } from "@/lib/pdf/generator";
-import type { Documento, Modelo } from "@/lib/types";
 
 gsap.registerPlugin(useGSAP);
 
+/**
+ * DocumentoDetalheView — tela de detalhe de um documento salvo.
+ *
+ * Wraps AuthGate (exige login). Carrega documento + modelo em paralelo via
+ * useAsync (race-condition safe). Delega:
+ *  - preview A4 paginado → DetalhePreview (flip 3D, paginação, formatação
+ *    hierárquica heading1/2/paragraph/signature/witness)
+ *  - ações (Editar / Baixar PDF / Duplicar / Excluir) → useDocumentoActions
+ *    (hook centralizado com actionLoading único + toasts)
+ *
+ * Mantém o layout existente (2-col grid, metadata card, histórico, zoom
+ * toggle, AlertDialog para excluir) — só delega o pesado.
+ */
 export function DocumentoDetalheView() {
   return (
     <AuthGate>
@@ -54,56 +64,44 @@ function DocumentoDetalheContent() {
   const { params, navigate } = useNav();
   const root = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(false);
-  const [doc, setDoc] = useState<Documento | null>(null);
-  const [modelo, setModelo] = useState<Modelo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [actionLoading, setActionLoading] = useState<
-    "download" | "duplicate" | "delete" | null
-  >(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const docId = params.id ?? "";
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!docId) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      setNotFound(false);
-      try {
-        const d = await getDocument(docId);
-        if (cancelled) return;
-        if (!d) {
-          setNotFound(true);
-          setLoading(false);
-          return;
-        }
-        setDoc(d);
-        // Load modelo in parallel — non-blocking: preview can render
-        // without it, but it's nice to show the template's corpo.
-        getModel(d.modeloSlug)
-          .then((m) => {
-            if (!cancelled) setModelo(m);
-          })
-          .catch((e) => console.error("Failed to load modelo:", e));
-      } catch (e) {
-        console.error(e);
-        toast.error("Não foi possível carregar o documento.");
-        setNotFound(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  // === Load doc + model in parallel via useAsync ==========================
+  // Race-condition safe (cancelled flag interno). Refetch via nonce se
+  // docId mudar.
+  const { data, loading } = useAsync(async () => {
+    if (!docId) return null;
+    const doc = await getDocument(docId);
+    if (!doc) return null;
+    // Load modelo em paralelo (non-blocking: preview funciona sem modelo,
+    // mas é bom ter o template preenchido).
+    let modelo: Modelo | null = null;
+    try {
+      modelo = await getModel(doc.modeloSlug);
+    } catch (e) {
+      logger.error("DocumentoDetalhe", "Failed to load modelo", e, {
+        slug: doc.modeloSlug,
+      });
     }
-    load();
-    return () => {
-      cancelled = true;
-    };
+    return { doc, modelo };
   }, [docId]);
 
+  const doc = data?.doc ?? null;
+  const modelo = data?.modelo ?? null;
+
+  // Hook de ações (precisa ser chamado incondicionalmente — regras de hooks).
+  // Quando doc for null, o hook retorna handlers no-op.
+  const {
+    actionLoading,
+    handleEditar,
+    handleBaixarPDF,
+    handleDuplicar,
+    handleExcluir,
+  } = useDocumentoActions(doc, modelo);
+
+  // GSAP stagger na entrada das colunas.
   useGSAP(
     () => {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -122,57 +120,23 @@ function DocumentoDetalheContent() {
     { scope: root, dependencies: [doc?.id] }
   );
 
-  async function handleDownload() {
-    if (!doc) return;
-    if (!modelo) {
-      toast.error("Modelo não encontrado para gerar o PDF.");
-      return;
-    }
-    setActionLoading("download");
-    try {
-      await gerarEBaixarPDF(modelo, doc.respostas, doc.modeloSlug);
-      toast.success("PDF gerado!");
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao gerar PDF. Tente novamente.");
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  async function handleDuplicate() {
-    if (!doc) return;
-    setActionLoading("duplicate");
-    try {
-      const novo = await duplicateDocument(doc.id);
-      if (novo) {
-        toast.success("Documento duplicado!");
-        navigate("dashboard");
-      } else {
-        toast.error("Não foi possível duplicar o documento.");
+  // Campos opcionais do modelo (para o preview tratar vazio como "" em vez
+  // de "______________________"). Calculado ANTES dos early returns pra
+  // respeitar a regra de hooks.
+  const camposOpcionais = useMemo(() => {
+    if (!modelo?.etapas) return [];
+    const out: string[] = [];
+    for (const etapa of modelo.etapas) {
+      if (etapa.tipo === "campo_grupo") {
+        for (const c of etapa.campos) if (c.obrigatorio === false) out.push(c.key);
+      } else if (etapa.tipo === "campo" && etapa.campo.obrigatorio === false) {
+        out.push(etapa.campo.key);
       }
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao duplicar documento.");
-    } finally {
-      setActionLoading(null);
     }
-  }
+    return out;
+  }, [modelo]);
 
-  async function handleDelete() {
-    if (!doc) return;
-    setActionLoading("delete");
-    try {
-      await deleteDocument(doc.id);
-      toast.success("Documento excluído.");
-      navigate("dashboard");
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao excluir documento.");
-      setActionLoading(null);
-    }
-  }
-
+  // === Loading skeleton ====================================================
   if (loading) {
     return (
       <PageShell>
@@ -183,7 +147,8 @@ function DocumentoDetalheContent() {
     );
   }
 
-  if (notFound || !doc) {
+  // === Not found ===========================================================
+  if (!doc) {
     return (
       <PageShell>
         <div className="max-w-md mx-auto px-5 sm:px-8 py-16 sm:py-24 text-center">
@@ -213,6 +178,7 @@ function DocumentoDetalheContent() {
     );
   }
 
+  // === Computed metadata ===================================================
   const isDone = doc.status === "concluido";
   const criadoFmt = new Date(doc.criadoEm).toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -225,31 +191,26 @@ function DocumentoDetalheContent() {
     year: "numeric",
   });
 
-  // Build historico entries from real timestamps.
   const historico: { acao: string; quando: string }[] = [
     {
       acao: `Documento criado a partir do modelo ${doc.modeloNome}`,
-      quando: `${criadoFmt}`,
+      quando: criadoFmt,
     },
   ];
   if (doc.atualizadoEm !== doc.criadoEm) {
     historico.unshift({
       acao: "Documento atualizado",
-      quando: `${atualizadoFmt}`,
+      quando: atualizadoFmt,
     });
   }
 
-  // Preview paragraphs: prefer the model's template filled with respostas.
-  const previewParagraphs =
-    modelo?.template.corpo?.map((linha) => fillTemplate(linha, doc.respostas)) ??
-    fallbackPreview(doc);
+  // Preview: se modelo carregou, usa o template real (com paginação flip 3D
+  // do DetalhePreview). Se não, mostra um fallback simples com as respostas.
+  const temTemplateCompleto = !!modelo?.template?.corpo?.length;
 
   return (
     <PageShell>
-      <div
-        ref={root}
-        className="max-w-6xl mx-auto px-5 sm:px-8 py-8 sm:py-12"
-      >
+      <div ref={root} className="max-w-6xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
         {/* Back */}
         <button
           type="button"
@@ -261,7 +222,7 @@ function DocumentoDetalheContent() {
         </button>
 
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-8 lg:gap-12">
-          {/* LEFT — A4 preview */}
+          {/* LEFT — A4 preview (delegate to DetalhePreview) */}
           <div data-det="col" className="order-2 lg:order-1">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-ink/60 uppercase tracking-wider">
@@ -284,11 +245,19 @@ function DocumentoDetalheContent() {
                 zoom ? "scale-[1.04] origin-top" : "scale-100",
               ].join(" ")}
             >
-              <A4Preview
-                docId={doc.id}
-                titulo={modelo?.template.titulo ?? doc.modeloNome}
-                paragraphs={previewParagraphs}
-              />
+              {temTemplateCompleto && modelo ? (
+                <div className="w-full max-w-[420px]">
+                  <DetalhePreview
+                    docId={doc.id}
+                    titulo={modelo.template.titulo}
+                    corpo={modelo.template.corpo}
+                    respostas={doc.respostas}
+                    camposOpcionais={camposOpcionais}
+                  />
+                </div>
+              ) : (
+                <FallbackPreview doc={doc} />
+              )}
             </div>
 
             <p className="mt-3 text-center text-xs text-ink/45">
@@ -343,15 +312,14 @@ function DocumentoDetalheContent() {
               </dl>
             </section>
 
-            {/* Actions */}
+            {/* Actions — delegates to useDocumentoActions */}
             <section aria-label="Ações" className="space-y-2.5">
               <ActionButton
                 primary
                 icon={<Pencil className="w-4 h-4" aria-hidden="true" />}
                 label="Editar respostas"
-                onClick={() =>
-                  navigate("criar", { slug: doc.modeloSlug })
-                }
+                onClick={handleEditar}
+                disabled={actionLoading !== null}
               />
               <ActionButton
                 icon={
@@ -362,7 +330,9 @@ function DocumentoDetalheContent() {
                   )
                 }
                 label={actionLoading === "download" ? "Gerando PDF..." : "Baixar PDF"}
-                onClick={handleDownload}
+                onClick={() => {
+                  void handleBaixarPDF();
+                }}
                 disabled={actionLoading !== null}
               />
               <ActionButton
@@ -374,7 +344,9 @@ function DocumentoDetalheContent() {
                   )
                 }
                 label={actionLoading === "duplicate" ? "Duplicando..." : "Duplicar"}
-                onClick={handleDuplicate}
+                onClick={() => {
+                  void handleDuplicar();
+                }}
                 disabled={actionLoading !== null}
               />
 
@@ -382,7 +354,11 @@ function DocumentoDetalheContent() {
                 docNome={doc.modeloNome}
                 loading={actionLoading === "delete"}
                 disabled={actionLoading !== null && actionLoading !== "delete"}
-                onConfirm={handleDelete}
+                open={confirmDelete}
+                onOpenChange={setConfirmDelete}
+                onConfirm={() => {
+                  void handleExcluir();
+                }}
               />
             </section>
 
@@ -417,31 +393,7 @@ function DocumentoDetalheContent() {
   );
 }
 
-/** Substitui {{key}} no template pelos valores das respostas. */
-function fillTemplate(template: string, respostas: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-    const v = respostas[key];
-    return v && v.trim() ? v : "______________________";
-  });
-}
-
-/** Caso o modelo não esteja disponível, montamos um preview simples das respostas. */
-function fallbackPreview(doc: Documento): string[] {
-  const entries = Object.entries(doc.respostas);
-  if (entries.length === 0) {
-    return [
-      "Este documento ainda não possui respostas preenchidas. Clique em “Editar respostas” para começar.",
-    ];
-  }
-  return entries.map(([key, value]) => `${labelify(key)}: ${value}`);
-}
-
-function labelify(key: string): string {
-  return key
-    .replace(/[_-]/g, " ")
-    .replace(/^\w/, (c) => c.toUpperCase());
-}
-
+/** Linha de metadata (dt + dd alinhados). */
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
@@ -451,6 +403,7 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Botão de ação padrão (primário ou outline). */
 function ActionButton({
   icon,
   label,
@@ -482,19 +435,24 @@ function ActionButton({
   );
 }
 
+/** Ação de excluir com confirmação (AlertDialog). */
 function DeleteAction({
   docNome,
   onConfirm,
   loading,
   disabled,
+  open,
+  onOpenChange,
 }: {
   docNome: string;
   onConfirm: () => void;
   loading: boolean;
   disabled: boolean;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
 }) {
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>
         <button
           type="button"
@@ -531,69 +489,48 @@ function DeleteAction({
   );
 }
 
-function A4Preview({
-  docId,
-  titulo,
-  paragraphs,
-}: {
-  docId: string;
-  titulo: string;
-  paragraphs: string[];
-}) {
+/**
+ * Fallback simples quando o modelo não está disponível (ex.: deletado do
+ * catálogo). Mostra as respostas em chave: valor numa folha A4 estática.
+ */
+function FallbackPreview({ doc }: { doc: Documento }) {
+  const entries = Object.entries(doc.respostas);
   return (
-    <div
-      data-doc-id={docId}
-      className="relative w-full max-w-[420px] aspect-[1/1.414] bg-white rounded-sm shadow-[0_18px_44px_-20px_rgba(14,35,64,0.35),0_2px_8px_-4px_rgba(14,35,64,0.18)] overflow-hidden ring-1 ring-black/5"
-    >
-      <Selo variant="watermark" />
-
-      <div className="relative h-full px-7 sm:px-9 py-8 sm:py-10 text-ink overflow-hidden">
-        <p className="text-[10px] sm:text-xs uppercase tracking-[0.18em] text-ink/45">
-          DocFacil · ID {docId}
-        </p>
-        <h3 className="mt-3 font-[family-name:var(--font-jakarta)] text-base sm:text-lg font-extrabold tracking-tight text-center uppercase">
-          {titulo}
-        </h3>
-        <div className="mt-2 mx-auto w-12 h-px bg-ink/20" />
-
-        <div className="mt-5 space-y-3 text-[11px] sm:text-[13px] leading-relaxed text-ink/85">
-          {paragraphs.slice(0, 8).map((p, i) => (
-            <p key={i} className="text-justify">
-              {p}
+    <div className="relative w-full max-w-[420px] aspect-[1/1.414] bg-white rounded-sm shadow-[0_18px_44px_-20px_rgba(14,35,64,0.35),0_2px_8px_-4px_rgba(14,35,64,0.18)] overflow-hidden ring-1 ring-black/5 p-8">
+      <p className="text-[10px] sm:text-xs uppercase tracking-[0.18em] text-ink/45">
+        DocFacil · ID {doc.id}
+      </p>
+      <h3 className="mt-3 font-[family-name:var(--font-jakarta)] text-base sm:text-lg font-extrabold tracking-tight text-center uppercase">
+        {doc.modeloNome}
+      </h3>
+      <div className="mt-2 mx-auto w-12 h-px bg-ink/20" />
+      <div className="mt-5 space-y-3 text-[11px] sm:text-[13px] leading-relaxed text-ink/85">
+        {entries.length === 0 ? (
+          <p className="italic text-ink/55">
+            Este documento ainda não possui respostas preenchidas.
+          </p>
+        ) : (
+          entries.map(([key, value]) => (
+            <p key={key} className="text-justify">
+              <span className="font-semibold capitalize">
+                {key.replace(/[_-]/g, " ")}:
+              </span>{" "}
+              {value}
             </p>
-          ))}
-          {paragraphs.length > 8 && (
-            <p className="text-center text-ink/40 italic">
-              ... (mais {paragraphs.length - 8} parágrafo
-              {paragraphs.length - 8 !== 1 ? "s" : ""})
-            </p>
-          )}
-        </div>
-
-        {/* Signature lines */}
-        <div className="absolute left-7 right-7 sm:left-9 sm:right-9 bottom-8 sm:bottom-10 grid grid-cols-2 gap-6">
-          <SignatureBlock label="PARTE 1" />
-          <SignatureBlock label="PARTE 2" />
-        </div>
+          ))
+        )}
       </div>
     </div>
   );
 }
 
-function SignatureBlock({ label }: { label: string }) {
-  return (
-    <div className="text-center">
-      <div className="border-t border-ink/40" />
-      <p className="mt-1.5 text-[9px] sm:text-[10px] uppercase tracking-wider text-ink/55">
-        {label}
-      </p>
-    </div>
-  );
-}
-
+/** Skeleton da tela de detalhe (loading). */
 function DetalheSkeleton() {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-8 lg:gap-12" aria-hidden="true">
+    <div
+      className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-8 lg:gap-12"
+      aria-hidden="true"
+    >
       <div className="order-2 lg:order-1">
         <div className="h-4 bg-[var(--blue-soft)]/50 rounded w-32 animate-pulse mb-3" />
         <div className="aspect-[1/1.414] max-w-[420px] mx-auto rounded-sm bg-[var(--blue-soft)]/25 animate-pulse" />

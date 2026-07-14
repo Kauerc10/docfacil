@@ -29,7 +29,7 @@ const COLS: { title: string; links: { label: string; view?: View }[] }[] = [
       { label: "Central de ajuda", view: "ajuda" },
       { label: "Falar com atendente" },
       { label: "Status" },
-      { label: "Termos" },
+      { label: "Termos", view: "termos" },
     ],
   },
 ];
@@ -113,9 +113,24 @@ export function Footer() {
               {COMPANY.tagline}
             </p>
             <div className="flex items-center gap-4">
-              <button className="hover:text-white/80 transition-colors">Privacidade</button>
-              <button className="hover:text-white/80 transition-colors">Termos</button>
-              <button className="hover:text-white/80 transition-colors">Cookies</button>
+              <button
+                onClick={() => navigate("privacidade")}
+                className="hover:text-white/80 transition-colors"
+              >
+                Privacidade
+              </button>
+              <button
+                onClick={() => navigate("termos")}
+                className="hover:text-white/80 transition-colors"
+              >
+                Termos
+              </button>
+              <button
+                onClick={() => navigate("cookies")}
+                className="hover:text-white/80 transition-colors"
+              >
+                Cookies
+              </button>
             </div>
           </div>
 

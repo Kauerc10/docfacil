@@ -23,6 +23,36 @@ export interface TemplateModelo {
   corpo: string[];
 }
 
+/**
+ * Cláusula dinâmica opcional (parágrafo inserido no template quando selecionada).
+ * O template usa `{{clausula:id}}` para marcar o ponto de inserção.
+ */
+export interface ClausulaDinamica {
+  /** id único — usado em `{{clausula:id}}` no template */
+  id: string;
+  titulo: string;
+  descricao: string;
+  /** corpo injetado no documento quando a cláusula é selecionada */
+  corpo: string;
+  /** campos extras mostrados quando a cláusula é selecionada */
+  camposExtras?: CampoModelo[];
+}
+
+/** Tipos de etapa do fluxo /criar. */
+export type TipoEtapa = "campo" | "campo_grupo" | "clausulas";
+
+/**
+ * Etapa do fluxo /criar. Cada etapa é um dos três tipos:
+ *  - "campo"       = uma única pergunta (1 CampoModelo)
+ *  - "campo_grupo" = vários campos relacionados em um único card
+ *                    (ex.: endereço com CEP → logradouro → bairro → cidade → UF)
+ *  - "clausulas"   = lista de cláusulas dinâmicas opcionais
+ */
+export type EtapaModelo =
+  | { tipo: "campo"; campo: CampoModelo }
+  | { tipo: "campo_grupo"; tituloGrupo?: string; campos: CampoModelo[] }
+  | { tipo: "clausulas"; titulo?: string; clausulas: ClausulaDinamica[] };
+
 export interface Modelo {
   slug: string;
   nome: string;
@@ -32,6 +62,11 @@ export interface Modelo {
   minutos: number;
   popular?: boolean;
   icone: "key" | "home" | "handshake" | "family" | "receipt" | "seal";
+  /** Etapas do fluxo /criar (source of truth). Quando ausente, o fluxo cai
+   *  back para `campos` (1 etapa por campo). */
+  etapas?: EtapaModelo[];
+  /** Campos derivados das etapas (ou definidos diretamente quando `etapas`
+   *  está ausente). */
   campos: CampoModelo[];
   template: TemplateModelo;
   /** timestamps do Firestore (quando vindo do backend) */

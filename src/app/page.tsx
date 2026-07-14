@@ -24,6 +24,11 @@ import { PerfilView } from "@/components/docfacil/views/perfil-view";
 import { AjudaView } from "@/components/docfacil/views/ajuda-view";
 import { LoginView } from "@/components/docfacil/views/login-view";
 import { CadastroView } from "@/components/docfacil/views/cadastro-view";
+import { TermosView } from "@/components/docfacil/views/termos-view";
+import { PrivacidadeView } from "@/components/docfacil/views/privacidade-view";
+import { CookiesView } from "@/components/docfacil/views/cookies-view";
+import { CheckoutView } from "@/components/docfacil/views/checkout-view";
+import { CookieBanner } from "@/components/docfacil/cookie-banner";
 
 function HomeView() {
   return (
@@ -67,6 +72,14 @@ function CurrentView() {
       return <LoginView />;
     case "cadastro":
       return <CadastroView />;
+    case "termos":
+      return <TermosView />;
+    case "privacidade":
+      return <PrivacidadeView />;
+    case "cookies":
+      return <CookiesView />;
+    case "checkout":
+      return <CheckoutView />;
     default:
       return <HomeView />;
   }
@@ -84,6 +97,7 @@ export default function Home() {
           </main>
           <Footer />
           <WhatsAppButton />
+          <CookieBanner />
         </div>
       </NavProvider>
     </AuthProvider>

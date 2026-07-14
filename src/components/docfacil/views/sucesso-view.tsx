@@ -6,10 +6,16 @@ import { useGSAP } from "@gsap/react";
 import { ArrowLeft, Check, Copy, Download, Loader2, Mail, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Selo } from "../selo";
+import { Pet } from "../pet";
+import { Confetti } from "../confetti";
+import { PaymentBarrier } from "../payment-barrier";
 import { useNav } from "../nav-context";
+import { useAuth } from "@/lib/auth-context";
 import { getModel } from "@/lib/services/models-service";
 import { getDocument } from "@/lib/services/documents-service";
 import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf/generator";
+import { logger } from "@/lib/logger";
+import { SUCCESS_MESSAGES, ERROR_MESSAGES } from "@/lib/constants";
 import type { Modelo } from "@/lib/types";
 import { PageShell, PageHeader } from "./page-shell";
 
@@ -19,26 +25,32 @@ gsap.registerPlugin(useGSAP);
  * SucessoView — the standalone success / download screen, shown right after
  * the user finishes a document in CriarView. This is the brand climax:
  * the green DOCFACIL stamp "strikes" the A4 sheet (scale overshoot + small
- * yoyo shake), then the single coral CTA breathes in.
+ * yoyo shake), then the single coral CTA breathes in. Confetti fires on
+ * mount (3s).
  *
- * Distinct from SuccessShowcase (the home-page marketing version): this one
- * fires on mount (not on scroll) and uses the real model the user just filled.
+ * Auth-aware CTA:
+ *  - !user (deslogado) → PaymentBarrier (R$ 9,90 avulso ou login) em vez do
+ *    botão direto de download. O usuário só baixa o PDF após pagar ou entrar.
+ *  - user (logado)    → botão coral "Baixar Documento (PDF)" direto +
+ *    share icons + upsell "Crie uma conta Pro" (se grátis).
  *
- * Wiring pós-Task 5:
- * - Modelo vem de `getModel(slug)` (Firestore/local via services).
- * - `params.id` (passado pela CriarView) carrega o documento salvo em si
- *   via `getDocument(id)`, pra mostrar as respostas reais na prévia A4.
- * - O botão coral chama `gerarEBaixarPDF(modelo, respostas, slug)` de
- *   verdade (pdfmake carregado dinamicamente na primeira chamada).
+ * Wiring:
+ *  - Modelo vem de `getModel(slug)` (Firestore/local via services).
+ *  - `params.id` (passado pela CriarView) carrega o documento salvo via
+ *    `getDocument(id)`, pra mostrar as respostas reais na prévia A4.
+ *  - O botão coral chama `gerarEBaixarPDF(modelo, respostas, slug)` de
+ *    verdade (pdfmake carregado dinamicamente na primeira chamada).
  */
 export function SucessoView() {
   const { params, navigate } = useNav();
   const slug = params.slug ?? "";
   const docId = params.id;
+  const { user } = useAuth();
 
   const root = useRef<HTMLDivElement | null>(null);
   const [copied, setCopied] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(true);
 
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [respostas, setRespostas] = useState<Record<string, string>>({});
@@ -57,7 +69,7 @@ export function SucessoView() {
       // Se não há doc (ex.: veio do SuccessShowcase demo da home), segue
       // com respostas vazias — a prévia mostra ____________, como antes.
     } catch (e) {
-      console.error("[SucessoView] falha ao carregar:", e);
+      logger.error("SucessoView", "falha ao carregar", e, { slug, docId });
       setModelo(null);
     } finally {
       setLoading(false);
@@ -74,6 +86,13 @@ export function SucessoView() {
     preloadPdfmake().catch(() => {
       /* silent — o botão ainda vai funcionar, só será mais lento na 1ª vez */
     });
+  }, []);
+
+  // Confetti: some após 3s (também some automaticamente via Confetti internals,
+  // mas garantimos o unmount pra liberar os 40 elementos do DOM).
+  useEffect(() => {
+    const t = setTimeout(() => setShowConfetti(false), 3000);
+    return () => clearTimeout(t);
   }, []);
 
   // Stamp strike — fires on mount (no ScrollTrigger needed, user just landed).
@@ -127,12 +146,12 @@ export function SucessoView() {
     setGerandoPdf(true);
     try {
       await gerarEBaixarPDF(modelo, respostas, modelo.slug);
-      toast.success("PDF gerado!", {
+      toast.success(SUCCESS_MESSAGES.PDF_GENERATED, {
         description: `Seu ${modelo.nome} foi baixado.`,
       });
     } catch (e) {
-      console.error("[SucessoView] falha ao gerar PDF:", e);
-      toast.error("Não foi possível gerar o PDF.", {
+      logger.error("SucessoView", "falha ao gerar PDF", e, { slug });
+      toast.error(ERROR_MESSAGES.PDF_FAILED, {
         description: "Tente novamente em alguns segundos.",
       });
     } finally {
@@ -207,6 +226,8 @@ export function SucessoView() {
 
   return (
     <PageShell className="bg-[var(--green-tint)]/40 min-h-screen">
+      {showConfetti && <Confetti duration={3000} />}
+
       <div ref={root} className="mx-auto max-w-2xl px-4 sm:px-6 py-10 sm:py-14">
         <PageHeader
           eyebrow="Documento pronto"
@@ -277,86 +298,114 @@ export function SucessoView() {
           </div>
         </div>
 
-        {/* CTA + share + upsell */}
-        <div className="mt-8 text-center">
-          <button
-            data-suc="cta"
-            type="button"
-            onClick={handleBaixarPDF}
-            disabled={gerandoPdf}
-            aria-busy={gerandoPdf}
-            className="coral-pulse inline-flex items-center justify-center gap-2.5 h-14 w-full sm:w-auto sm:px-10 rounded-2xl bg-[var(--coral)] text-white font-bold text-lg hover:bg-[var(--coral-hover)] active:scale-[0.99] transition-colors disabled:opacity-80 disabled:cursor-not-allowed"
-          >
-            {gerandoPdf ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Gerando PDF…
-              </>
-            ) : (
-              <>
-                <Download className="w-5 h-5" />
-                Baixar Documento (PDF)
-              </>
-            )}
-          </button>
-
-          <div className="mt-5 flex items-center justify-center gap-3">
+        {/* CTA + share + upsell — auth-aware branching */}
+        {user ? (
+          <div className="mt-8 text-center">
             <button
-              data-suc="secondary"
+              data-suc="cta"
               type="button"
-              aria-label="Compartilhar no WhatsApp"
-              className="grid place-items-center w-11 h-11 rounded-full border border-[var(--border)] text-ink/70 hover:bg-[var(--blue-soft)] hover:text-[var(--blue-royal)] transition-colors"
+              onClick={handleBaixarPDF}
+              disabled={gerandoPdf}
+              aria-busy={gerandoPdf}
+              className="coral-pulse inline-flex items-center justify-center gap-2.5 h-14 w-full sm:w-auto sm:px-10 rounded-2xl bg-[var(--coral)] text-white font-bold text-lg hover:bg-[var(--coral-hover)] active:scale-[0.99] transition-colors disabled:opacity-80 disabled:cursor-not-allowed"
             >
-              <MessageCircle className="w-4 h-4" />
-            </button>
-            <button
-              data-suc="secondary"
-              type="button"
-              aria-label="Enviar por e-mail"
-              className="grid place-items-center w-11 h-11 rounded-full border border-[var(--border)] text-ink/70 hover:bg-[var(--blue-soft)] hover:text-[var(--blue-royal)] transition-colors"
-            >
-              <Mail className="w-4 h-4" />
-            </button>
-            <button
-              data-suc="secondary"
-              type="button"
-              onClick={handleCopyLink}
-              aria-label={copied ? "Link copiado" : "Copiar link"}
-              className="grid place-items-center w-11 h-11 rounded-full border border-[var(--border)] text-ink/70 hover:bg-[var(--blue-soft)] hover:text-[var(--blue-royal)] transition-colors"
-            >
-              {copied ? (
-                <Check className="w-4 h-4 text-[var(--selo-green)]" />
+              {gerandoPdf ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Gerando PDF…
+                </>
               ) : (
-                <Copy className="w-4 h-4" />
+                <>
+                  <Download className="w-5 h-5" />
+                  Baixar Documento (PDF)
+                </>
               )}
             </button>
-          </div>
-          {copied && (
-            <p className="mt-2 text-xs text-[var(--selo-green)] font-semibold">
-              Link copiado para a área de transferência
-            </p>
-          )}
 
-          <p data-suc="upsell" className="mt-7 text-sm text-ink/60">
-            Quer editar isso depois?{" "}
+            <div className="mt-5 flex items-center justify-center gap-3">
+              <button
+                data-suc="secondary"
+                type="button"
+                aria-label="Compartilhar no WhatsApp"
+                className="grid place-items-center w-11 h-11 rounded-full border border-[var(--border)] text-ink/70 hover:bg-[var(--blue-soft)] hover:text-[var(--blue-royal)] transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+              </button>
+              <button
+                data-suc="secondary"
+                type="button"
+                aria-label="Enviar por e-mail"
+                className="grid place-items-center w-11 h-11 rounded-full border border-[var(--border)] text-ink/70 hover:bg-[var(--blue-soft)] hover:text-[var(--blue-royal)] transition-colors"
+              >
+                <Mail className="w-4 h-4" />
+              </button>
+              <button
+                data-suc="secondary"
+                type="button"
+                onClick={handleCopyLink}
+                aria-label={copied ? "Link copiado" : "Copiar link"}
+                className="grid place-items-center w-11 h-11 rounded-full border border-[var(--border)] text-ink/70 hover:bg-[var(--blue-soft)] hover:text-[var(--blue-royal)] transition-colors"
+              >
+                {copied ? (
+                  <Check className="w-4 h-4 text-[var(--selo-green)]" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+            {copied && (
+              <p className="mt-2 text-xs text-[var(--selo-green)] font-semibold">
+                Link copiado para a área de transferência
+              </p>
+            )}
+
+            <p data-suc="upsell" className="mt-7 text-sm text-ink/60">
+              Quer editar isso depois?{" "}
+              <button
+                type="button"
+                onClick={() => navigate("planos")}
+                className="text-[var(--blue-royal)] font-semibold hover:underline"
+              >
+                Conheça o plano Pro
+              </button>
+            </p>
+
             <button
               type="button"
-              onClick={() => navigate("cadastro")}
-              className="text-[var(--blue-royal)] font-semibold hover:underline"
+              onClick={() => navigate("home")}
+              className="mt-6 inline-flex items-center gap-1.5 text-sm text-ink/55 hover:text-[var(--blue-royal)] font-medium transition-colors"
             >
-              Crie uma conta grátis
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Voltar ao início
             </button>
-          </p>
+          </div>
+        ) : (
+          <div className="mt-8">
+            <PaymentBarrier
+              documentoNome={modelo.nome}
+              slug={modelo.slug}
+              docId={docId}
+              onLogin={() => navigate("login")}
+            />
 
-          <button
-            type="button"
-            onClick={() => navigate("home")}
-            className="mt-6 inline-flex items-center gap-1.5 text-sm text-ink/55 hover:text-[var(--blue-royal)] font-medium transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Voltar ao início
-          </button>
-        </div>
+            {/* Mascote + reassurance abaixo da barreira */}
+            <div className="mt-8 flex flex-col items-center text-center gap-3">
+              <Pet mood="atencao" size={64} />
+              <p className="text-sm text-ink/60 max-w-sm">
+                Você preencheu tudo certinho. Para baixar o PDF sem marca
+                d&apos;água, faça o pagamento único ou entre na sua conta.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate("home")}
+                className="mt-3 inline-flex items-center gap-1.5 text-sm text-ink/55 hover:text-[var(--blue-royal)] font-medium transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Voltar ao início
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </PageShell>
   );

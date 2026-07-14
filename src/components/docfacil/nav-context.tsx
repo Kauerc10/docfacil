@@ -21,12 +21,16 @@ export type View =
   | "sucesso"
   | "ia"
   | "planos"
+  | "checkout"
   | "dashboard"
   | "documento-detalhe"
   | "perfil"
   | "ajuda"
   | "login"
-  | "cadastro";
+  | "cadastro"
+  | "termos"
+  | "privacidade"
+  | "cookies";
 
 type NavParams = Record<string, string | undefined>;
 

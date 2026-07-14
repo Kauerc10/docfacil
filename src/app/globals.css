@@ -280,6 +280,21 @@
     font-weight: 500;
     color: var(--selo-green);
   }
+
+  /* === Cookie banner — slide-up + fade on open === */
+  .docfacil-cookie-banner[data-state="open"] {
+    animation: docfacil-cookie-slide-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes docfacil-cookie-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 @layer utilities {

@@ -1,35 +1,49 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import gsap from "gsap";
-import { useGSAP } from "@gsap/react";
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
-import { Selo } from "../selo";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNav } from "../nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { getModel } from "@/lib/services/models-service";
 import { createDocument } from "@/lib/services/documents-service";
-import type { CampoModelo, Modelo } from "@/lib/types";
-import { cn } from "@/lib/utils";
-
-gsap.registerPlugin(useGSAP);
+import { normalizarEstado } from "@/lib/normalizers";
+import { logger } from "@/lib/logger";
+import { UX_CONFIG } from "@/lib/constants";
+import type { Modelo, EtapaModelo } from "@/lib/types";
+import type {
+  EtapaModelo as ChatEtapa,
+  PetMood,
+  RespostasState,
+} from "./criar/types";
+import { ChatStep } from "./criar/chat-step";
+import { PreviewA4 } from "./criar/preview-a4";
+import { CriarLayout } from "./criar/layout";
+import {
+  CriarLoading,
+  CriarModeloNaoEncontrado,
+} from "./criar/loading-states";
+import { LoadingDocumento } from "../loading-documento";
 
 /**
- * CriarView — the heart of the DocFacil product.
+ * CriarView — thin orchestrator (~250 lines) for the DocFacil "Concierge" flow.
  *
- * A split-screen "Concierge" filling flow: on the left, one question at a
- * time with a large input (the way a notary's assistant would guide you);
- * on the right, an A4 "Ateliê" preview that fills in live as you answer,
- * with a brief blue highlight (field-land) every time a placeholder lands.
+ * Delegates rendering to extracted subcomponents (ChatStep, PreviewA4,
+ * CriarLayout, CriarLoading, CriarModeloNaoEncontrado, LoadingDocumento) and
+ * keeps only:
+ *  - state (stepIndex, answers, clausulasChecked, petMood, fieldError,
+ *    submitting, mostrandoLoading)
+ *  - the etapasEfetivas computation (static model.etapas + dynamic clause
+ *    extras as separate "campo" steps for each selected clause with extras)
+ *  - handleAvancar (validate → normalize estado → advance | save)
+ *  - salvarDocumento (LoadingDocumento 1.5s → createDocument → navigate sucesso)
  *
- * Desktop = side-by-side; mobile = tabs (Perguntas / Visualizar).
- * Wraps in a custom `min-h-screen pt-[72px] flex flex-col` shell so the
- * split screen can fill the viewport height without PageShell's padding.
+ * Translation model:
+ *   modelos.ts EtapaModelo ("campo" | "campo_grupo" | "clausulas")
+ *     ↓ traduzirParaChatStep
+ *   criar/types.ts EtapaModelo ("pergunta" | "grupo" | "clausulas")
  *
- * Quando o usuário termina o último passo, persistimos o documento via
- * `createDocument` (Firestore em prod, localStorage em demo) e navegamos
- * para a tela de sucesso com o id real — a SucessoView então pode gerar
- * o PDF de verdade.
+ * The criar/ subcomponents still use the older naming ("pergunta" / "grupo")
+ * because ChatStep, CampoPergunta, and GrupoCampos were built before the
+ * modelos.ts etapas structure — we translate at the boundary.
  */
 export function CriarView() {
   const { params, navigate } = useNav();
@@ -39,26 +53,29 @@ export function CriarView() {
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [mostrandoLoading, setMostrandoLoading] = useState(false);
 
-  const [step, setStep] = useState(0);
-  // `answers` holds the live draft for every key — when the user types, the
-  // Ateliê preview updates instantly; when they advance, the answer is
-  // already saved. No separate `draft` state, no effect-reset cycle.
+  const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [clausulasSelecionadas, setClausulasSelecionadas] = useState<string[]>([]);
+  const [extrasPorClausula, setExtrasPorClausula] = useState<
+    Record<string, Record<string, string>>
+  >({});
+  const [petMood, setPetMood] = useState<PetMood>("falando");
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<"perguntas" | "visualizar">("perguntas");
   const [pulseProgress, setPulseProgress] = useState(false);
 
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
-  const questionRef = useRef<HTMLDivElement | null>(null);
-  const root = useRef<HTMLDivElement | null>(null);
+  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // === Load model ===========================================================
   const loadModel = useCallback(async () => {
     setLoading(true);
     try {
       const m = await getModel(slug);
       setModelo(m);
     } catch (e) {
-      console.error("[CriarView] falha ao carregar modelo:", e);
+      logger.error("CriarView", "falha ao carregar modelo", e, { slug });
       setModelo(null);
     } finally {
       setLoading(false);
@@ -69,422 +86,318 @@ export function CriarView() {
     loadModel();
   }, [loadModel]);
 
-  const campos = modelo?.campos ?? [];
-  const total = campos.length;
-  const current: CampoModelo | undefined = campos[step];
-
-  // Focus the input whenever a new question appears.
+  // Cleanup pending timers on unmount.
   useEffect(() => {
-    const t = window.setTimeout(() => inputRef.current?.focus(), 60);
-    return () => window.clearTimeout(t);
-  }, [step]);
+    return () => {
+      if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    };
+  }, []);
 
-  // GSAP entrance for the current question bubble.
-  useGSAP(
-    () => {
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-      if (!questionRef.current) return;
-      gsap.fromTo(
-        questionRef.current,
-        { y: 20, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }
-      );
-    },
-    { scope: root, dependencies: [step] }
+  // === etapasEfetivas =======================================================
+  // Static model.etapas + dynamic "campo" steps for each selected clause's
+  // camposExtras. Recomputed when selection changes.
+  const etapasEfetivas: EtapaModelo[] = useMemo(() => {
+    if (!modelo?.etapas) return [];
+    const out: EtapaModelo[] = [];
+    for (const etapa of modelo.etapas) {
+      out.push(etapa);
+      if (etapa.tipo === "clausulas") {
+        for (const clausula of etapa.clausulas) {
+          if (
+            clausulasSelecionadas.includes(clausula.id) &&
+            clausula.camposExtras &&
+            clausula.camposExtras.length > 0
+          ) {
+            for (const extra of clausula.camposExtras) {
+              out.push({ tipo: "campo", campo: extra });
+            }
+          }
+        }
+      }
+    }
+    return out;
+  }, [modelo, clausulasSelecionadas]);
+
+  const totalEtapas = etapasEfetivas.length;
+  const etapaAtual = etapasEfetivas[stepIndex];
+  const isLast = stepIndex + 1 >= totalEtapas;
+
+  // Campos opcionais (obrigatorio === false) → viram string vazia no preview
+  // em vez de "______________________" quando não preenchidos.
+  const camposOpcionais = useMemo(() => {
+    if (!modelo?.etapas) return [];
+    const out: string[] = [];
+    for (const etapa of modelo.etapas) {
+      if (etapa.tipo === "campo_grupo") {
+        for (const c of etapa.campos) if (c.obrigatorio === false) out.push(c.key);
+      } else if (etapa.tipo === "campo" && etapa.campo.obrigatorio === false) {
+        out.push(etapa.campo.key);
+      }
+    }
+    return out;
+  }, [modelo]);
+
+  // clausulas selecionadas → id:corpo para o preview
+  const clausulasMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (!modelo?.etapas) return map;
+    for (const etapa of modelo.etapas) {
+      if (etapa.tipo === "clausulas") {
+        for (const cl of etapa.clausulas) {
+          if (clausulasSelecionadas.includes(cl.id)) map[cl.id] = cl.corpo;
+        }
+      }
+    }
+    return map;
+  }, [modelo, clausulasSelecionadas]);
+
+  // === Pet mood cycle =======================================================
+  // "falando" por padrão (initial state), "feliz" por 600ms ao avançar,
+  // "atencao" em erro de validação, "pensando" enquanto salva.
+  // Gerenciado manualmente nos handlers — sem useEffect (evita cascading
+  // renders e respeita a regra react-hooks/set-state-in-effect).
+
+  // === Respostas state (campos + clausulas) ================================
+  const respostas: RespostasState = useMemo(
+    () => ({ campos: answers, clausulasSelecionadas }),
+    [answers, clausulasSelecionadas]
   );
 
-  // --- Loading skeleton — mantém o split-screen medido pra não pular ---
-  if (loading) {
-    return (
-      <div className="min-h-screen pt-[72px] flex flex-col bg-paper">
-        <div className="px-4 sm:px-6 lg:px-8 py-4 border-b border-[var(--border)] bg-paper">
-          <div className="max-w-7xl mx-auto">
-            <div className="h-4 w-24 rounded-md bg-[var(--blue-soft)]/60 animate-pulse" />
-            <div className="mt-3 h-2 w-full rounded-full bg-[var(--blue-soft)] overflow-hidden">
-              <div className="h-full w-0 bg-[var(--selo-green)]" />
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 lg:grid lg:grid-cols-[45%_55%]">
-          <div
-            className="bg-paper p-6 sm:p-8 lg:p-10 flex flex-col gap-5 min-h-[60vh] lg:min-h-0 animate-pulse"
-            role="status"
-            aria-busy="true"
-            aria-label="Carregando modelo"
-          >
-            <div className="mt-auto space-y-4">
-              <div className="flex gap-3">
-                <div className="shrink-0 w-10 h-10 rounded-full bg-[var(--blue-soft)]" />
-                <div className="bg-surface border border-[var(--border)] rounded-2xl px-5 py-3.5 max-w-[85%]">
-                  <div className="h-4 w-56 rounded-md bg-[var(--blue-soft)]/70" />
-                </div>
-              </div>
-              <div className="h-14 w-full rounded-xl bg-[var(--blue-soft)]/50" />
-              <div className="h-12 w-40 rounded-xl bg-[var(--blue-royal)]/40" />
-            </div>
-          </div>
-          <div className="hidden lg:grid bg-[#efe9dd] p-8 place-items-center min-h-[60vh]">
-            <div className="w-full max-w-[340px] aspect-[1/1.414] bg-white rounded-sm shadow-[0_20px_40px_-20px_rgba(14,35,64,0.3)] p-6 animate-pulse space-y-3">
-              <div className="h-3 w-32 mx-auto rounded bg-[var(--blue-soft)]/70" />
-              <div className="h-px bg-ink/10" />
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-2.5 rounded bg-[var(--blue-soft)]/55"
-                  style={{ width: `${70 + ((i * 11) % 25)}%` }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!modelo) {
-    return (
-      <div className="min-h-[70vh] pt-[72px] grid place-items-center px-4">
-        <div className="text-center max-w-md">
-          <Selo variant="mark" className="w-10 h-10 mx-auto" />
-          <h2 className="mt-4 font-[family-name:var(--font-jakarta)] text-2xl font-bold text-ink">
-            Modelo não encontrado
-          </h2>
-          <p className="mt-2 text-ink/65">
-            O documento que você procura não está disponível agora. Explore
-            nosso catálogo completo.
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate("modelos")}
-            className="mt-6 inline-flex items-center justify-center h-12 px-6 rounded-xl bg-[var(--blue-royal)] text-white font-semibold hover:bg-[var(--navy)] transition-colors"
-          >
-            Ver todos os modelos
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const handleInputChange = (value: string) => {
-    if (!current) return;
-    setAnswers((prev) => ({ ...prev, [current.key]: value }));
+  // === Handlers =============================================================
+  const handleInputChange = (key: string, value: string) => {
+    setAnswers((prev) => ({ ...prev, [key]: value }));
+    if (fieldError) {
+      setFieldError(null);
+      setPetMood("falando");
+    }
   };
 
-  const handleAvancar = async () => {
-    if (!current) return;
-    const value = (answers[current.key] ?? "").trim();
-    if (!value) {
-      // Brief shake to signal the field is required.
-      if (inputRef.current && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        gsap.fromTo(
-          inputRef.current,
-          { x: -6 },
-          { x: 0, duration: 0.4, ease: "elastic.out(1, 0.4)" }
-        );
-      }
-      inputRef.current?.focus();
-      return;
+  const handleGrupoFieldChange = (
+    _grupoKey: string,
+    fieldKey: string,
+    value: string
+  ) => {
+    setAnswers((prev) => ({ ...prev, [fieldKey]: value }));
+    if (fieldError) {
+      setFieldError(null);
+      setPetMood("falando");
     }
-    // Persist the trimmed value so the preview/history shows a clean string.
-    const trimmedAnswers = { ...answers, [current.key]: value };
-    setAnswers(trimmedAnswers);
+  };
 
-    // Brief progress-pulse to celebrate the completed step.
-    setPulseProgress(true);
-    window.setTimeout(() => setPulseProgress(false), 1300);
+  const handleClausulaFieldChange = (
+    clausulaId: string,
+    payload:
+      | { tipo: "toggle"; selecionada: boolean }
+      | { tipo: "extra"; fieldKey: string; value: string }
+  ) => {
+    if (payload.tipo === "toggle") {
+      setClausulasSelecionadas((prev) =>
+        payload.selecionada
+          ? [...prev, clausulaId]
+          : prev.filter((id) => id !== clausulaId)
+      );
+    } else {
+      setExtrasPorClausula((prev) => ({
+        ...prev,
+        [clausulaId]: {
+          ...(prev[clausulaId] ?? {}),
+          [payload.fieldKey]: payload.value,
+        },
+      }));
+    }
+    if (fieldError) {
+      setFieldError(null);
+      setPetMood("falando");
+    }
+  };
 
-    if (step + 1 >= total) {
-      // Final step — persist the document via services layer, then navigate
-      // to SucessoView with the real id so PDF generation works.
-      setSubmitting(true);
+  // Validação: pergunta → obrigatório se campo.obrigatorio !== false
+  const validarEtapaAtual = (): string | null => {
+    if (!etapaAtual) return null;
+    if (etapaAtual.tipo === "campo") {
+      const c = etapaAtual.campo;
+      const v = (answers[c.key] ?? "").trim();
+      if (c.obrigatorio !== false && !v) {
+        return "Preencha este campo para avançar.";
+      }
+    } else if (etapaAtual.tipo === "campo_grupo") {
+      for (const c of etapaAtual.campos) {
+        const v = (answers[c.key] ?? "").trim();
+        if (c.obrigatorio !== false && !v) {
+          return `Preencha: ${c.pergunta}`;
+        }
+      }
+    }
+    // clausulas: sempre pode avançar (seleção opcional)
+    return null;
+  };
+
+  // Normaliza campos de estado (SP, São Paulo, sp → SP) no avatar atual.
+  const normalizarEstadoSeAplicavel = () => {
+    if (!etapaAtual) return;
+    const camposParaNormalizar: { key: string; pergunta: string }[] = [];
+    if (etapaAtual.tipo === "campo") {
+      camposParaNormalizar.push(etapaAtual.campo);
+    } else if (etapaAtual.tipo === "campo_grupo") {
+      camposParaNormalizar.push(...etapaAtual.campos);
+    }
+    setAnswers((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const c of camposParaNormalizar) {
+        if (/estado|uf/i.test(c.key) || /estado|uf/i.test(c.pergunta)) {
+          const norm = normalizarEstado(next[c.key] ?? "");
+          if (norm !== (next[c.key] ?? "")) {
+            next[c.key] = norm;
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+  };
+
+  const salvarDocumento = async (respostasFinais: Record<string, string>) => {
+    if (!modelo) return;
+    setSubmitting(true);
+    setMostrandoLoading(true);
+    setPetMood("pensando");
+    // LoadingDocumento animação é 1.5s — esperamos esse tempo mínimo antes
+    // de navegar pra sucesso, dando sensação de "preparando seu documento".
+    advanceTimer.current = setTimeout(async () => {
       try {
         const userId = user?.uid || "demo";
         const doc = await createDocument({
           modeloSlug: modelo.slug,
           modeloNome: modelo.nome,
-          respostas: trimmedAnswers,
+          respostas: respostasFinais,
           status: "concluido",
           userId,
         });
         navigate("sucesso", { slug, id: doc.id });
       } catch (e) {
-        console.error("[CriarView] falha ao salvar documento:", e);
-        // Não bloqueamos o usuário — navegamos mesmo assim com id vazio pra
-        // que ele não perca o preenchimento. A SucessoView lida com fallback.
+        logger.error("CriarView", "falha ao salvar documento", e, { slug });
+        // Não bloqueamos o usuário — navegamos mesmo assim pra que ele não
+        // perca o preenchimento. SucessoView lida com fallback.
         setSubmitting(false);
+        setMostrandoLoading(false);
         navigate("sucesso", { slug });
       }
+    }, 1500);
+  };
+
+  const handleAvancar = () => {
+    if (!etapaAtual || submitting) return;
+    const erro = validarEtapaAtual();
+    if (erro) {
+      setFieldError(erro);
+      setPetMood("atencao");
       return;
     }
-    setStep(step + 1);
-  };
+    setFieldError(null);
+    normalizarEstadoSeAplicavel();
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleAvancar();
-    }
-  };
+    // progress-pulse ao completar a etapa
+    setPulseProgress(true);
+    setTimeout(() => setPulseProgress(false), UX_CONFIG.PROGRESS_PULSE_DURATION);
 
-  const progressPct = total > 0 ? (step / total) * 100 : 0;
-  const history = campos.slice(0, step);
-  const isLast = step + 1 >= total;
-
-  return (
-    <div ref={root} className="min-h-screen pt-[72px] flex flex-col bg-paper">
-      {/* Top bar: voltar + progress + step counter */}
-      <div className="px-4 sm:px-6 lg:px-8 py-4 border-b border-[var(--border)] bg-paper">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => navigate("modelo-detalhe", { slug })}
-              className="inline-flex items-center gap-1 text-sm font-semibold text-ink/65 hover:text-[var(--blue-royal)] transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Voltar
-            </button>
-            <span className="ml-auto text-sm font-medium text-ink/60">
-              passo{" "}
-              <span className="text-ink font-bold">
-                {Math.min(step + 1, total)}
-              </span>{" "}
-              de {total}
-            </span>
-          </div>
-          <div className="mt-3 h-2 w-full rounded-full bg-[var(--blue-soft)] overflow-hidden">
-            <div
-              className={cn(
-                "h-full bg-[var(--selo-green)] transition-[width] duration-500 ease-out rounded-full",
-                pulseProgress && "progress-pulse"
-              )}
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile tabs */}
-      <div className="lg:hidden flex border-b border-[var(--border)] bg-paper sticky top-[72px] z-10">
-        {(["perguntas", "visualizar"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setMobileTab(t)}
-            className={cn(
-              "flex-1 py-3 text-sm font-semibold transition-colors border-b-2 capitalize",
-              mobileTab === t
-                ? "text-[var(--blue-royal)] border-[var(--blue-royal)]"
-                : "text-ink/55 border-transparent hover:text-ink"
-            )}
-          >
-            {t === "perguntas" ? "Perguntas" : "Visualizar"}
-          </button>
-        ))}
-      </div>
-
-      {/* Split screen */}
-      <div className="flex-1 lg:grid lg:grid-cols-[45%_55%]">
-        {/* Left — Concierge chat */}
-        <div
-          className={cn(
-            "bg-paper p-6 sm:p-8 lg:p-10 flex flex-col gap-5 min-h-[60vh] lg:min-h-0 overflow-y-auto scroll-fine",
-            mobileTab === "perguntas" ? "flex" : "hidden lg:flex"
-          )}
-        >
-          {/* History of previous Q&A — faded, sits above the current question */}
-          {history.length > 0 && (
-            <div className="space-y-4 opacity-60">
-              {history.map((c) => (
-                <div key={c.key} className="space-y-2">
-                  <div className="flex gap-3">
-                    <div className="shrink-0 w-8 h-8 rounded-full bg-[var(--blue-soft)] grid place-items-center">
-                      <Selo variant="mark" className="w-4 h-4" />
-                    </div>
-                    <div className="bg-surface border border-[var(--border)] rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[85%]">
-                      <p className="text-ink/80 text-sm leading-relaxed">
-                        {c.pergunta}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="ml-auto bg-[var(--blue-royal)] text-white rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[75%] w-fit">
-                    <p className="text-sm break-words">{answers[c.key]}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Current question + input — pinned to the bottom of the column */}
-          {current && (
-            <div ref={questionRef} className="mt-auto space-y-4">
-              <div className="flex gap-3">
-                <div className="shrink-0 w-10 h-10 rounded-full bg-[var(--blue-soft)] grid place-items-center">
-                  <Selo variant="mark" className="w-5 h-5" />
-                </div>
-                <div className="bg-surface border border-[var(--border)] rounded-2xl rounded-tl-sm px-5 py-3.5 max-w-[85%]">
-                  <p className="text-ink text-base sm:text-lg leading-relaxed font-medium">
-                    {current.pergunta}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                {current.tipo === "textarea" ? (
-                  <textarea
-                    ref={(el) => {
-                      inputRef.current = el;
-                    }}
-                    value={answers[current.key] ?? ""}
-                    onChange={(e) => handleInputChange(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={current.placeholder}
-                    aria-label={current.pergunta}
-                    rows={3}
-                    disabled={submitting}
-                    className="w-full min-h-[3.5rem] px-4 py-3 text-xl rounded-xl bg-surface border border-[var(--blue-soft)] focus:border-[var(--blue-royal)] outline-none transition-colors placeholder:text-ink/40 resize-none disabled:opacity-60"
-                  />
-                ) : (
-                  <input
-                    ref={(el) => {
-                      inputRef.current = el;
-                    }}
-                    type="text"
-                    value={answers[current.key] ?? ""}
-                    onChange={(e) => handleInputChange(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={current.placeholder}
-                    aria-label={current.pergunta}
-                    inputMode={current.tipo === "number" ? "decimal" : "text"}
-                    disabled={submitting}
-                    className="w-full h-14 px-4 text-xl rounded-xl bg-surface border border-[var(--blue-soft)] focus:border-[var(--blue-royal)] outline-none transition-colors placeholder:text-ink/40 disabled:opacity-60"
-                  />
-                )}
-
-                {current.microcopy && (
-                  <p className="mt-2 pen-note text-sm pl-1">{current.microcopy}</p>
-                )}
-
-                <div className="mt-4 flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleAvancar}
-                    disabled={submitting}
-                    className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-xl bg-[var(--blue-royal)] text-white font-semibold hover:bg-[var(--navy)] active:scale-[0.99] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Salvando…
-                      </>
-                    ) : (
-                      <>
-                        {isLast ? "Finalizar documento" : "Avançar"}
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                  <kbd className="hidden sm:inline-flex text-xs text-ink/45 px-2 py-1.5 rounded border border-[var(--border)]">
-                    Enter ↵
-                  </kbd>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right — Ateliê live preview */}
-        <div
-          className={cn(
-            "bg-[#efe9dd] p-6 sm:p-8 grid place-items-center min-h-[60vh] lg:min-h-0 relative",
-            mobileTab === "visualizar" ? "grid" : "hidden lg:grid"
-          )}
-        >
-          <div className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--green-tint)] border border-[var(--selo-green)]/30 text-[var(--selo-green)] text-xs font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--selo-green)] animate-pulse" />
-            atualizando ao vivo
-          </div>
-
-          {/* A4 sheet */}
-          <div className="relative w-full max-w-[340px] aspect-[1/1.414] bg-white shadow-[0_20px_40px_-20px_rgba(14,35,64,0.3)] rounded-sm p-6 overflow-hidden">
-            <Selo variant="watermark" />
-
-            <div className="relative">
-              <p className="font-[family-name:var(--font-jakarta)] text-xs font-bold text-ink uppercase tracking-wide text-center">
-                {modelo.template.titulo}
-              </p>
-              <div className="mt-3 h-px bg-ink/15" />
-
-              <div className="mt-3 space-y-3">
-                {modelo.template.corpo.map((line, idx) => (
-                  <p
-                    key={idx}
-                    className="text-[0.7rem] leading-relaxed text-ink/80 text-pretty"
-                  >
-                    {renderTemplateLine(line, answers)}
-                  </p>
-                ))}
-              </div>
-
-              <div className="mt-8 flex justify-between items-end">
-                <div className="text-center">
-                  <div className="w-16 border-b border-ink/40" />
-                  <p className="mt-1 text-[0.5rem] text-ink/50 uppercase tracking-wide">
-                    Parte 1
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="w-16 border-b border-ink/40" />
-                  <p className="mt-1 text-[0.5rem] text-ink/50 uppercase tracking-wide">
-                    Parte 2
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Render a single template line, replacing every `{{key}}` placeholder with
- * either the user's answer (wrapped in a `.field-land` span that flashes
- * blue → transparent on mount) or a dotted-underline placeholder.
- *
- * The React key includes a `-filled` / `-empty` suffix so the span remounts
- * (and the CSS animation replays) the moment a field transitions from empty
- * to filled — i.e. on the user's first keystroke for that question.
- */
-function renderTemplateLine(line: string, answers: Record<string, string>) {
-  const parts = line.split(/(\{\{[^}]+\}\})/g);
-  return parts.map((part, i) => {
-    const m = part.match(/^\{\{([^}]+)\}\}$/);
-    if (m) {
-      const key = m[1];
-      const value = answers[key];
-      if (value) {
-        return (
-          <span
-            key={`${key}-${i}-filled`}
-            className="field-land font-semibold text-ink rounded px-0.5"
-          >
-            {value}
-          </span>
-        );
+    if (isLast) {
+      // Snapshot final: answers + extras de cláusulas achatados no mesmo mapa.
+      const respostasFinais: Record<string, string> = { ...answers };
+      for (const extraMap of Object.values(extrasPorClausula)) {
+        for (const [k, v] of Object.entries(extraMap)) {
+          respostasFinais[k] = v;
+        }
       }
-      return (
-        <span
-          key={`${key}-${i}-empty`}
-          aria-label={`campo ${key} a preencher`}
-          className="inline-block border-b border-dotted border-ink/40 min-w-[3rem] px-1 align-baseline"
-        >
-          &nbsp;
-        </span>
-      );
+      void salvarDocumento(respostasFinais);
+      return;
     }
-    return <span key={`t-${i}`}>{part}</span>;
-  });
+
+    // Pet fica feliz brevemente ao avançar, depois volta a "falando".
+    setPetMood("feliz");
+    setTimeout(() => setPetMood("falando"), UX_CONFIG.PET_HAPPY_DURATION);
+    setStepIndex((i) => Math.min(i + 1, totalEtapas - 1));
+  };
+
+  const handleVoltar = () => {
+    navigate("modelo-detalhe", { slug });
+  };
+
+  // === Render: loading / not found / loading-documento ======================
+  if (loading) return <CriarLoading />;
+
+  if (!modelo) return <CriarModeloNaoEncontrado onVoltar={() => navigate("modelos")} />;
+
+  if (mostrandoLoading) return <LoadingDocumento nomeModelo={modelo.nome} />;
+
+  // === Tradução modelos.ts EtapaModelo → criar/types.ts EtapaModelo =========
+  const etapaChat: ChatEtapa | null = etapaAtual
+    ? etapaAtual.tipo === "campo"
+      ? { tipo: "pergunta", campo: etapaAtual.campo }
+      : etapaAtual.tipo === "campo_grupo"
+      ? { tipo: "grupo", titulo: etapaAtual.tituloGrupo, campos: etapaAtual.campos }
+      : { tipo: "clausulas", titulo: etapaAtual.titulo, clausulas: etapaAtual.clausulas }
+    : null;
+
+  // Texto que o pet "fala" (digitado progressivamente) — por etapa.
+  const petText =
+    etapaAtual?.tipo === "campo"
+      ? etapaAtual.campo.pergunta
+      : etapaAtual?.tipo === "campo_grupo"
+      ? etapaAtual.tituloGrupo ?? "Preencha os campos abaixo:"
+      : etapaAtual?.tipo === "clausulas"
+      ? etapaAtual.titulo ?? "Selecione as cláusulas opcionais:"
+      : "Vamos começar?";
+
+  const progressPct = totalEtapas > 0 ? (stepIndex / totalEtapas) * 100 : 0;
+
+  // === Render: main split-screen ============================================
+  return (
+    <CriarLayout
+      step={stepIndex}
+      total={totalEtapas}
+      progressPct={progressPct}
+      pulseProgress={pulseProgress}
+      mobileTab={mobileTab}
+      onMobileTabChange={setMobileTab}
+      onVoltar={handleVoltar}
+      previewSlot={
+        <div className="w-full max-w-[340px] mx-auto">
+          <PreviewA4
+            titulo={modelo.template.titulo}
+            corpo={modelo.template.corpo}
+            respostas={answers}
+            clausulas={clausulasMap}
+            camposOpcionais={camposOpcionais}
+          />
+        </div>
+      }
+    >
+      {etapaChat && (
+        <ChatStep
+          petText={petText}
+          petMood={petMood}
+          etapa={etapaChat}
+          stepIndex={stepIndex}
+          totalEtapas={totalEtapas}
+          respostas={respostas}
+          onInputChange={handleInputChange}
+          onGrupoFieldChange={handleGrupoFieldChange}
+          onClausulaFieldChange={handleClausulaFieldChange}
+          onAvancar={handleAvancar}
+          isLast={isLast}
+          submitting={submitting}
+        />
+      )}
+      {fieldError && (
+        <p
+          role="alert"
+          className="mt-3 text-sm text-[var(--coral)] font-medium pl-1 flex items-center gap-1.5"
+        >
+          <span aria-hidden="true">⚠</span>
+          {fieldError}
+        </p>
+      )}
+    </CriarLayout>
+  );
 }

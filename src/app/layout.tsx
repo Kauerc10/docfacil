@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { COMPANY } from "@/lib/company";
+import { ErrorBoundary } from "@/components/docfacil/error-boundary";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -76,7 +77,9 @@ export default function RootLayout({
               "radial-gradient(circle at 12% 18%, rgba(20, 49, 92, 0.025) 0, transparent 38%), radial-gradient(circle at 88% 72%, rgba(62, 142, 110, 0.022) 0, transparent 42%), url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.035'/%3E%3C/feComponentTransfer%3E%3CfeComposite operator='over' in2='SourceGraphic'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
           }}
         />
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
         <Toaster />
         <SonnerToaster position="top-center" richColors closeButton />
       </body>

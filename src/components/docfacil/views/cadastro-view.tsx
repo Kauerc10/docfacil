@@ -5,6 +5,7 @@ import { Eye, EyeOff, Mail, Lock, User, Loader2, AlertCircle } from "lucide-reac
 import { useNav } from "@/components/docfacil/nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { Logo } from "@/components/docfacil/logo";
+import { TermsConsentModal } from "@/components/docfacil/terms-consent-modal";
 
 /** The standard 4-color Google "G" mark as inline SVG. */
 function GoogleGIcon({ className }: { className?: string }) {
@@ -33,6 +34,17 @@ function GoogleGIcon({ className }: { className?: string }) {
 /**
  * CadastroView (spec 4.8) — sign-up screen.
  * Wired to the real AuthContext (signUpWithEmail / signInWithGoogle).
+ *
+ * Fluxo de consentimento (LGPD-aware):
+ *  1. Usuário preenche nome + e-mail + senha + checkbox "Aceito os Termos".
+ *  2. Validação client-side (nome, e-mail, senha 8+, checkbox marcado).
+ *  3. Em vez de chamar signUpWithEmail direto, abre o TermsConsentModal
+ *     (flow="cadastro") — modal bloqueante que força o aceite explícito dos
+ *     Termos de Uso + Política de Privacidade (e captura opt-in de marketing).
+ *     O registro de consentimento é persistido via consent-service (IP,
+ *     user-agent, versão dos termos) para fins de auditoria LGPD.
+ *  4. Aceitando → signUpWithEmail(nome, email, password) → navigate("dashboard").
+ *     Cancelando → volta pro form (sem signup).
  */
 export function CadastroView() {
   const { navigate } = useNav();
@@ -45,6 +57,7 @@ export function CadastroView() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
 
   function validate(): string | null {
     if (!nome.trim()) return "Informe seu nome completo.";
@@ -63,6 +76,15 @@ export function CadastroView() {
       return;
     }
     setValidationError(null);
+    // Abre o modal de consentimento (LGPD). O signup só prossegue depois
+    // do aceite ser persistido pelo consent-service.
+    setConsentOpen(true);
+  }
+
+  // Chamado pelo TermsConsentModal após o registro de consentimento ser
+  // persistido com sucesso (flow="cadastro").
+  async function handleConsentAccepted() {
+    setConsentOpen(false);
     setSubmitting(true);
     try {
       await signUpWithEmail(nome.trim(), email.trim(), password);
@@ -280,6 +302,18 @@ export function CadastroView() {
           </button>
         </p>
       </div>
+
+      {/* TermsConsentModal — fluxo LGPD de cadastro. Bloqueia backdrop/ESC
+          até o usuário decidir entre aceitar ou cancelar via botão. O
+          registro é persistido pelo consent-service antes de onAccept. */}
+      <TermsConsentModal
+        open={consentOpen}
+        onClose={() => setConsentOpen(false)}
+        onAccept={handleConsentAccepted}
+        flow="cadastro"
+        userEmail={email.trim() || undefined}
+        userId={undefined}
+      />
     </div>
   );
 }
