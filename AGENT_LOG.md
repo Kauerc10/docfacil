@@ -4,25 +4,34 @@
 
 ---
 
-### Ciclo 1 — Retomar FASES existentes
+### Ciclo 1 — Auditoria + Fixes iniciais (23:37 - 23:45 UTC)
 
-**Início:** 23:37 UTC
+**Tempo decorrido:** ~8 minutos
 
-**Estado atual do projeto:**
-- 124 arquivos TS/TSX, ~16.500 linhas
-- Lint limpo, dev server rodando
-- Branch 24h criada e pushada para remote
-- FASES 1-8 já concluídas (infraestrutura, pet, services, legal, subcomponents, rewire)
+**Feito:**
+1. ✅ Branch `24h` criada e pushada para remote
+2. ✅ AGENT_LOG.md criado
+3. ✅ Auditoria visual da home page (pet, search, cards, cookie banner — tudo presente)
+4. ✅ Auditoria do criar flow (pet, form fields, A4 preview, progress bar — tudo funcionando)
+5. ✅ Auditoria da página de modelos (6 cards renderizando, search + filtros presentes)
+6. ✅ Footer links testados (Termos → navega para TermosView corretamente)
+7. ✅ Header: adicionado estado de login (useAuth — avatar + Sair quando logado, Entrar quando deslogado)
+8. ✅ Prisma schema modelado para domínio DocFacil (User, Document, Consent, Order, DocumentTemplate)
+9. ✅ db:push executado com sucesso
 
-**Pendências identificadas:**
-1. Verificar se todas as views estão funcionando (browser test)
-2. Verificar se modelos.ts tem campo_grupo funcionando
-3. Verificar se criar-view usa subcomponentes corretamente
-4. Verificar se sucesso-view tem Confetti + PaymentBarrier
-5. Verificar se cadastro-view tem TermsConsentModal
-6. Verificar se documento-detalhe-view usa DetalhePreview + useDocumentoActions
-7. Prisma schema ainda é boilerplate (User/Post) — precisa modelar domínio DocFacil
-8. Header não mostra estado de login (Entrar/Sair)
-9. Footer links podem não estar todos funcionais
+**Commits:**
+- `fa80c0c` feat(header): adiciona estado de login
+- `77c6a5e` feat(db): modela schema Prisma para o domínio DocFacil
 
-**Próximo passo:** Auditoria visual completa via Agent Browser
+**Pendências:**
+- GSAP selectors no modelos-view (data-modelos='card' não encontra elementos) — warning não-crítico
+- Verificar visualmente: sucesso, cadastro, dashboard, documento-detalhe, planos, ia, ajuda, login
+- Verificar mobile (390x844) de todas as telas
+- Melhorar copy/textos onde necessário
+- Verificar se modelos.ts tem campo_grupo funcionando em todos os modelos
+
+---
+
+### Ciclo 2 — Continuar auditoria visual + fixes (23:45 UTC)
+
+**Próximo:** Verificar sucesso, cadastro, dashboard, planos

@@ -69,6 +69,7 @@ export function ModelosView() {
   // Refresh ScrollTrigger whenever the list changes so the stagger re-runs.
   useGSAP(
     () => {
+      if (loading || filtrados.length === 0) return;
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       const st = ScrollTrigger.refresh();
       gsap.from("[data-modelos='card']", {
