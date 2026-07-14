@@ -5,6 +5,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { Selo } from "./selo";
+import { Pet } from "./pet";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -16,13 +17,13 @@ const STEPS = [
   },
   {
     n: "02",
-    title: "Converse com o Concierge",
+    title: "Converse com o assistente",
     desc: "Uma pergunta de cada vez, sem juridiquês. Como um atendente guiando.",
   },
   {
     n: "03",
     title: "Baixe seu PDF",
-    desc: "Pronto, com validade legal. O selo é carimbado e o documento é seu.",
+    desc: "Pronto e formatado. O documento é seu para assinar e usar.",
   },
 ];
 
@@ -136,8 +137,8 @@ export function HowItWorks() {
               className="p-6 sm:p-8 bg-[var(--paper)] flex flex-col gap-4"
             >
               <div className="flex items-center gap-2 pb-3 border-b border-[var(--border)]">
-                <Selo variant="mark" className="w-5 h-5" />
-                <span className="font-semibold text-ink text-sm">Concierge DocFacil</span>
+                <Pet mood="idle" size={28} />
+                <span className="font-semibold text-ink text-sm">Assistente DocFacil</span>
                 <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-[var(--selo-green)] font-semibold">
                   <span className="w-2 h-2 rounded-full bg-[var(--selo-green)] animate-pulse" />
                   no passo 2 de 5
@@ -145,8 +146,8 @@ export function HowItWorks() {
               </div>
 
               <div data-how="bubble" className="flex gap-3">
-                <div className="shrink-0 w-8 h-8 rounded-full bg-[var(--blue-soft)] grid place-items-center">
-                  <Selo variant="mark" className="w-4 h-4" />
+                <div className="shrink-0 w-8 h-8">
+                  <Pet mood="falando" size={32} />
                 </div>
                 <div className="bg-surface border border-[var(--border)] rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]">
                   <p className="text-ink/80 text-[0.95rem] leading-relaxed">
@@ -161,8 +162,8 @@ export function HowItWorks() {
               </div>
 
               <div data-how="bubble" className="flex gap-3">
-                <div className="shrink-0 w-8 h-8 rounded-full bg-[var(--blue-soft)] grid place-items-center">
-                  <Selo variant="mark" className="w-4 h-4" />
+                <div className="shrink-0 w-8 h-8">
+                  <Pet mood="idle" size={32} />
                 </div>
                 <div className="bg-surface border border-[var(--border)] rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]">
                   <p className="text-ink/80 text-[0.95rem] leading-relaxed">

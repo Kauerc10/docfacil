@@ -5,6 +5,7 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { Search, ArrowRight, ShieldCheck } from "lucide-react";
 import { Selo } from "./selo";
+import { Pet } from "./pet";
 import { useNav } from "./nav-context";
 import { MODELOS } from "@/lib/modelos";
 
@@ -178,7 +179,7 @@ export function Hero() {
         {/* Credibility seal + stats row */}
         <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-10">
           <div data-hero="selo" className="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0">
-            <Selo variant="credibility" className="w-full h-full" />
+            <Pet mood="idle" size={112} />
           </div>
 
           <div className="flex items-center gap-6 sm:gap-8">
