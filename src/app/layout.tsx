@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   authors: [{ name: COMPANY.name, url: COMPANY.url }],
   creator: COMPANY.name,
   publisher: COMPANY.name,
-  copyright: `© ${COMPANY.copyrightRange()} ${COMPANY.name}`,
+  other: { copyright: `© ${COMPANY.copyrightRange()} ${COMPANY.name}` },
   icons: {
     icon: "/logo.svg",
   },
