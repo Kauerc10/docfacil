@@ -131,7 +131,7 @@ export function HowItWorks() {
           className="mt-14 rounded-3xl overflow-hidden border border-[var(--border)] shadow-[0_30px_60px_-30px_rgba(14,35,64,0.35)] bg-surface"
         >
           <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[420px]">
-            {/* Left — Concierge chat */}
+            {/* Left — Assistente chat */}
             <div
               data-how="demo-left"
               className="p-6 sm:p-8 bg-[var(--paper)] flex flex-col gap-4"

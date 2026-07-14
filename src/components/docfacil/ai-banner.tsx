@@ -76,7 +76,7 @@ export function AIBanner() {
                 className="mt-4 text-white/70 text-lg max-w-xl leading-relaxed"
               >
                 Descreva sua situação em uma frase. A gente propõe a estrutura,
-                você aprova, e o Concierge preenche o resto.
+                você aprova, e o assistente preenche o resto.
               </p>
               <a
                 data-ia="cta"
