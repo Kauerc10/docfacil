@@ -1,8 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// DocFacil — Prisma Schema
+// Domínio: geração de documentos legais via chat conversacional.
+// SQLite em dev, fácil migrar para PostgreSQL em produção.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +11,91 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// === Usuários ===
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
+  phone     String?
+  plano     String   @default("gratis") // gratis | avulso | pro
+  fotoUrl   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  documents Document[]
+  consents  Consent[]
+  orders    Order[]
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// === Documentos gerados ===
+model Document {
+  id          String   @id @default(cuid())
+  userId      String
+  modeloSlug  String
+  modeloNome  String
+  respostas   String   // JSON string de Record<string, string>
+  status      String   @default("rascunho") // rascunho | concluido
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+// === Consentimentos legais (prova forense) ===
+model Consent {
+  id            String   @id @default(cuid())
+  userId        String
+  userEmail     String
+  documents     String   // JSON array: ["termos", "privacidade", "marketing"]
+  termsVersion  String
+  flow          String   // cadastro | checkout | document-generation
+  ipAddress     String?
+  userAgent     String
+  termsHash     String
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// === Pedidos de pagamento ===
+model Order {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  userId      String
+  userEmail   String?
+  plan        String   // avulso | pro
+  amount      Float
+  provider    String   // kirvano | perfectpay | stripe
+  status      String   @default("pending") // pending | paid | failed | refunded
+  documentId  String?
+  createdAt   DateTime @default(now())
+  paidAt      DateTime?
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+// === Templates de documentos (opcional — pode vir do Firestore) ===
+model DocumentTemplate {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  nome        String
+  desc        String
+  categoria   String
+  minutos     Int
+  popular     Boolean  @default(false)
+  icone       String
+  etapas      String   // JSON string das etapas
+  template    String   // JSON string do template (titulo + corpo)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([categoria])
 }
