@@ -17,7 +17,7 @@ const TESTIMONIALS = [
   {
     name: "Rodrigo P.",
     role: "Pequeno empreendedor",
-    text: "Precisei de um comodato pra emprestar um equipamento. Em 4 minutos estava assinado. O selo no final deu uma segurança boa.",
+    text: "Precisei de um comodato pra emprestar um equipamento. Em 4 minutos estava pronto e formatado. A corujinha me guiou direitinho.",
   },
   {
     name: "Ana Lúcia F.",

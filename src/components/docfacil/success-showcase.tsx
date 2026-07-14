@@ -92,7 +92,7 @@ export function SuccessShowcase() {
             O final
           </p>
           <h2 data-ss="title" className="mt-2 font-[family-name:var(--font-jakarta)] text-3xl sm:text-4xl font-extrabold text-ink tracking-tight">
-            Pronto. Seu documento ganha o selo.
+            Pronto. Seu documento está formatado.
           </h2>
         </div>
 
@@ -141,7 +141,7 @@ export function SuccessShowcase() {
                       DOCFACIL
                     </p>
                     <p className="mt-1 text-[0.55rem] font-semibold uppercase tracking-widest opacity-80">
-                      Válido · {new Date().toLocaleDateString("pt-BR")}
+                      Gerado · {new Date().toLocaleDateString("pt-BR")}
                     </p>
                   </div>
                 </div>

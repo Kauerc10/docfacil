@@ -90,7 +90,7 @@ export function Hero() {
           className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--green-tint)] border border-[var(--selo-green)]/25 text-[var(--selo-green)] text-[0.85rem] font-semibold mb-7"
         >
           <ShieldCheck className="w-4 h-4" />
-          Modelos revisados com prática cartorial real
+          Modelos baseados em prática cartorial real
         </div>
 
         {/* Title with split lines for stagger */}
