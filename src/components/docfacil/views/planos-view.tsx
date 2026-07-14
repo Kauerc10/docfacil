@@ -50,7 +50,7 @@ const PLANOS: Plano[] = [
   {
     id: "avulso",
     nome: "Avulso",
-    preco: "R$ 19,90",
+    preco: "R$ 9,90",
     precoSub: "por documento",
     desc: "Para quem precisa de um documento específico",
     features: [
@@ -66,7 +66,7 @@ const PLANOS: Plano[] = [
   {
     id: "pro",
     nome: "Pro",
-    preco: "R$ 29,90",
+    preco: "R$ 24,90",
     precoSub: "/mês",
     desc: "Para quem usa todo mês",
     features: [
