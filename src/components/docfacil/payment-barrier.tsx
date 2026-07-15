@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Download,
   FileText,
@@ -9,11 +8,9 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import { toast } from "sonner";
 import { useNav } from "./nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { PLAN_PRICES } from "@/lib/services/checkout-service";
-import { TermsConsentModal } from "./terms-consent-modal";
 
 /**
  * PaymentBarrier — barreira de pagamento para o usuário deslogado que quer
@@ -24,8 +21,8 @@ import { TermsConsentModal } from "./terms-consent-modal";
  * baixar grátis" (usuário Pro ou Avulso já pode baixar sem pagar de novo).
  *
  * Fluxo do CTA coral:
- *   1. Abre o `TermsConsentModal` (flow="checkout").
- *   2. Aceitando → `navigate("checkout", { plan: "avulso", slug, docId })`.
+ *   1. Usuário clica em "Baixar por R$ X,XX".
+ *   2. Navega direto para o checkout (o modal de termos aparece lá).
  *
  * Não inclui a lógica de "se usuário logado e plano pago → liberar download"
  * — esse roteamento é responsabilidade da view que renderiza a barreira.
@@ -46,7 +43,7 @@ export function PaymentBarrier({
 }: PaymentBarrierProps) {
   const { navigate } = useNav();
   const { user } = useAuth();
-  const [consentOpen, setConsentOpen] = useState(false);
+
 
   const price = PLAN_PRICES.avulso;
   const priceLabel = price.toLocaleString("pt-BR", {
@@ -62,12 +59,6 @@ export function PaymentBarrier({
   ];
 
   function handlePayClick() {
-    setConsentOpen(true);
-  }
-
-  function handleAccept() {
-    setConsentOpen(false);
-    toast.info("Redirecionando para o checkout…");
     navigate("checkout", { plan: "avulso", slug, docId });
   }
 
@@ -79,8 +70,7 @@ export function PaymentBarrier({
     navigate("login");
   }
 
-  const userId = user?.uid ?? "guest";
-  const userEmail = user?.email ?? "guest@docfacil.com";
+
 
   return (
     <section className="px-4 py-8 sm:py-10">
@@ -156,15 +146,6 @@ export function PaymentBarrier({
           </div>
         </div>
       </div>
-
-      <TermsConsentModal
-        open={consentOpen}
-        onClose={() => setConsentOpen(false)}
-        onAccept={handleAccept}
-        flow="checkout"
-        userId={userId}
-        userEmail={userEmail}
-      />
     </section>
   );
 }

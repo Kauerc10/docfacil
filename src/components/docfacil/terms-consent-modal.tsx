@@ -101,9 +101,7 @@ export function TermsConsentModal({
             </DialogTitle>
           </div>
           <DialogDescription className="text-ink/65 text-base">
-            Para continuar, você precisa concordar com nossos documentos
-            legais. Seu registro de aceite fica armazenado com data, IP e
-            versão — para sua proteção e a nossa.
+            Para continuar, leia e aceite nossos termos. É rápido!
           </DialogDescription>
         </DialogHeader>
 
@@ -165,9 +163,7 @@ function ConsentForm({
         documents,
         termsVersion: TERMS_VERSION,
       });
-      toast.success(SUCCESS_MESSAGES.CONSENT_RECORDED, {
-        description: "Obrigado! Seu aceite foi registrado com segurança.",
-      });
+      toast.success(SUCCESS_MESSAGES.CONSENT_RECORDED);
       onAccept();
     } catch (e) {
       console.error("[TermsConsentModal] falha ao registrar consent:", e);

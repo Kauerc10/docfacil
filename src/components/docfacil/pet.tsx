@@ -29,10 +29,14 @@ export function Pet({ mood = "idle", size = 80, className }: { mood?: Mood; size
     <div ref={root} className={cn("relative inline-block", className)} style={{ width: size, height: size }}>
       {mood === "pensando" && <ThinkingBubbles />}
       {mood === "falando" && <TalkingDots />}
-      <svg viewBox="0 0 100 100" className="w-full h-full" aria-hidden="true">
+      {/* Círculo tracejado — SVG separado, rotaciona independentemente do pet */}
+      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full" aria-hidden="true" style={{ pointerEvents: "none" }}>
         <circle cx="50" cy="50" r="46" fill="none" stroke="var(--blue-royal)" strokeWidth="1.5" strokeDasharray="3 4" opacity="0.4">
           <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="40s" repeatCount="indefinite" />
         </circle>
+      </svg>
+      {/* Corujinha — SVG separado, não rotaciona com o círculo */}
+      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full" aria-hidden="true">
         {/* Orelhas (tufts sutis e arredondados) */}
         <path d="M 33 34 Q 30 25 35 24 Q 38 29 37 34 Z" fill="var(--blue-royal)" />
         <path d="M 67 34 Q 70 25 65 24 Q 62 29 63 34 Z" fill="var(--blue-royal)" />
