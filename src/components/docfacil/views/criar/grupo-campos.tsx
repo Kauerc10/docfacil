@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { ArrowRight, Loader2, MapPin, Check } from "lucide-react";
+import { ArrowRight, ChevronDown, Loader2, MapPin, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizarEstado, normalizarLogradouro } from "@/lib/normalizers";
 import { buscarCep } from "@/lib/services/cep-service";
@@ -290,6 +290,7 @@ export function GrupoCampos({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {campos.map((c, idx) => {
           const isTextarea = c.tipo === "textarea";
+          const isSelect = c.tipo === "select" && c.opcoes && c.opcoes.length > 0;
           const erro = erros[c.key];
           const tipo = detectarMascara(c);
           const buscando = buscandoCep && c.key === camposEndereco?.cepKey;
@@ -343,6 +344,42 @@ export function GrupoCampos({
                       : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]"
                   )}
                 />
+              ) : isSelect ? (
+                <div className="relative">
+                  <select
+                    id={`g-${c.key}`}
+                    ref={(el) => {
+                      refs.current[c.key] = el;
+                    }}
+                    value={values[c.key] ?? ""}
+                    onChange={(e) => handleChange(c, e.target.value)}
+                    onBlur={() => handleBlur(c)}
+                    onKeyDown={(e) => handleKeyDown(e, idx)}
+                    aria-invalid={!!erro}
+                    disabled={submitting}
+                    className={cn(
+                      "w-full h-12 pl-4 pr-10 text-base rounded-xl bg-surface border-2 outline-none transition-all appearance-none disabled:opacity-60 cursor-pointer",
+                      "focus:shadow-[0_8px_24px_-12px_rgba(37,84,199,0.45)]",
+                      erro
+                        ? "border-[var(--coral)] focus:border-[var(--coral)]"
+                        : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]",
+                      !(values[c.key] ?? "") && "text-ink/40"
+                    )}
+                  >
+                    <option value="" disabled>
+                      {c.placeholder ?? "Selecione…"}
+                    </option>
+                    {c.opcoes!.map((op) => (
+                      <option key={op} value={op} className="text-ink">
+                        {op}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/50 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                </div>
               ) : (
                 <div className="relative">
                   <input

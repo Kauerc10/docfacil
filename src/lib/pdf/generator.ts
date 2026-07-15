@@ -1,7 +1,12 @@
 /**
  * PDF generation with pdfmake 0.3+.
  *
- * Produces um PDF A4 profissional baseado nos modelos de referência:
+ * Produz um PDF A4 profissional usando o motor em `lib/document-engine/`
+ * (single source of truth para preenchimento + classificação). Mudou alguma
+ * regra de renderização? Muda no motor, todos os renderers (PreviewA4,
+ * DetalhePreview, PDF) acompanham automaticamente.
+ *
+ * Features:
  * - Título centralizado em negrito
  * - Parágrafos justificados com espaçamento adequado
  * - Detecção automática de cláusulas (CLÁUSULA PRIMEIRA – DO OBJETO) → bold
@@ -12,6 +17,11 @@
  * - Footer limpo: "Gerado por DocFacil" + data + página X/Y
  * - Sem marca d'água grande (documentos limpos e profissionais)
  */
+import {
+  fillDocument,
+  classifyLine,
+  extractClausulasSelecionadas,
+} from "../document-engine";
 import type { Modelo } from "../types";
 
 type PdfMakeModule = typeof import("pdfmake/build/pdfmake");
@@ -51,122 +61,78 @@ async function loadPdfmake(): Promise<PdfMakeContext> {
   return pdfmakePromise;
 }
 
-// === Parser de linhas ===
+// === Build content via motor (single source of truth) =====================
 
-type ContentNode =
-  | { type: "heading1"; text: string }
-  | { type: "heading2"; text: string }
-  | { type: "paragraph"; text: string }
-  | { type: "empty" }
-  | { type: "signature"; text: string }
-  | { type: "witness"; text: string };
-
-function parseLine(linha: string): ContentNode {
-  const trimmed = linha.trim();
-  if (!trimmed) return { type: "empty" };
-
-  // Heading 1: "1. DAS PARTES" (numeração + MAIÚSCULAS)
-  if (/^\d+\.\s+[A-ZÀ-Ú]/.test(trimmed) && trimmed === trimmed.toUpperCase()) {
-    return { type: "heading1", text: trimmed };
-  }
-
-  // Heading 2: "Cláusula Primeira:", "Cláusula de Multa:", "CLÁUSULA PRIMEIRA –"
-  if (/^Cláusula(\s+\w+)?:/i.test(trimmed) || /^CLÁUSULA\s+/i.test(trimmed)) {
-    return { type: "heading2", text: trimmed };
-  }
-
-  // Linha de assinatura (underscores)
-  if (/_{5,}/.test(trimmed)) {
-    return { type: "signature", text: trimmed };
-  }
-
-  // Observação / testemunha
-  if (/^OBSERVAÇÃO|^RECONHECIMENTO|^TESTEMUNHA/i.test(trimmed)) {
-    return { type: "witness", text: trimmed };
-  }
-
-  return { type: "paragraph", text: trimmed };
-}
-
-// === Preenchimento de template ===
-
-function fillTemplate(
-  template: string,
+/**
+ * Constrói o array de conteúdo pdfmake a partir de um modelo + respostas +
+ * cláusulas selecionadas. Usa o motor em `lib/document-engine/` para:
+ *   1. Preencher o template (cláusulas + endereços + separadores RG)
+ *   2. Classificar cada linha (heading1/2, paragraph, signature, witness, empty)
+ *
+ * Depois mapeia cada classificação para o estilo pdfmake correspondente.
+ */
+function buildContent(
+  modelo: Modelo,
   respostas: Record<string, string>,
-  modelo: Modelo
-): string {
-  let result = template;
+  clausulasSelecionadas: string[],
+  camposOpcionais: string[]
+): unknown[] {
+  // 1. Preenche o documento via motor (título + corpo)
+  const linhasPreenchidas = fillDocument(
+    {
+      titulo: modelo.template.titulo,
+      corpo: modelo.template.corpo,
+      respostas,
+      clausulasSelecionadas,
+      modelo,
+    },
+    { camposOpcionais }
+  );
 
-  // {{clausula:X}}
-  result = result.replace(/\{\{clausula:(\w+)\}\}/g, (_, key: string) => {
-    const marcada = respostas[`__clausula_${key}`] === "true";
-    if (!marcada) return "";
-    for (const etapa of (modelo as unknown as { etapas?: Array<{ tipo: string; clausulas?: Array<{ key: string; textoClausula: string }> }> }).etapas || []) {
-      if (etapa.tipo !== "clausulas") continue;
-      const clausula = etapa.clausulas?.find((c) => c.key === key);
-      if (clausula) {
-        return clausula.textoClausula.replace(/\{\{(\w+)\}\}/g, (_m2: string, k2: string) =>
-          respostas[k2] && respostas[k2].trim() ? respostas[k2] : "______"
-        );
-      }
-    }
-    return "";
-  });
-
-  // {{key}}
-  result = result.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
-    const v = respostas[key];
-    if (v && v.trim()) return v;
-    if (/complemento|rg/i.test(key)) return "";
-    return "______________________";
-  });
-
-  result = result.replace(/\s{2,}/g, " ").replace(/,\s*,/g, ",");
-  return result;
-}
-
-// === Build content ===
-
-function buildContent(corpoPreenchido: string[]): unknown[] {
+  // 2. Classifica cada linha via motor e mapeia para pdfmake
   const content: unknown[] = [];
-  const nodes = corpoPreenchido.map(parseLine);
+  for (const linha of linhasPreenchidas) {
+    const classified = classifyLine(linha);
 
-  for (const node of nodes) {
-    if (node.type === "empty") {
+    if (classified.tipo === "empty") {
       content.push({ text: "", margin: [0, 4] });
       continue;
     }
 
-    if (node.type === "heading1") {
+    if (classified.tipo === "heading1") {
+      // Se for o título principal (primeira linha), pula — é renderizado
+      // separadamente no docDefinition.content[0]. Caso contrário, é uma
+      // seção numerada (1. DAS PARTES).
+      if (linha === modelo.template.titulo) continue;
       content.push({
-        text: node.text,
+        text: classified.texto,
         style: "sectionHeading",
         margin: [0, 12, 0, 4],
       });
       continue;
     }
 
-    if (node.type === "heading2") {
+    if (classified.tipo === "heading2") {
       content.push({
-        text: node.text,
+        text: classified.texto,
         style: "clauseHeading",
         margin: [0, 8, 0, 3],
       });
       continue;
     }
 
-    if (node.type === "signature") {
+    if (classified.tipo === "signature") {
       content.push({
-        text: node.text,
+        text: classified.texto,
         style: "signature",
         margin: [0, 4, 0, 2],
       });
       continue;
     }
 
-    if (node.type === "witness") {
+    if (classified.tipo === "witness") {
       content.push({
-        text: node.text,
+        text: classified.texto,
         style: "witness",
         margin: [0, 8, 0, 4],
       });
@@ -174,11 +140,14 @@ function buildContent(corpoPreenchido: string[]): unknown[] {
     }
 
     // Parágrafo
-    if (node.type === "paragraph") {
+    if (classified.tipo === "paragraph") {
       // Citação legal (entre aspas, contendo "Art." ou "Pena")
-      if (node.text.startsWith('"') && (node.text.includes("Art.") || node.text.includes("Pena"))) {
+      if (
+        classified.texto.startsWith('"') &&
+        (classified.texto.includes("Art.") || classified.texto.includes("Pena"))
+      ) {
         content.push({
-          text: node.text,
+          text: classified.texto,
           style: "legalQuote",
           margin: [20, 4, 20, 8],
         });
@@ -186,7 +155,7 @@ function buildContent(corpoPreenchido: string[]): unknown[] {
       }
 
       // Label: "LOCADOR:" em bold
-      const colonMatch = node.text.match(/^([A-ZÀ-Ú][A-ZÀ-Ú\s/()]+):\s*(.+)$/);
+      const colonMatch = classified.texto.match(/^([A-ZÀ-Ú][A-ZÀ-Ú\s/()]+):\s*(.+)$/);
       if (colonMatch && colonMatch[1].length < 40) {
         content.push({
           text: [
@@ -198,7 +167,7 @@ function buildContent(corpoPreenchido: string[]): unknown[] {
         });
       } else {
         content.push({
-          text: node.text,
+          text: classified.texto,
           style: "body",
           margin: [0, 0, 0, 6],
           alignment: "justify",
@@ -210,8 +179,15 @@ function buildContent(corpoPreenchido: string[]): unknown[] {
   return content;
 }
 
-// === Geração ===
+// === Geração ================================================================
 
+/**
+ * Gera e baixa um PDF A4 do documento.
+ *
+ * @param modelo Modelo a usar (template + etapas para composição/cláusulas)
+ * @param respostas Respostas brutas do usuário (campos individuais + `__clausula_${id}` = "true")
+ * @param nomeArquivo Nome base do arquivo (sem extensão) — default: `${slug}-${data}`
+ */
 export async function gerarEBaixarPDF(
   modelo: Modelo,
   respostas: Record<string, string>,
@@ -219,21 +195,21 @@ export async function gerarEBaixarPDF(
 ): Promise<void> {
   const pdfmake = await loadPdfmake();
 
-  const corpoPreenchido = modelo.template.corpo
-    .map((linha) => fillTemplate(linha, respostas, modelo))
-    .filter((linha, i) => {
-      const original = modelo.template.corpo[i];
-      if (/\{\{clausula:/.test(original) && !linha.trim()) return false;
-      return true;
-    });
+  // Extrai cláusulas selecionadas das respostas (convenção __clausula_${id})
+  const clausulasSelecionadas = extractClausulasSelecionadas(respostas);
+
+  // Computa campos opcionais a partir das etapas do modelo (campos com
+  // obrigatorio === false + campos individuais de endereço + separadores RG
+  // + extras de cláusulas NÃO selecionadas).
+  const camposOpcionais = computeCamposOpcionais(modelo, clausulasSelecionadas);
+
+  const contentNodes = buildContent(modelo, respostas, clausulasSelecionadas, camposOpcionais);
 
   const dataHoje = new Date().toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "long",
     year: "numeric",
   });
-
-  const contentNodes = buildContent(corpoPreenchido);
 
   const docDefinition = {
     pageSize: "A4" as const,
@@ -318,6 +294,47 @@ export async function gerarEBaixarPDF(
 
   const nome = nomeArquivo || `${modelo.slug}-${dataHoje.replace(/\//g, "-")}`;
   pdfmake.createPdf(docDefinition).download(`${nome}.pdf`);
+}
+
+/**
+ * Computa a lista de campos opcionais a partir das etapas do modelo.
+ * Inclui:
+ *  - Campos com `obrigatorio === false`
+ *  - Campos individuais de endereço (cepKey, logradouroKey, etc.)
+ *  - Separadores de RG (`<prefix>_rg_separador`)
+ *  - Extras de cláusulas NÃO selecionadas (devem virar "" no template)
+ */
+function computeCamposOpcionais(
+  modelo: Modelo,
+  clausulasSelecionadas: string[]
+): string[] {
+  const out: string[] = [];
+  if (!modelo.etapas) return out;
+  for (const etapa of modelo.etapas) {
+    if (etapa.tipo === "campo_grupo") {
+      for (const c of etapa.campos) {
+        if (c.obrigatorio === false) out.push(c.key);
+        if (c.key === "rg" || c.key.endsWith("_rg")) {
+          const prefix = c.key === "rg" ? "" : c.key.slice(0, -3);
+          out.push(prefix ? `${prefix}_rg_separador` : "rg_separador");
+        }
+      }
+      if (etapa.endereco) {
+        const e = etapa.endereco;
+        out.push(e.cepKey, e.logradouroKey, e.numeroKey, e.bairroKey, e.cidadeKey, e.ufKey);
+        if (e.complementoKey) out.push(e.complementoKey);
+      }
+    } else if (etapa.tipo === "campo" && etapa.campo.obrigatorio === false) {
+      out.push(etapa.campo.key);
+    } else if (etapa.tipo === "clausulas") {
+      for (const cl of etapa.clausulas) {
+        if (!clausulasSelecionadas.includes(cl.id) && cl.camposExtras) {
+          for (const ex of cl.camposExtras) out.push(ex.key);
+        }
+      }
+    }
+  }
+  return out;
 }
 
 export async function preloadPdfmake(): Promise<void> {

@@ -4,40 +4,36 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Selo } from "../../selo";
+import { renderDocument } from "@/lib/document-engine";
+import type { LinhaQuebrada } from "@/lib/document-engine";
+import type { Modelo } from "@/lib/types";
 import type { PreviewA4Props } from "./types";
 
 const LINHAS_POR_PAGINA = 20;
 const CHARS_POR_LINHA = 76;
 
-/** Marcadores de estilo que podem aparecer no template. */
-type TipoLinha = "heading1" | "heading2" | "paragraph" | "signature" | "witness";
-
-interface LinhaRenderizada {
-  tipo: TipoLinha;
-  texto: string;
-}
+/** Marcadores de estilo que podem aparecer no template (espelhado do engine). */
+type TipoLinha = "heading1" | "heading2" | "paragraph" | "signature" | "witness" | "empty";
 
 /**
  * PreviewA4 — prévia A4 ao vivo com paginação flip 3D CSS.
  *
+ * Refatorado para usar o motor em `lib/document-engine/` (single source of
+ * truth para preenchimento + classificação + paginação). Mudou alguma regra
+ * de renderização? Muda no motor, todos os renderers acompanham.
+ *
  * - Pagina automaticamente em páginas de 20 linhas (após wrapping)
- * - Formatação hierárquica:
- *     heading1   = bold navy uppercase (título do documento)
- *     heading2   = bold ink (subtítulo de seção — prefixo `## `)
- *     paragraph  = justificado (default)
- *     signature  = monospace (linhas marcadas `[ASSINATURA]` ou contêm "Assinatura:")
- *     witness    = itálico (linhas marcadas `[TESTEMUNHA]` ou contêm "Testemunha")
+ * - Formatação hierárquica: heading1, heading2, paragraph, signature, witness
  * - Navegação: dots + setas laterais. Flip 3D via CSS perspective + rotateY.
  * - Badge "ao vivo" no canto superior direito.
  * - Selo marca d'água no fundo.
- * - Template filling: substitui `{{key}}` por valor ou "______"; `{{clausula:id}}`
- *   pelo corpo da cláusula (quando presente). Campos opcionais vazios = "".
  */
 export function PreviewA4({
   titulo,
   corpo,
   respostas,
-  clausulas = {},
+  clausulasSelecionadas = [],
+  modelo,
   camposOpcionais = [],
   docId,
   showLiveBadge = true,
@@ -46,77 +42,23 @@ export function PreviewA4({
 }: PreviewA4Props) {
   const [pagina, setPagina] = useState(0);
 
-  // 1. Renderiza cada linha do template (substitui placeholders).
-  const linhasRenderizadas = useMemo<LinhaRenderizada[]>(() => {
-    const saida: LinhaRenderizada[] = [];
-    saida.push({ tipo: "heading1", texto: titulo });
-    for (const linha of corpo) {
-      const renderizada = preencherTemplate(linha, respostas, clausulas, camposOpcionais);
-      // detecta tipo
-      const trimmed = renderizada.trim();
-      if (trimmed.startsWith("## ")) {
-        saida.push({ tipo: "heading2", texto: trimmed.slice(3) });
-      } else if (
-        trimmed.startsWith("[ASSINATURA]") ||
-        /assinatura\s*:/i.test(trimmed)
-      ) {
-        saida.push({
-          tipo: "signature",
-          texto: trimmed.replace(/^\[ASSINATURA\]\s*/, ""),
-        });
-      } else if (
-        trimmed.startsWith("[TESTEMUNHA]") ||
-        /testemunha/i.test(trimmed)
-      ) {
-        saida.push({
-          tipo: "witness",
-          texto: trimmed.replace(/^\[TESTEMUNHA\]\s*/, ""),
-        });
-      } else if (trimmed.startsWith("# ")) {
-        saida.push({ tipo: "heading1", texto: trimmed.slice(2) });
-      } else {
-        saida.push({ tipo: "paragraph", texto: renderizada });
-      }
-    }
-    return saida;
-  }, [titulo, corpo, respostas, clausulas, camposOpcionais]);
-
-  // 2. Quebra linhas longas em múltiplas linhas visuais (wrapping).
-  const linhasQuebradas = useMemo<string[]>(() => {
-    const todas: string[] = [];
-    for (const l of linhasRenderizadas) {
-      if (l.tipo === "heading1" || l.tipo === "heading2") {
-        // títulos não quebramos — sempre 1 linha
-        todas.push(`__${l.tipo}__${l.texto}`);
-        continue;
-      }
-      const prefixo = `__${l.tipo}__`;
-      // wrapping por palavra
-      const palavras = l.texto.split(/\s+/).filter(Boolean);
-      let atual = "";
-      for (const p of palavras) {
-        if ((atual + " " + p).trim().length > CHARS_POR_LINHA) {
-          if (atual) todas.push(prefixo + atual.trim());
-          atual = p;
-        } else {
-          atual = (atual + " " + p).trim();
-        }
-      }
-      if (atual.trim()) todas.push(prefixo + atual.trim());
-      else if (palavras.length === 0) todas.push(prefixo);
-    }
-    return todas;
-  }, [linhasRenderizadas]);
-
-  // 3. Agrupa em páginas de LINHAS_POR_PAGINA.
+  // === Renderização via motor centralizado =================================
   const paginas = useMemo(() => {
-    const out: string[][] = [];
-    for (let i = 0; i < linhasQuebradas.length; i += LINHAS_POR_PAGINA) {
-      out.push(linhasQuebradas.slice(i, i + LINHAS_POR_PAGINA));
-    }
-    if (out.length === 0) out.push([]);
-    return out;
-  }, [linhasQuebradas]);
+    return renderDocument(
+      {
+        titulo,
+        corpo,
+        respostas,
+        clausulasSelecionadas,
+        modelo,
+      },
+      {
+        linhasPorPagina: LINHAS_POR_PAGINA,
+        charsPorLinha: CHARS_POR_LINHA,
+        camposOpcionais,
+      }
+    );
+  }, [titulo, corpo, respostas, clausulasSelecionadas, modelo, camposOpcionais]);
 
   // Reset página quando total muda.
   const total = paginas.length;
@@ -147,7 +89,7 @@ export function PreviewA4({
           className="relative w-full h-full"
           style={{ transformStyle: "preserve-3d" }}
         >
-          {paginas.map((linhas, idx) => {
+          {paginas.map((pag, idx) => {
             const ativa = idx === paginaAtual;
             const isPast = idx < paginaAtual;
             return (
@@ -173,7 +115,7 @@ export function PreviewA4({
                 }}
               >
                 <PaginaSheet
-                  linhas={linhas}
+                  linhas={pag.linhas}
                   showWatermark={showWatermark}
                   docId={docId}
                   numeroPagina={idx + 1}
@@ -241,7 +183,7 @@ function PaginaSheet({
   numeroPagina,
   totalPaginas,
 }: {
-  linhas: string[];
+  linhas: LinhaQuebrada[];
   showWatermark: boolean;
   docId?: string;
   numeroPagina: number;
@@ -259,12 +201,9 @@ function PaginaSheet({
         )}
 
         <div className="flex-1 space-y-2.5 overflow-hidden">
-          {linhas.map((linha, i) => {
-            const match = linha.match(/^__(\w+)__(.*)$/);
-            const tipo = (match?.[1] as TipoLinha) || "paragraph";
-            const texto = match?.[2] ?? linha;
-            return <Linha key={i} tipo={tipo} texto={texto} />;
-          })}
+          {linhas.map((linha, i) => (
+            <Linha key={i} tipo={linha.tipo as TipoLinha} texto={linha.texto} />
+          ))}
         </div>
 
         {/* Footer com paginação */}
@@ -305,6 +244,8 @@ function Linha({ tipo, texto }: { tipo: TipoLinha; texto: string }) {
           {texto}
         </p>
       );
+    case "empty":
+      return <p className="text-[0.65rem]">&nbsp;</p>;
     case "paragraph":
     default:
       return (
@@ -313,31 +254,4 @@ function Linha({ tipo, texto }: { tipo: TipoLinha; texto: string }) {
         </p>
       );
   }
-}
-
-/**
- * Substitui `{{key}}` e `{{clausula:id}}` no template.
- * - Campos opcionais vazios viram "" (string vazia).
- * - Outros campos vazios viram "______________________".
- * - `{{clausula:id}}` vira o corpo da cláusula quando ela está selecionada
- *   (passada via `clausulas`), ou "" quando não está.
- */
-function preencherTemplate(
-  linha: string,
-  respostas: Record<string, string>,
-  clausulas: Record<string, string>,
-  camposOpcionais: string[]
-): string {
-  return linha.replace(/\{\{([^}]+)\}\}/g, (match, key: string) => {
-    const k = key.trim();
-    // cláusula dinâmica: {{clausula:id}}
-    if (k.startsWith("clausula:")) {
-      const id = k.slice("clausula:".length);
-      return clausulas[id] ?? "";
-    }
-    const valor = respostas[k];
-    if (valor && valor.trim()) return valor;
-    if (camposOpcionais.includes(k)) return "";
-    return "______________________";
-  });
 }

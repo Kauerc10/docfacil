@@ -20,8 +20,8 @@ import type { CampoModelo, EnderecoConfig } from "@/lib/types";
 // === Mascote mood (espelha o tipo interno do pet.tsx) ===
 export type PetMood = "idle" | "falando" | "feliz" | "atencao" | "pensando";
 
-// === Input ref union type (single text input OR textarea) ===
-export type InputElement = HTMLInputElement | HTMLTextAreaElement;
+// === Input ref union type (single text input OR textarea OR select) ===
+export type InputElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 export type InputRef = InputElement | null;
 
 // === Etapa (step) of the criar flow ===
@@ -122,8 +122,10 @@ export interface PreviewA4Props {
   titulo: string;
   corpo: string[];
   respostas: Record<string, string>;
-  /** cláusulas selecionadas (id → corpo) injetadas via `{{clausula:id}}` */
-  clausulas?: Record<string, string>;
+  /** IDs das cláusulas dinâmicas selecionadas (injetadas via `{{clausula:id}}`) */
+  clausulasSelecionadas?: string[];
+  /** modelo (usado para composição de endereço e definição de cláusulas) */
+  modelo?: import("@/lib/types").Modelo;
   /** campos opcionais que, quando vazios, viram string vazia em vez de "_____" */
   camposOpcionais?: string[];
   /** doc id exibido no canto superior (quando aplicável) */

@@ -4,16 +4,14 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Selo } from "../../selo";
+import { renderDocument } from "@/lib/document-engine";
+import type { LinhaQuebrada } from "@/lib/document-engine";
+import type { Modelo } from "@/lib/types";
 
 const LINHAS_POR_PAGINA = 20;
 const CHARS_POR_LINHA = 78;
 
-type TipoLinha = "heading1" | "heading2" | "paragraph" | "signature" | "witness";
-
-interface LinhaRenderizada {
-  tipo: TipoLinha;
-  texto: string;
-}
+type TipoLinha = "heading1" | "heading2" | "paragraph" | "signature" | "witness" | "empty";
 
 export interface DetalhePreviewProps {
   /** id do documento salvo (exibido no header da 1ª página) */
@@ -23,8 +21,10 @@ export interface DetalhePreviewProps {
   corpo: string[];
   /** respostas salvas no Firestore/localStorage */
   respostas: Record<string, string>;
-  /** cláusulas dinâmicas selecionadas: id → corpo */
-  clausulas?: Record<string, string>;
+  /** IDs das cláusulas dinâmicas selecionadas (extraídas das respostas) */
+  clausulasSelecionadas?: string[];
+  /** modelo (usado para composição de endereço e definição de cláusulas) */
+  modelo?: Modelo;
   /** chaves dos campos opcionais (vazios viram "" em vez de "_____") */
   camposOpcionais?: string[];
   /** classe extra no root */
@@ -37,92 +37,43 @@ export interface DetalhePreviewProps {
  * DetalhePreview — prévia A4 paginada com flip 3D CSS para a tela de
  * detalhe do documento salvo.
  *
- * Mesma engine de paginação/formatatação da PreviewA4 (criar-view), mas
- * otimizada pra um documento já preenchido:
+ * Refatorado para usar o motor em `lib/document-engine/` (single source of
+ * truth). A única diferença visual vs PreviewA4 é:
  *  - Sem badge "ao vivo" (não é mais um draft ativo)
  *  - Header da 1ª página mostra o docId
  *  - Footer em cada página com "DocFacil · pág. X/Y"
- *  - fillTemplate trata `{{key}}`, `{{clausula:id}}` e campos opcionais
- *    (campos vazios opcionais viram string vazia; obrigatórios viram
- *    "______________________")
+ *  - Padding um pouco maior (px-7 sm:px-9) para leitura confortável
  */
 export function DetalhePreview({
   docId,
   titulo,
   corpo,
   respostas,
-  clausulas = {},
+  clausulasSelecionadas = [],
+  modelo,
   camposOpcionais = [],
   className,
   showWatermark = true,
 }: DetalhePreviewProps) {
   const [pagina, setPagina] = useState(0);
 
-  const linhasRenderizadas = useMemo<LinhaRenderizada[]>(() => {
-    const saida: LinhaRenderizada[] = [];
-    saida.push({ tipo: "heading1", texto: titulo });
-    for (const linha of corpo) {
-      const renderizada = fillTemplate(linha, respostas, clausulas, camposOpcionais);
-      const trimmed = renderizada.trim();
-      if (trimmed.startsWith("## ")) {
-        saida.push({ tipo: "heading2", texto: trimmed.slice(3) });
-      } else if (
-        trimmed.startsWith("[ASSINATURA]") ||
-        /assinatura\s*:/i.test(trimmed)
-      ) {
-        saida.push({
-          tipo: "signature",
-          texto: trimmed.replace(/^\[ASSINATURA\]\s*/, ""),
-        });
-      } else if (
-        trimmed.startsWith("[TESTEMUNHA]") ||
-        /testemunha/i.test(trimmed)
-      ) {
-        saida.push({
-          tipo: "witness",
-          texto: trimmed.replace(/^\[TESTEMUNHA\]\s*/, ""),
-        });
-      } else if (trimmed.startsWith("# ")) {
-        saida.push({ tipo: "heading1", texto: trimmed.slice(2) });
-      } else {
-        saida.push({ tipo: "paragraph", texto: renderizada });
-      }
-    }
-    return saida;
-  }, [titulo, corpo, respostas, clausulas, camposOpcionais]);
-
-  const linhasQuebradas = useMemo<string[]>(() => {
-    const todas: string[] = [];
-    for (const l of linhasRenderizadas) {
-      if (l.tipo === "heading1" || l.tipo === "heading2") {
-        todas.push(`__${l.tipo}__${l.texto}`);
-        continue;
-      }
-      const prefixo = `__${l.tipo}__`;
-      const palavras = l.texto.split(/\s+/).filter(Boolean);
-      let atual = "";
-      for (const p of palavras) {
-        if ((atual + " " + p).trim().length > CHARS_POR_LINHA) {
-          if (atual) todas.push(prefixo + atual.trim());
-          atual = p;
-        } else {
-          atual = (atual + " " + p).trim();
-        }
-      }
-      if (atual.trim()) todas.push(prefixo + atual.trim());
-      else if (palavras.length === 0) todas.push(prefixo);
-    }
-    return todas;
-  }, [linhasRenderizadas]);
-
   const paginas = useMemo(() => {
-    const out: string[][] = [];
-    for (let i = 0; i < linhasQuebradas.length; i += LINHAS_POR_PAGINA) {
-      out.push(linhasQuebradas.slice(i, i + LINHAS_POR_PAGINA));
-    }
-    if (out.length === 0) out.push([]);
-    return out;
-  }, [linhasQuebradas]);
+    return renderDocument(
+      {
+        titulo,
+        corpo,
+        respostas,
+        clausulasSelecionadas,
+        modelo,
+        docId,
+      },
+      {
+        linhasPorPagina: LINHAS_POR_PAGINA,
+        charsPorLinha: CHARS_POR_LINHA,
+        camposOpcionais,
+      }
+    );
+  }, [titulo, corpo, respostas, clausulasSelecionadas, modelo, camposOpcionais, docId]);
 
   const total = paginas.length;
   if (pagina > total - 1) {
@@ -143,7 +94,7 @@ export function DetalhePreview({
           className="relative w-full h-full"
           style={{ transformStyle: "preserve-3d" }}
         >
-          {paginas.map((linhas, idx) => {
+          {paginas.map((pag, idx) => {
             const ativa = idx === paginaAtual;
             const isPast = idx < paginaAtual;
             return (
@@ -165,7 +116,7 @@ export function DetalhePreview({
                 }}
               >
                 <DetalhePagina
-                  linhas={linhas}
+                  linhas={pag.linhas}
                   showWatermark={showWatermark}
                   docId={docId}
                   numeroPagina={idx + 1}
@@ -230,7 +181,7 @@ function DetalhePagina({
   numeroPagina,
   totalPaginas,
 }: {
-  linhas: string[];
+  linhas: LinhaQuebrada[];
   showWatermark: boolean;
   docId: string;
   numeroPagina: number;
@@ -248,12 +199,9 @@ function DetalhePagina({
         )}
 
         <div className="flex-1 space-y-2.5 overflow-hidden mt-3">
-          {linhas.map((linha, i) => {
-            const match = linha.match(/^__(\w+)__(.*)$/);
-            const tipo = (match?.[1] as TipoLinha) || "paragraph";
-            const texto = match?.[2] ?? linha;
-            return <Linha key={i} tipo={tipo} texto={texto} />;
-          })}
+          {linhas.map((linha, i) => (
+            <Linha key={i} tipo={linha.tipo as TipoLinha} texto={linha.texto} />
+          ))}
         </div>
 
         <div className="mt-3 pt-2 border-t border-ink/10 flex items-center justify-between text-[0.55rem] text-ink/40 uppercase tracking-wider">
@@ -293,6 +241,8 @@ function Linha({ tipo, texto }: { tipo: TipoLinha; texto: string }) {
           {texto}
         </p>
       );
+    case "empty":
+      return <p className="text-[11px] sm:text-[13px]">&nbsp;</p>;
     case "paragraph":
     default:
       return (
@@ -301,30 +251,4 @@ function Linha({ tipo, texto }: { tipo: TipoLinha; texto: string }) {
         </p>
       );
   }
-}
-
-/**
- * Substitui `{{key}}` e `{{clausula:id}}` no template.
- * - Campos opcionais vazios viram "" (string vazia).
- * - Outros campos vazios viram "______________________".
- * - `{{clausula:id}}` vira o corpo da cláusula quando ela está em `clausulas`,
- *   ou "" quando não está (cláusula não selecionada).
- */
-function fillTemplate(
-  template: string,
-  respostas: Record<string, string>,
-  clausulas: Record<string, string>,
-  camposOpcionais: string[]
-): string {
-  return template.replace(/\{\{([^}]+)\}\}/g, (match, key: string) => {
-    const k = key.trim();
-    if (k.startsWith("clausula:")) {
-      const id = k.slice("clausula:".length);
-      return clausulas[id] ?? "";
-    }
-    const valor = respostas[k];
-    if (valor && valor.trim()) return valor;
-    if (camposOpcionais.includes(k)) return "";
-    return "______________________";
-  });
 }

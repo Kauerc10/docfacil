@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { ArrowRight, Check, Loader2 } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ClausulaCardProps, ClausulasPerguntaProps } from "./types";
 
@@ -180,6 +180,31 @@ export function ClausulaCard({
                   rows={2}
                   className="w-full min-h-[3rem] px-3 py-2 text-base rounded-lg bg-surface border-2 border-[var(--blue-soft)] focus:border-[var(--blue-royal)] outline-none transition-all resize-none placeholder:text-ink/40"
                 />
+              ) : campo.tipo === "select" && campo.opcoes ? (
+                <div className="relative">
+                  <select
+                    id={`extra-${clausula.id}-${campo.key}`}
+                    value={extras[campo.key] ?? ""}
+                    onChange={(e) => onExtraChange(campo.key, e.target.value)}
+                    className={cn(
+                      "w-full h-11 pl-3 pr-9 text-base rounded-lg bg-surface border-2 border-[var(--blue-soft)] focus:border-[var(--blue-royal)] outline-none transition-all appearance-none cursor-pointer",
+                      !(extras[campo.key] ?? "") && "text-ink/40"
+                    )}
+                  >
+                    <option value="" disabled>
+                      {campo.placeholder ?? "Selecione…"}
+                    </option>
+                    {campo.opcoes.map((op) => (
+                      <option key={op} value={op} className="text-ink">
+                        {op}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/50 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                </div>
               ) : (
                 <input
                   id={`extra-${clausula.id}-${campo.key}`}

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizarEstado } from "@/lib/normalizers";
 import type { CampoPerguntaProps } from "./types";
@@ -37,6 +37,7 @@ export function CampoPergunta({
   const root = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const selectRef = useRef<HTMLSelectElement>(null);
 
   // Mount: animação de entrada suave (fade + slide-up + scale leve).
   // Mais amigável que a animação anterior — eased spring-like curve.
@@ -65,7 +66,7 @@ export function CampoPergunta({
   const erroPrev = useRef<string | null>(null);
   useEffect(() => {
     if (erro && erro !== erroPrev.current) {
-      const el = textareaRef.current ?? inputRef.current;
+      const el = textareaRef.current ?? inputRef.current ?? selectRef.current;
       if (el && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         gsap.fromTo(el, { x: -6 }, { x: 0, duration: 0.4, ease: "elastic.out(1, 0.4)" });
       }
@@ -76,7 +77,7 @@ export function CampoPergunta({
   // Auto-focus on mount.
   useEffect(() => {
     const t = window.setTimeout(() => {
-      const el = textareaRef.current ?? inputRef.current;
+      const el = textareaRef.current ?? inputRef.current ?? selectRef.current;
       el?.focus();
     }, 60);
     return () => window.clearTimeout(t);
@@ -98,6 +99,7 @@ export function CampoPergunta({
   };
 
   const isTextarea = campo.tipo === "textarea";
+  const isSelect = campo.tipo === "select" && campo.opcoes && campo.opcoes.length > 0;
   const inputMode = campo.tipo === "number" ? "decimal" : "text";
 
   return (
@@ -122,6 +124,40 @@ export function CampoPergunta({
                 ? "border-[var(--coral)] focus:border-[var(--coral)]"
                 : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]"
             )}
+          />
+        </div>
+      ) : isSelect ? (
+        <div data-campo="el" className="relative">
+          <select
+            ref={selectRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            aria-label={campo.pergunta}
+            aria-invalid={!!erro}
+            disabled={submitting}
+            className={cn(
+              "w-full h-14 pl-4 pr-10 text-xl rounded-xl bg-surface border-2 outline-none transition-all appearance-none disabled:opacity-60 cursor-pointer",
+              "focus:shadow-[0_8px_24px_-12px_rgba(37,84,199,0.45)]",
+              erro
+                ? "border-[var(--coral)] focus:border-[var(--coral)]"
+                : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]",
+              !value && "text-ink/40"
+            )}
+          >
+            <option value="" disabled>
+              {campo.placeholder ?? "Selecione uma opção…"}
+            </option>
+            {campo.opcoes!.map((op) => (
+              <option key={op} value={op} className="text-ink">
+                {op}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/50 pointer-events-none"
+            aria-hidden="true"
           />
         </div>
       ) : (

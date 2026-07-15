@@ -5,7 +5,8 @@ import { useNav } from "../nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { getModel } from "@/lib/services/models-service";
 import { createDocument } from "@/lib/services/documents-service";
-import { normalizarEstado, aplicarComposicaoEndereco } from "@/lib/normalizers";
+import { normalizarEstado } from "@/lib/normalizers";
+import { aplicarComposicaoModelo, encodeClausulasSelecionadas } from "@/lib/document-engine";
 import { logger } from "@/lib/logger";
 import { UX_CONFIG } from "@/lib/constants";
 import type { Modelo, EtapaModelo } from "@/lib/types";
@@ -94,29 +95,14 @@ export function CriarView() {
   }, []);
 
   // === etapasEfetivas =======================================================
-  // Static model.etapas + dynamic "campo" steps for each selected clause's
-  // camposExtras. Recomputed when selection changes.
+  // Static model.etapas — as cláusulas selecionadas NÃO geram etapas extras
+  // porque seus campos extras já são preenchidos inline no ClausulaCard
+  // (quando o usuário marca a cláusula, os campos extras aparecem abaixo).
+  // Isso evita pedir os mesmos dados duas vezes.
   const etapasEfetivas: EtapaModelo[] = useMemo(() => {
     if (!modelo?.etapas) return [];
-    const out: EtapaModelo[] = [];
-    for (const etapa of modelo.etapas) {
-      out.push(etapa);
-      if (etapa.tipo === "clausulas") {
-        for (const clausula of etapa.clausulas) {
-          if (
-            clausulasSelecionadas.includes(clausula.id) &&
-            clausula.camposExtras &&
-            clausula.camposExtras.length > 0
-          ) {
-            for (const extra of clausula.camposExtras) {
-              out.push({ tipo: "campo", campo: extra });
-            }
-          }
-        }
-      }
-    }
-    return out;
-  }, [modelo, clausulasSelecionadas]);
+    return [...modelo.etapas];
+  }, [modelo]);
 
   const totalEtapas = etapasEfetivas.length;
   const etapaAtual = etapasEfetivas[stepIndex];
@@ -125,14 +111,21 @@ export function CriarView() {
   // Campos opcionais (obrigatorio === false) → viram string vazia no preview
   // em vez de "______________________" quando não preenchidos.
   // Inclui também os campos individuais de endereço (ex.: "_cep", "_rua",
-  // "_numero", etc.) — o que aparece no template é a `saidaKey` (composta),
-  // não os campos separados.
+  // "_numero", etc.) e separadores de RG — o que aparece no template é a
+  // `saidaKey` (composta) e `<prefix>_rg_separador`, não os campos separados.
   const camposOpcionais = useMemo(() => {
     if (!modelo?.etapas) return [];
     const out: string[] = [];
     for (const etapa of modelo.etapas) {
       if (etapa.tipo === "campo_grupo") {
-        for (const c of etapa.campos) if (c.obrigatorio === false) out.push(c.key);
+        for (const c of etapa.campos) {
+          if (c.obrigatorio === false) out.push(c.key);
+          // separadores de RG são opcionais ("" quando RG vazio)
+          if (c.key === "rg" || c.key.endsWith("_rg")) {
+            const prefix = c.key === "rg" ? "" : c.key.slice(0, -3);
+            out.push(prefix ? `${prefix}_rg_separador` : "rg_separador");
+          }
+        }
         // campos individuais de endereço NÃO vão para o template — só a
         // string composta (saidaKey). Marcamos como opcionais para que, se
         // aparecerem em algum template, viram "" em vez de "______".
@@ -144,11 +137,21 @@ export function CriarView() {
       } else if (etapa.tipo === "campo" && etapa.campo.obrigatorio === false) {
         out.push(etapa.campo.key);
       }
+      // clausula extras: se a cláusula não foi selecionada, os campos extras
+      // não têm valor — marcamos como opcionais para virarem "" no template
+      if (etapa.tipo === "clausulas") {
+        for (const cl of etapa.clausulas) {
+          if (!clausulasSelecionadas.includes(cl.id) && cl.camposExtras) {
+            for (const ex of cl.camposExtras) out.push(ex.key);
+          }
+        }
+      }
     }
     return out;
-  }, [modelo]);
+  }, [modelo, clausulasSelecionadas]);
 
-  // clausulas selecionadas → id:corpo para o preview
+  // clausulas selecionadas → id:corpo para o preview (legacy map, ainda usado
+  // em alguns lugares; pode ser removido quando a migração estiver completa)
   const clausulasMap = useMemo(() => {
     const map: Record<string, string> = {};
     if (!modelo?.etapas) return map;
@@ -162,15 +165,14 @@ export function CriarView() {
     return map;
   }, [modelo, clausulasSelecionadas]);
 
-  // === Composição de endereço =================================================
-  // Para cada `campo_grupo` com `endereco` configurado, monta a string final
-  // (ex.: "Rua das Flores, 123 - Centro, São Paulo/SP, CEP 01234-567") e
-  // atribui à `saidaKey` (ex.: "endereco" ou "imovel"). Essa string é o que
-  // o template consome via `{{endereco}}` ou `{{imovel}}`.
+  // === Composição de endereço + separadores RG ==============================
+  // O motor em lib/document-engine cuida de tudo: para cada `campo_grupo` com
+  // `endereco` configurado, monta a string final e atribui à `saidaKey`. Para
+  // campos RG opcionais, gera `<prefix>_rg_separador` = ", RG <valor>" ou "".
   // Aplicada tanto para o PreviewA4 (live preview) quanto para createDocument (save).
   const respostasComEndereco = useMemo(() => {
     if (!modelo) return answers;
-    return aplicarComposicaoEndereco(answers, modelo);
+    return aplicarComposicaoModelo(answers, modelo);
   }, [answers, modelo]);
 
   // === Pet mood cycle =======================================================
@@ -324,9 +326,14 @@ export function CriarView() {
     setTimeout(() => setPulseProgress(false), UX_CONFIG.PROGRESS_PULSE_DURATION);
 
     if (isLast) {
-      // Snapshot final: answers + extras de cláusulas achatados no mesmo mapa
-      // + composição de endereço (string final em `saidaKey`).
-      const respostasFinais: Record<string, string> = { ...respostasComEndereco };
+      // Snapshot final:
+      // 1. respostasComEndereco (campos individuais + composições de endereço + separadores RG)
+      // 2. clausulasSelecionadas codificadas como __clausula_${id} = "true" (para persistência)
+      // 3. extras de cláusulas achatados no mesmo mapa
+      const respostasFinais: Record<string, string> = {
+        ...respostasComEndereco,
+        ...encodeClausulasSelecionadas(clausulasSelecionadas),
+      };
       for (const extraMap of Object.values(extrasPorClausula)) {
         for (const [k, v] of Object.entries(extraMap)) {
           respostasFinais[k] = v;
@@ -392,7 +399,8 @@ export function CriarView() {
             titulo={modelo.template.titulo}
             corpo={modelo.template.corpo}
             respostas={respostasComEndereco}
-            clausulas={clausulasMap}
+            clausulasSelecionadas={clausulasSelecionadas}
+            modelo={modelo}
             camposOpcionais={camposOpcionais}
           />
         </div>
@@ -400,6 +408,7 @@ export function CriarView() {
     >
       {etapaChat && (
         <ChatStep
+          key={stepIndex}
           petText={petText}
           petMood={petMood}
           etapa={etapaChat}

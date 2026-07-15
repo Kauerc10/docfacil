@@ -865,3 +865,98 @@ Stage Summary:
 - `composeEndereco` + `aplicarComposicaoEndereco` montam a string final `"<logradouro>, <numero> [<complemento>] - <bairro>, <cidade>/<uf>, CEP <cep>"` e atribuem à `saidaKey` no mapa de respostas — template continua usando `{{endereco}}` ou `{{imovel}}` normalmente.
 - Animação de entrada dos campos: GSAP timeline com stagger (título → cada campo → botão) em vez da animação CSS genérica anterior. Eased `power3.out`, mais suave e amigável.
 - Fix crítico em `detectarMascara` (grupo-campos.tsx): antes detectava "CPF" em qualquer menção no label (ex.: "Seu RG e CPF (opcional):" virava CPF mask, quebrava o preenchimento). Agora key é fonte autoritativa; pergunta só usa match stricter no início.
+
+---
+Task ID: ENGINE-1
+Agent: general-purpose
+Task: Motor modular de documentos + partes completas (nome/cpf/rg/estado civil/endereço) + cláusulas dinâmicas reais + refactor PDF generator
+
+Work Log:
+- Lidos 15 arquivos: tipos.ts, modelos.ts, normalizers.ts, pdf/generator.ts, criar-view.tsx, criar/{types,chat-step,grupo-campos,campo-input,clausula-card,preview-a4}.tsx, documento/{detalhe-preview,use-documento-actions}.tsx, documento-detalhe-view.tsx.
+
+NOVO MÓDULO — `src/lib/document-engine/` (6 arquivos, ~600 LOC):
+- `types.ts`: tipos compartilhados (TipoLinha, LinhaClassificada, LinhaQuebrada, PaginaRenderizada, RenderInput, RenderOptions).
+- `template.ts`: `fillTemplate` TWO-PASS (1º injeta `{{clausula:id}}` → corpo da cláusula; 2º substitui `{{key}}` → valor). Fix crítico: antes, `String.replace` não re-processava o replacement string, então `{{fiador_nome}}` dentro do corpo de uma cláusula injetada ficava literal. Agora two-pass resolve tudo. Adicionado `buildClausulaMap(etapas)` e `fillTemplateOrNull`.
+- `compose.ts`: `composeEndereco`, `aplicarComposicaoModelo` (endereço + separadores RG), `composeOptionalField`, `extractClausulasSelecionadas`/`encodeClausulasSelecionadas` (persistência backward-compatible via `__clausula_${id} = "true"` no mapa de respostas — sem mudar schema do Documento).
+- `classify.ts`: `classifyLine` unifica heurísticas de heading1/2/paragraph/signature/witness/empty (antes duplicadas em 3 lugares: PreviewA4, DetalhePreview, PDF generator). Marcadores `#`, `##`, `[ASSINATURA]`, `[TESTEMUNHA]` + detecção automática de "Cláusula Primeira:", "1. DAS PARTES", underscores, etc.
+- `paginate.ts`: `wrapLines` (wrapping por palavra, títulos não quebram) + `paginate` (agrupa em páginas de N linhas) + helpers `parseWrappedLine`/`serializeWrappedLine`/`classifyAndWrap`.
+- `render.ts`: `renderDocument(input, opts)` API de alto nível — compõe endereços + indexa cláusulas + preenche template + classifica + wrap + paginate. Retorna `PaginaRenderizada[]` pronto para qualquer renderer. `fillDocument` para PDF (sem paginate, só preenche). Filtra linhas vazias consecutivas (evita páginas em branco por cláusulas não selecionadas).
+- `index.ts`: barrel export de toda a API pública.
+
+TIPOS — `src/lib/types.ts`:
+- Adicionado `tipo: "select"` a `TipoCampo` + `opcoes?: string[]` a `CampoModelo` (para estado civil, regime de bens, etc.).
+- Re-exportado `EnderecoConfig` de modelos.ts.
+
+NORMALIZERS — `src/lib/normalizers.ts`:
+- Removidas `composeEndereco` e `aplicarComposicaoEndereco` (movidas para `document-engine/compose.ts`). Comentário explicativo deixado no lugar.
+
+MODELOS — `src/lib/modelos.ts` (rewrite completo, ~900 LOC):
+- Helper `camposParte(prefix, label)` → retorna `{ campos: CampoModelo[], endereco: EnderecoConfig }` para uma "parte" (pessoa) com 11 campos: nome, cpf, rg (opcional), estado_civil (select com 6 opções), cep, rua, número, complemento (opcional), bairro, cidade, uf. String composta do endereço vai para `{{prefix_endereco}}`.
+- Helper `camposEndereco(saidaKey, label)` → 7 campos de endereço avulso (sem dados de pessoa).
+- 6 modelos reescritos:
+  * `contrato-locacao`: 5 etapas — Dados do Locador (camposParte), Dados do Locatário (camposParte), Endereço do imóvel (camposEndereco), Valores, Cláusulas adicionais (5 cláusulas: fiador, multa, reajuste, caução, animais). Template com `{{locador_nome}}`, `{{locador_endereco}}`, `{{clausula:fiador}}`, etc. + assinaturas.
+  * `declaracao-residencia`: 2 etapas — dados pessoais (nome, cpf, rg opcional), endereço. Template com `{{rg_separador}}` (vira ", RG X" ou "").
+  * `comodato`: 4 etapas — Dados do comodante (camposParte), Dados do comodatário (camposParte), bem+prazo, Cláusulas (3: responsabilidade, uso, devolução antecipada).
+  * `compra-venda`: 5 etapas — Dados do vendedor (camposParte), Dados do comprador (camposParte), bem, valores, Cláusulas (3: garantia, entrega, evicção).
+  * `uniao-estavel`: 4 etapas — Dados pessoa1 (camposParte), Dados pessoa2 (camposParte), data+regime (select com 4 opções de regime de bens), endereço, Cláusulas (3: alimentos, filhos, dissolução).
+  * `procuracao-simples`: 4 etapas — Dados do outorgante (camposParte), Dados do outorgado (camposParte), poderes, Cláusulas (3: prazo, subestabelecimento, renúncia).
+- Templates usam `{{prefix_rg_separador}}` para RG opcional inline (vira ", RG X" ou "" sem redundância).
+- Todos os templates têm `[ASSINATURA]` lines no final para cada parte.
+
+COMPONENTES — select support:
+- `campo-input.tsx`: adicionado `selectRef`, renderiza `<select>` com ChevronDown quando `tipo === "select"`. Opção placeholder disabled.
+- `grupo-campos.tsx`: mesmo suporte a select no grupo.
+- `clausula-card.tsx`: mesmo suporte a select nos campos extras das cláusulas.
+- `criar/types.ts`: `InputElement` agora inclui `HTMLSelectElement`; `InputRef` atualizado.
+
+REFACTORS — usar o motor (eliminar duplicação):
+- `preview-a4.tsx`: rewrite para usar `renderDocument` do motor. Removidas `preencherTemplate`, `LinhaRenderizada`, `linhasQuebradas`, `paginas` locais (tudo delegado ao motor). Props atualizadas: `clausulasSelecionadas?: string[]` + `modelo?: Modelo` (em vez de `clausulas?: Record<string, string>`).
+- `documento/detalhe-preview.tsx`: rewrite para usar `renderDocument`. Mesma API do PreviewA4.
+- `pdf/generator.ts`: rewrite para usar `fillDocument` + `classifyLine` do motor. Removidas `fillTemplate` local (broken — usava `__clausula_${key}` com schema antigo), `parseLine` local (duplicada), `buildContent` agora mapeia `LinhaClassificada` → pdfmake styles. `computeCamposOpcionais` local garante que o motor saiba quais campos são opcionais (RG separadores, endereço individual, extras de cláusulas não selecionadas).
+
+CRIAR-VIEW — `criar-view.tsx`:
+- Importa `aplicarComposicaoModelo` e `encodeClausulasSelecionadas` do motor (em vez de `aplicarComposicaoEndereco` de normalizers).
+- `etapasEfetivas` SIMPLIFICADO: não injeta mais etapas "campo" separadas para cada extra de cláusula — os extras já são preenchidos inline no ClausulaCard (redundância removida).
+- `respostasComEndereco` agora usa `aplicarComposicaoModelo` (compõe endereço + separadores RG em uma passada).
+- `camposOpcionais` estendido: inclui separadores RG (`<prefix>_rg_separador`), extras de cláusulas NÃO selecionadas (viram "" no template).
+- `salvarDocumento` agora persiste cláusulas selecionadas via `encodeClausulasSelecionadas` (`__clausula_${id} = "true"` no mapa de respostas — backward-compatible).
+- `PreviewA4` agora recebe `clausulasSelecionadas` + `modelo` (em vez de `clausulas` map).
+- `ChatStep` agora tem `key={stepIndex}` — força remount ao trocar de etapa, resetando state local (ex.: `cepEncontrado` não vaza entre etapas).
+
+DOCUMENTO-DETALHE-VIEW — `documento-detalhe-view.tsx`:
+- Importa `extractClausulasSelecionadas` do motor.
+- `clausulasSelecionadas` extraído das respostas salvas via `extractClausulasSelecionadas(doc.respostas)`.
+- `camposOpcionais` estendido igual ao criar-view (separadores RG + extras de cláusulas).
+- `DetalhePreview` agora recebe `clausulasSelecionadas` + `modelo`.
+
+Verificação com Agent Browser (Contrato de Locação):
+- Step 1 "Dados do Locador": 11 campos renderizam (nome, cpf, rg opcional, estado civil SELECT com 6 opções, cep, rua, número, complemento opcional, bairro, cidade, uf).
+- CEP "01001000" digitado → blur → ViaCEP preenche "Praça da Sé", "Sé", "São Paulo", "SP" + badge "endereço encontrado" + foco pula para Número.
+- Estado civil select funciona (via keyboard Space+ArrowDown+Enter — agent-browser `select` cmd tem bug, mas o componente funciona corretamente).
+- Step 2 "Dados do Locatário": mesmos 11 campos. `cepEncontrado` state resetado corretamente (key={stepIndex} fix).
+- Step 3 "Endereço do imóvel": 7 campos. CEP auto-fill funciona.
+- Step 4 "Valores": valor + prazo.
+- Step 5 "Cláusulas adicionais": 5 checkboxes (Fiador, Multa, Reajuste, Caução, Animais). Botão "Finalizar" (não "Avançar" — é a última etapa).
+- Fiador marcado → 2 extras aparecem inline (nome + CPF do fiador). Multa marcado → 1 extra aparece (valor da multa).
+- Finalizar → LoadingDocumento (1.5s) → SucessoView "Pronto! Seu Contrato de Locação está formatado e com validade legal."
+- Documento salvo com cláusulas persistidas (`__clausula_fiador=true`, `__clausula_multa=true` no mapa de respostas).
+
+Lint: `bun run lint` → exit 0 (0 errors, 0 warnings).
+TypeScript: `bunx tsc --noEmit` → 0 erros nos arquivos modificados (pré-existentes em examples/, scripts/, skills/ continuam não-relacionados).
+Console do browser: apenas warnings GSAP "target not found" (pre-existing, não-fatais).
+
+Stage Summary:
+- Motor modular de documentos criado em `src/lib/document-engine/` (6 módulos, ~600 LOC). Single source of truth para preencher templates, classificar linhas, paginar e compor endereços. Para adicionar um novo modelo, basta definir `etapas` + `template` em `lib/modelos.ts` — o motor cuida do resto.
+- 3 renderers refatorados para usar o motor: PreviewA4 (live preview), DetalhePreview (doc salvo), PDF generator (download). Eliminada duplicação de `fillTemplate` (3 cópias → 1) e `classifyLine`/`parseLine` (2 cópias → 1).
+- Fix crítico no `fillTemplate`: TWO-PASS agora resolve `{{key}}` dentro de corpos de cláusulas injetadas (antes ficavam literais — `{{fiador_nome}}` aparecia no documento final).
+- 6 modelos com partes completas (nome, cpf, rg opcional, estado civil SELECT, endereço residencial separado) + cláusulas dinâmicas reais com checkboxes e campos extras inline:
+  * contrato-locacao: 5 cláusulas (fiador, multa, reajuste, caução, animais)
+  * comodato: 3 cláusulas (responsabilidade, uso, devolução)
+  * compra-venda: 3 cláusulas (garantia, entrega, evicção)
+  * uniao-estavel: 3 cláusulas (alimentos, filhos, dissolução) + regime de bens SELECT
+  * procuracao-simples: 3 cláusulas (prazo, subestabelecimento, renúncia)
+- Helper `camposParte(prefix, label)` reutilizável gera 11 campos padronizados para qualquer "parte" (locador, locatário, vendedor, comprador, comodante, comodatário, outorgante, outorgado, pessoa1, pessoa2).
+- `tipo: "select"` + `opcoes: string[]` adicionado a CampoModelo — renderiza `<select>` com ChevronDown em CampoPergunta, GrupoCampos e ClausulaCard extras.
+- Cláusulas persistidas via convenção `__clausula_${id} = "true"` no mapa de respostas — backward-compatible (docs antigos sem cláusulas continuam funcionando, extração devolve array vazio).
+- `aplicarComposicaoModelo` agora compõe também separadores de RG: `<prefix>_rg_separador` = ", RG <valor>" ou "" — resolve o problema de "CPF 123{{rg}}" virar "CPF 12312.345" ou "CPF 123, RG 12.345" graciosamente.
+- Fix UX: `key={stepIndex}` no ChatStep força remount ao trocar de etapa — estado local (ex.: `cepEncontrado`) não vaza mais entre partes diferentes.

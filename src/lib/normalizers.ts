@@ -1,8 +1,14 @@
 /**
  * Sistema de normalização/autocorreção para campos de formulário.
  * Determinístico (não-IA): instantâneo, gratuito, 100% confiável, offline.
+ *
+ * NOTA: A composição de endereço (composeEndereco) e a aplicação de composição
+ * a partir das etapas do modelo (aplicarComposicaoModelo) foram movidas para
+ * `lib/document-engine/compose.ts` — single source of truth para todos os
+ * renderers (PreviewA4, DetalhePreview, PDF). Aqui ficam apenas as
+ * normalizações de campo único (estado, logradouro, data, CPF, CNPJ, CEP,
+ * telefone) usadas pelos inputs durante a digitação.
  */
-import type { EnderecoConfig } from "./types";
 
 const ESTADOS_MAP: Record<string, string> = {
   AC:"AC",AL:"AL",AP:"AP",AM:"AM",BA:"BA",CE:"CE",DF:"DF",ES:"ES",GO:"GO",MA:"MA",MT:"MT",MS:"MS",MG:"MG",PA:"PA",PB:"PB",PR:"PR",PE:"PE",PI:"PI",RJ:"RJ",RN:"RN",RS:"RS",RO:"RO",RR:"RR",SC:"SC",SP:"SP",SE:"SE",TO:"TO",
@@ -140,72 +146,12 @@ export function temPrefixoLogradouro(entrada: string): boolean {
 }
 
 // ============================================================================
-// COMPOSIÇÃO DE ENDEREÇO — junta os campos separados em uma string única
-// para o template
+// COMPOSIÇÃO DE ENDEREÇO — movida para lib/document-engine/compose.ts
 // ============================================================================
-
-/**
- * Compõe a string final de endereço a partir dos campos separados.
- * Formato: "<logradouro>, <numero> [<complemento>] - <bairro>, <cidade>/<uf>, CEP <cep>"
- * Campos vazios são omitidos graciosamente.
- */
-export function composeEndereco(
-  answers: Record<string, string>,
-  config: EnderecoConfig
-): string {
-  const logradouro = (answers[config.logradouroKey] ?? "").trim();
-  const numero = (answers[config.numeroKey] ?? "").trim();
-  const complemento = config.complementoKey
-    ? (answers[config.complementoKey] ?? "").trim()
-    : "";
-  const bairro = (answers[config.bairroKey] ?? "").trim();
-  const cidade = (answers[config.cidadeKey] ?? "").trim();
-  const uf = normalizarEstado(answers[config.ufKey] ?? "").trim();
-  const cep = (answers[config.cepKey] ?? "").trim();
-
-  const partes: string[] = [];
-
-  // "Rua das Flores, 123" ou "Rua das Flores, 123, Apto 45"
-  if (logradouro) {
-    let ini = logradouro;
-    if (numero) ini += `, ${numero}`;
-    if (complemento) ini += `, ${complemento}`;
-    partes.push(ini);
-  }
-
-  // "Centro"
-  if (bairro) partes.push(bairro);
-
-  // "São Paulo/SP"
-  if (cidade && uf) partes.push(`${cidade}/${uf}`);
-  else if (cidade) partes.push(cidade);
-  else if (uf) partes.push(uf);
-
-  // "CEP 01234-567"
-  if (cep) partes.push(`CEP ${cep}`);
-
-  return partes.join(" - ");
-}
-
-/**
- * Recebe o mapa de respostas e devolve um NOVO mapa com as strings de
- * endereço compostas a partir das configurações encontradas nas etapas.
- * Útil para passar para o PreviewA4 (live preview) e para createDocument (save).
- */
-export function aplicarComposicaoEndereco<T extends { etapas?: unknown }>(
-  answers: Record<string, string>,
-  modelo: T
-): Record<string, string> {
-  const next: Record<string, string> = { ...answers };
-  const etapas = (modelo as { etapas?: Array<{ tipo: string; endereco?: EnderecoConfig }> }).etapas;
-  if (!etapas) return next;
-  for (const etapa of etapas) {
-    if (etapa.tipo === "campo_grupo" && etapa.endereco) {
-      next[etapa.endereco.saidaKey] = composeEndereco(next, etapa.endereco);
-    }
-  }
-  return next;
-}
+// As funções composeEndereco, aplicarComposicaoModelo e helpers de cláusulas
+// agora vivem em lib/document-engine/compose.ts (single source of truth).
+// Importe de lá:
+//   import { composeEndereco, aplicarComposicaoModelo } from "@/lib/document-engine";
 
 export function normalizarData(entrada: string): string {
   const nums = entrada.replace(/\D/g, "");

@@ -5,7 +5,7 @@
 
 export type Categoria = "Locação" | "Família" | "Comercial" | "Pessoal";
 
-export type TipoCampo = "text" | "textarea" | "date" | "number";
+export type TipoCampo = "text" | "textarea" | "date" | "number" | "select";
 
 export interface CampoModelo {
   /** chave usada no template {{key}} */
@@ -14,6 +14,8 @@ export interface CampoModelo {
   placeholder?: string;
   microcopy?: string;
   tipo?: TipoCampo;
+  /** quando tipo === "select", opções disponíveis no dropdown */
+  opcoes?: string[];
   /** se true, campo obrigatório (default true) */
   obrigatorio?: boolean;
 }
