@@ -80,6 +80,11 @@ export function aplicarComposicaoModelo(
       // composição de endereço (quando configurado)
       if (etapa.endereco) {
         next[etapa.endereco.saidaKey] = composeEndereco(next, etapa.endereco);
+        // Normaliza o campo UF individual in-place para que
+        // {{prefix_uf}} no template (ex.: foro) tenha o valor canonico (SP, RJ, ...)
+        const ufRaw = next[etapa.endereco.ufKey] ?? "";
+        const ufNorm = normalizarEstado(ufRaw);
+        if (ufNorm !== ufRaw) next[etapa.endereco.ufKey] = ufNorm;
       }
       // composição de separadores para campos opcionais comuns (RG)
       // Detecta chaves que terminam em "_rg" ou são exatamente "rg"
