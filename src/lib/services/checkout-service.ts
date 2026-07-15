@@ -1,10 +1,12 @@
 /**
  * Checkout service — integração com gateways de pagamento brasileiros.
  * Suporta kirvano, perfectpay, stripe. Demo mode simula.
- * Planos: avulso R$9,90 (sem conta), pro R$24,90 (com conta).
+ * Preços e rótulos vêm de `@/lib/pricing` (fonte única de verdade).
  */
+import { PLAN_PRICES, PLAN_LABELS, type PaidPlan } from "@/lib/pricing";
+
 export type CheckoutProvider = "kirvano" | "perfectpay" | "stripe";
-export type CheckoutPlan = "avulso" | "pro";
+export type CheckoutPlan = PaidPlan;
 
 export interface CheckoutParams {
   provider?: CheckoutProvider; plan: CheckoutPlan; userId?: string; userEmail?: string;
@@ -14,8 +16,9 @@ export interface CheckoutResult {
   checkoutUrl: string; orderId: string; provider: CheckoutProvider; plan: CheckoutPlan; amount: number;
 }
 
-export const PLAN_PRICES: Record<CheckoutPlan, number> = { avulso: 9.9, pro: 24.9 };
-export const PLAN_LABELS: Record<CheckoutPlan, string> = { avulso: "Documento Avulso", pro: "Plano Pro (mensal)" };
+// Re-exporta para compatibilidade — consumidores existentes continuam funcionando.
+// Prefira importar diretamente de `@/lib/pricing` em código novo.
+export { PLAN_PRICES, PLAN_LABELS } from "@/lib/pricing";
 
 export const ACTIVE_PROVIDER: CheckoutProvider | "demo" =
   (process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER as CheckoutProvider | undefined) || "demo";
