@@ -1,5 +1,5 @@
 import { COMPANY } from "@/lib/company";
-import { COOKIE_PREFS_KEY } from "@/lib/services/consent-service";
+import { ReopenPrefsButton } from "./reopen-prefs-button";
 
 /**
  * CookiesContent — conteúdo da Política de Cookies, versão 1.0.
@@ -8,9 +8,8 @@ import { COOKIE_PREFS_KEY } from "@/lib/services/consent-service";
  * terceiros, gestão de preferências (botão "Reabrir preferências" que limpa o
  * localStorage e recarrega a página), links para navegadores, atualizações.
  *
- * O botão "Reabrir preferências" chama `reopenPreferences()` que usa `window`
- * — só funciona client-side, mas é seguro chamar num Server Component porque
- * o handler só executa no clique (no browser).
+ * Server Component. O botão "Reabrir preferências" é um Client Component
+ * separado (ReopenPrefsButton) para evitar passar onClick pelo server.
  */
 export function CookiesContent() {
   return (
@@ -97,13 +96,7 @@ export function CookiesContent() {
         banner reaparecer.
       </p>
       <p>
-        <button
-          type="button"
-          onClick={reopenPreferences}
-          className="inline-flex items-center justify-center rounded-xl bg-[var(--blue-royal)] px-5 py-3 text-sm font-semibold text-white hover:bg-[var(--navy)] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)]"
-        >
-          Reabrir preferências
-        </button>
+        <ReopenPrefsButton />
       </p>
       <p className="text-sm">
         (Isso remove a chave <code>docfacil:cookie-prefs</code> do armazenamento
@@ -173,17 +166,3 @@ export function CookiesContent() {
   );
 }
 
-/**
- * Limpa as preferências de cookies (localStorage) e recarrega a página para
- * o banner reaparecer. O handler só executa no browser (onclick), então é
- * seguro mesmo quando o conteúdo é renderizado por um Server Component.
- */
-function reopenPreferences() {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.removeItem(COOKIE_PREFS_KEY);
-  } catch {
-    /* ignore */
-  }
-  window.location.reload();
-}
