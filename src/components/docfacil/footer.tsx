@@ -3,6 +3,7 @@
 import { Logo } from "./logo";
 import { useNav, type View } from "./nav-context";
 import { COMPANY } from "@/lib/company";
+import { LEGAL_PATHS } from "@/lib/legal/legal-link";
 
 const COLS: { title: string; links: { label: string; view?: View }[] }[] = [
   {
@@ -89,16 +90,37 @@ export function Footer() {
               {c.title}
             </h4>
             <ul className="mt-3 space-y-2.5">
-              {c.links.map((l) => (
-                <li key={l.label}>
-                  <button
-                    onClick={() => l.view && navigate(l.view)}
-                    className="text-white/60 hover:text-white text-sm transition-colors text-left"
-                  >
-                    {l.label}
-                  </button>
-                </li>
-              ))}
+              {c.links.map((l) => {
+                // Views que agora têm rota file-based real ganham href (SEO);
+                // demais continuam como botão (só navegam via SPA).
+                const realPath = LEGAL_PATHS[l.view ?? ""];
+                if (realPath) {
+                  return (
+                    <li key={l.label}>
+                      <a
+                        href={realPath}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (l.view) navigate(l.view);
+                        }}
+                        className="text-white/60 hover:text-white text-sm transition-colors"
+                      >
+                        {l.label}
+                      </a>
+                    </li>
+                  );
+                }
+                return (
+                  <li key={l.label}>
+                    <button
+                      onClick={() => l.view && navigate(l.view)}
+                      className="text-white/60 hover:text-white text-sm transition-colors text-left"
+                    >
+                      {l.label}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ))}
@@ -113,24 +135,38 @@ export function Footer() {
               {COMPANY.tagline}
             </p>
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate("privacidade")}
+              {/* Links legais com href real (SEO/crawlable) + navegação SPA
+                  via onClick (evita reload dentro da home SPA). */}
+              <a
+                href="/privacidade"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("privacidade");
+                }}
                 className="hover:text-white/80 transition-colors"
               >
                 Privacidade
-              </button>
-              <button
-                onClick={() => navigate("termos")}
+              </a>
+              <a
+                href="/termos"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("termos");
+                }}
                 className="hover:text-white/80 transition-colors"
               >
                 Termos
-              </button>
-              <button
-                onClick={() => navigate("cookies")}
+              </a>
+              <a
+                href="/cookies"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("cookies");
+                }}
                 className="hover:text-white/80 transition-colors"
               >
                 Cookies
-              </button>
+              </a>
             </div>
           </div>
 
