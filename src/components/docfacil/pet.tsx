@@ -10,33 +10,42 @@ gsap.registerPlugin(useGSAP);
 /**
  * Pet — mascote corujinha do DocFacil.
  * Coruja com orelhas (tufts), símbolo de sabedoria + documentos.
- * Animações GSAP fluidas (um único useGSAP coordena tudo, sem tremor).
+ *
+ * Estrutura DOM:
+ *   <div root>           ← APENAS posicionamento (w/h, relative)
+ *     <svg círculo>      ← SMIL animation rotate 40s (independente)
+ *     <svg corujinha>    ← GSAP mood animations (bounce/scale/tilt) — NÃO afeta o círculo
+ *
+ * Bug anterior: GSAP aplicava rotation/translate no root, fazendo o círculo
+ * rodar junto com a corujinha. Agora o root é estático; só a corujinha se move.
  */
 type Mood = "idle" | "falando" | "feliz" | "atencao" | "pensando";
 
 export function Pet({ mood = "idle", size = 80, className }: { mood?: Mood; size?: number; className?: string; }) {
-  const root = useRef<HTMLDivElement>(null);
+  const corujinha = useRef<SVGSVGElement>(null);
 
   useGSAP(() => {
-    const el = root.current;
+    const el = corujinha.current;
     if (!el) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     gsap.killTweensOf(el);
-    gsap.to(el, { y: 0, rotation: 0, scale: 1, duration: 0.2, ease: "power2.out", onComplete: () => applyMood(el, mood) });
-  }, { scope: root, dependencies: [mood] });
+    // reset rápido antes de aplicar novo mood
+    gsap.set(el, { y: 0, rotation: 0, scale: 1 });
+    applyMood(el, mood);
+  }, { scope: corujinha, dependencies: [mood] });
 
   return (
-    <div ref={root} className={cn("relative inline-block", className)} style={{ width: size, height: size }}>
+    <div className={cn("relative inline-block", className)} style={{ width: size, height: size }}>
       {mood === "pensando" && <ThinkingBubbles />}
       {mood === "falando" && <TalkingDots />}
-      {/* Círculo tracejado — SVG separado, rotaciona independentemente do pet */}
+      {/* Círculo tracejado — SVG separado, roda via SMIL (40s) — não é afetado pelo GSAP da corujinha */}
       <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full" aria-hidden="true" style={{ pointerEvents: "none" }}>
         <circle cx="50" cy="50" r="46" fill="none" stroke="var(--blue-royal)" strokeWidth="1.5" strokeDasharray="3 4" opacity="0.4">
           <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="40s" repeatCount="indefinite" />
         </circle>
       </svg>
-      {/* Corujinha — SVG separado, não rotaciona com o círculo */}
-      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full" aria-hidden="true">
+      {/* Corujinha — SVG separado, GSAP aplica mood AQUI (não no root) — o círculo fica intacto */}
+      <svg ref={corujinha} viewBox="0 0 100 100" className="absolute inset-0 w-full h-full" aria-hidden="true" style={{ transformOrigin: "50% 70%" }}>
         {/* Orelhas (tufts sutis e arredondados) */}
         <path d="M 33 34 Q 30 25 35 24 Q 38 29 37 34 Z" fill="var(--blue-royal)" />
         <path d="M 67 34 Q 70 25 65 24 Q 62 29 63 34 Z" fill="var(--blue-royal)" />
@@ -111,32 +120,38 @@ export function Pet({ mood = "idle", size = 80, className }: { mood?: Mood; size
   );
 }
 
-function applyMood(el: HTMLDivElement, mood: Mood): void {
+/**
+ * Aplica animações de mood na corujinha (SVG, NÃO no root div).
+ * O círculo tracejado permanece intacto rodando via SMIL no seu próprio SVG.
+ */
+function applyMood(el: SVGSVGElement, mood: Mood): void {
   switch (mood) {
     case "feliz":
       gsap.timeline()
-        .to(el, { y: -18, scale: 1.08, duration: 0.3, ease: "back.out(1.7)" })
-        .to(el, { rotation: -8, duration: 0.15, ease: "power1.inOut" })
-        .to(el, { rotation: 8, duration: 0.15, ease: "power1.inOut" })
-        .to(el, { rotation: 0, duration: 0.15, ease: "power1.inOut" })
-        .to(el, { y: 0, scale: 1, duration: 0.4, ease: "bounce.out" })
-        .to(el, { y: -5, scale: 1.02, duration: 0.8, ease: "sine.inOut", yoyo: true, repeat: -1 });
+        .to(el, { y: -14, scale: 1.06, duration: 0.28, ease: "back.out(1.7)" })
+        .to(el, { rotation: -5, duration: 0.12, ease: "power1.inOut" })
+        .to(el, { rotation: 5, duration: 0.12, ease: "power1.inOut" })
+        .to(el, { rotation: 0, duration: 0.12, ease: "power1.inOut" })
+        .to(el, { y: 0, scale: 1, duration: 0.35, ease: "bounce.out" })
+        .to(el, { y: -3, scale: 1.015, duration: 0.8, ease: "sine.inOut", yoyo: true, repeat: -1 });
       break;
     case "atencao":
       gsap.timeline()
-        .to(el, { rotation: -3, duration: 0.08, ease: "power1.inOut" })
-        .to(el, { rotation: 3, duration: 0.08, ease: "power1.inOut" })
         .to(el, { rotation: -2, duration: 0.08, ease: "power1.inOut" })
         .to(el, { rotation: 2, duration: 0.08, ease: "power1.inOut" })
-        .to(el, { rotation: 0, duration: 0.15, ease: "power2.out" })
-        .to(el, { rotation: 6, duration: 1.2, ease: "sine.inOut", yoyo: true, repeat: -1, transformOrigin: "50% 85%" });
+        .to(el, { rotation: -1.5, duration: 0.08, ease: "power1.inOut" })
+        .to(el, { rotation: 1.5, duration: 0.08, ease: "power1.inOut" })
+        .to(el, { rotation: 0, duration: 0.15, ease: "power2.out" });
+      // bob suave contínuo (sem rotation contínua — era isso que fazia "girar")
+      gsap.to(el, { y: -2, duration: 1.4, ease: "sine.inOut", yoyo: true, repeat: -1 });
       break;
     case "falando":
-      gsap.to(el, { rotation: 2, duration: 0.7, ease: "sine.inOut", yoyo: true, repeat: -1, transformOrigin: "50% 85%" });
+      // apenas oscilação vertical sutil + scale — sem rotation (não "gira")
+      gsap.to(el, { y: -2, duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: -1 });
       gsap.to(el, { scale: 1.02, duration: 1.5, ease: "sine.inOut", yoyo: true, repeat: -1, transformOrigin: "50% 60%" });
       break;
     case "pensando":
-      gsap.to(el, { y: -4, duration: 2, ease: "sine.inOut", yoyo: true, repeat: -1 });
+      gsap.to(el, { y: -3, duration: 2, ease: "sine.inOut", yoyo: true, repeat: -1 });
       break;
     case "idle":
     default:

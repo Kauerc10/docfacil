@@ -38,15 +38,24 @@ export function CampoPergunta({
   const inputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Mount: animation campoIn (fade + slide-up).
+  // Mount: animação de entrada suave (fade + slide-up + scale leve).
+  // Mais amigável que a animação anterior — eased spring-like curve.
   useGSAP(
     () => {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       if (!root.current) return;
-      gsap.fromTo(
+      const tl = gsap.timeline();
+      tl.fromTo(
         root.current,
-        { y: 16, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.42, ease: "power3.out", delay: 0.05 }
+        { y: 18, opacity: 0, scale: 0.98 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.42, ease: "power3.out" }
+      );
+      // label + input + microcopy entram em stagger sutil
+      tl.fromTo(
+        root.current.querySelectorAll("[data-campo='el']"),
+        { y: 8, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.32, ease: "power3.out", stagger: 0.06 },
+        "-=0.18"
       );
     },
     { scope: root }
@@ -92,67 +101,69 @@ export function CampoPergunta({
   const inputMode = campo.tipo === "number" ? "decimal" : "text";
 
   return (
-    <div ref={root} className="space-y-2" style={{ animation: "campoIn 0.42s cubic-bezier(0.22,1,0.36,1)" }}>
-      <style>{`@keyframes campoIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-
+    <div ref={root} className="space-y-2">
       {isTextarea ? (
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          placeholder={campo.placeholder}
-          aria-label={campo.pergunta}
-          aria-invalid={!!erro}
-          rows={3}
-          disabled={submitting}
-          className={cn(
-            "w-full min-h-[3.5rem] px-4 py-3 text-xl rounded-xl bg-surface border-2 outline-none transition-all resize-none disabled:opacity-60 placeholder:text-ink/40",
-            "focus:shadow-[0_8px_24px_-12px_rgba(37,84,199,0.45)]",
-            erro
-              ? "border-[var(--coral)] focus:border-[var(--coral)]"
-              : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]"
-          )}
-        />
+        <div data-campo="el">
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            placeholder={campo.placeholder}
+            aria-label={campo.pergunta}
+            aria-invalid={!!erro}
+            rows={3}
+            disabled={submitting}
+            className={cn(
+              "w-full min-h-[3.5rem] px-4 py-3 text-xl rounded-xl bg-surface border-2 outline-none transition-all resize-none disabled:opacity-60 placeholder:text-ink/40",
+              "focus:shadow-[0_8px_24px_-12px_rgba(37,84,199,0.45)]",
+              erro
+                ? "border-[var(--coral)] focus:border-[var(--coral)]"
+                : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]"
+            )}
+          />
+        </div>
       ) : (
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          placeholder={campo.placeholder}
-          aria-label={campo.pergunta}
-          aria-invalid={!!erro}
-          inputMode={inputMode}
-          disabled={submitting}
-          className={cn(
-            "w-full h-14 px-4 text-xl rounded-xl bg-surface border-2 outline-none transition-all disabled:opacity-60 placeholder:text-ink/40",
-            "focus:shadow-[0_8px_24px_-12px_rgba(37,84,199,0.45)]",
-            erro
-              ? "border-[var(--coral)] focus:border-[var(--coral)]"
-              : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]"
-          )}
-        />
+        <div data-campo="el">
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            placeholder={campo.placeholder}
+            aria-label={campo.pergunta}
+            aria-invalid={!!erro}
+            inputMode={inputMode}
+            disabled={submitting}
+            className={cn(
+              "w-full h-14 px-4 text-xl rounded-xl bg-surface border-2 outline-none transition-all disabled:opacity-60 placeholder:text-ink/40",
+              "focus:shadow-[0_8px_24px_-12px_rgba(37,84,199,0.45)]",
+              erro
+                ? "border-[var(--coral)] focus:border-[var(--coral)]"
+                : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]"
+            )}
+          />
+        </div>
       )}
 
       {erro && (
-        <p className="text-sm text-[var(--coral)] font-medium pl-1 flex items-center gap-1.5">
+        <p data-campo="el" className="text-sm text-[var(--coral)] font-medium pl-1 flex items-center gap-1.5">
           <span aria-hidden="true">⚠</span>
           {erro}
         </p>
       )}
 
       {campo.microcopy && !erro && (
-        <p className="pen-note text-sm pl-1 flex items-start gap-1.5">
+        <p data-campo="el" className="pen-note text-sm pl-1 flex items-start gap-1.5">
           <span aria-hidden="true" className="text-[var(--selo-green)] mt-px">•</span>
           <span>{campo.microcopy}</span>
         </p>
       )}
 
-      <div className="mt-3 flex items-center gap-3">
+      <div data-campo="el" className="mt-3 flex items-center gap-3">
         <button
           type="button"
           onClick={onAvancar}

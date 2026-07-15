@@ -123,12 +123,19 @@ function DocumentoDetalheContent() {
   // Campos opcionais do modelo (para o preview tratar vazio como "" em vez
   // de "______________________"). Calculado ANTES dos early returns pra
   // respeitar a regra de hooks.
+  // Inclui campos individuais de endereço (ex.: "_cep", "_rua") — só a
+  // string composta (saidaKey) aparece no template.
   const camposOpcionais = useMemo(() => {
     if (!modelo?.etapas) return [];
     const out: string[] = [];
     for (const etapa of modelo.etapas) {
       if (etapa.tipo === "campo_grupo") {
         for (const c of etapa.campos) if (c.obrigatorio === false) out.push(c.key);
+        if (etapa.endereco) {
+          const e = etapa.endereco;
+          out.push(e.cepKey, e.logradouroKey, e.numeroKey, e.bairroKey, e.cidadeKey, e.ufKey);
+          if (e.complementoKey) out.push(e.complementoKey);
+        }
       } else if (etapa.tipo === "campo" && etapa.campo.obrigatorio === false) {
         out.push(etapa.campo.key);
       }

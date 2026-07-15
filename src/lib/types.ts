@@ -42,15 +42,48 @@ export interface ClausulaDinamica {
 export type TipoEtapa = "campo" | "campo_grupo" | "clausulas";
 
 /**
+ * Configuração de endereço para um `campo_grupo` — habilita:
+ *  - Auto-preenchimento via ViaCEP quando o usuário digita o CEP
+ *  - Normalização automática do logradouro (strip/normalização de "Rua"/"Avenida"/"Av." etc.)
+ *  - Composição da string final que vai para o template (saidaKey)
+ *
+ * A string composta tem o formato:
+ *   "<logradouro>, <numero> [<complemento>] - <bairro>, <cidade>/<uf>, CEP <cep>"
+ * e é atribuída à chave `saidaKey` (ex.: "endereco" ou "imovel") no mapa de
+ * respostas enviado ao template. Os campos individuais continuam no mapa
+ * para referência, mas o template só consome `saidaKey`.
+ */
+export interface EnderecoConfig {
+  /** chave do campo de CEP (ex.: "cep") */
+  cepKey: string;
+  /** chave do campo de logradouro/rua (ex.: "rua") */
+  logradouroKey: string;
+  /** chave do campo de número (ex.: "numero") */
+  numeroKey: string;
+  /** chave do campo de complemento (opcional, ex.: "complemento") */
+  complementoKey?: string;
+  /** chave do campo de bairro (ex.: "bairro") */
+  bairroKey: string;
+  /** chave do campo de cidade (ex.: "cidade") */
+  cidadeKey: string;
+  /** chave do campo de UF/estado (ex.: "uf") */
+  ufKey: string;
+  /** chave do campo "virtual" no template que recebe a string composta final */
+  saidaKey: string;
+}
+
+/**
  * Etapa do fluxo /criar. Cada etapa é um dos três tipos:
  *  - "campo"       = uma única pergunta (1 CampoModelo)
  *  - "campo_grupo" = vários campos relacionados em um único card
  *                    (ex.: endereço com CEP → logradouro → bairro → cidade → UF)
+ *                    Quando `endereco` está presente, o grupo ganha auto-fill
+ *                    ViaCEP + normalização de logradouro + composição automática.
  *  - "clausulas"   = lista de cláusulas dinâmicas opcionais
  */
 export type EtapaModelo =
   | { tipo: "campo"; campo: CampoModelo }
-  | { tipo: "campo_grupo"; tituloGrupo?: string; campos: CampoModelo[] }
+  | { tipo: "campo_grupo"; tituloGrupo?: string; campos: CampoModelo[]; endereco?: EnderecoConfig }
   | { tipo: "clausulas"; titulo?: string; clausulas: ClausulaDinamica[] };
 
 export interface Modelo {

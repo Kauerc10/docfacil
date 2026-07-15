@@ -15,7 +15,7 @@
  * Mask + validation helpers live here too so both the criar flow and the
  * documento-detalhe view use the same deterministic (non-AI) rules.
  */
-import type { CampoModelo } from "@/lib/types";
+import type { CampoModelo, EnderecoConfig } from "@/lib/types";
 
 // === Mascote mood (espelha o tipo interno do pet.tsx) ===
 export type PetMood = "idle" | "falando" | "feliz" | "atencao" | "pensando";
@@ -25,9 +25,11 @@ export type InputElement = HTMLInputElement | HTMLTextAreaElement;
 export type InputRef = InputElement | null;
 
 // === Etapa (step) of the criar flow ===
+// "grupo" pode ter `endereco` configurado — quando presente, habilita
+// auto-fill ViaCEP, normalização de logradouro e composição automática.
 export type EtapaModelo =
   | { tipo: "pergunta"; campo: CampoModelo }
-  | { tipo: "grupo"; titulo?: string; campos: CampoModelo[] }
+  | { tipo: "grupo"; titulo?: string; campos: CampoModelo[]; endereco?: EnderecoConfig }
   | { tipo: "clausulas"; titulo?: string; clausulas: ClausulaDinamica[] };
 
 // === Dynamic clause (optional paragraph the user toggles) ===

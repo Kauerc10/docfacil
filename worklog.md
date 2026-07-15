@@ -752,3 +752,116 @@ Stage Summary:
 - Todos os `console.error` removidos dos 4 views reescritos — substituídos por `logger.error(scope, message, error, context)` com scope identificado (CriarView, SucessoView, DocumentoDetalhe). DocumentoDetalhe usa logger do hook internamente.
 - `UX_CONFIG` (TYPING_SPEED, INPUT_FOCUS_DELAY, PET_HAPPY_DURATION, PROGRESS_PULSE_DURATION) usado em vez de magic numbers. `SUCCESS_MESSAGES` (PDF_GENERATED, CONSENT_RECORDED) e `ERROR_MESSAGES` (PDF_FAILED) usados em toasts.
 - Próximo subagent pode: (a) adicionar `ClausulaDinamica` reais aos MODELOS (hoje nenhum template usa `{{clausula:id}}` — o campo `etapas[].clausulas` está vazio em todos os modelos); (b) adicionar campos CEP/logradouro/bairro/cidade/uf separados ao `contrato-locacao` (hoje é um textarea `imovel`) e plugar o `camposEndereco` do GrupoCampos; (c) migrar os subcomponentes `criar/types.ts` pra usar `campo`/`campo_grupo` (em vez de `pergunta`/`grupo`) eliminando a tradução boundary no criar-view.
+
+---
+Task ID: UX-2
+Agent: general-purpose
+Task: Pet não gira + melhorar perguntas/endereço/correção de rua + animação de campos + commit/push
+
+Work Log:
+- Lidos 12 arquivos: pet.tsx, hero.tsx, how-it-works.tsx, loading-documento.tsx, sucesso-view.tsx, chat-step.tsx, grupo-campos.tsx, campo-input.tsx, criar-view.tsx, criar/types.ts, modelos.ts, lib/types.ts, lib/normalizers.ts, preview-a4.tsx, documento-detalhe-view.tsx, services/cep-service.ts.
+
+FILE 1 — `src/components/docfacil/pet.tsx` (rewrite):
+- Bug da rotação: GSAP `applyMood(el, mood)` recebia `el = root.current` (DIV pai) — aplicava rotation em TODO o container, fazendo o círculo tracejado girar JUNTO com a corujinha.
+- Fix: criado `corujinha = useRef<SVGSVGElement>` apontando para o SVG da corujinha. `applyMood` agora recebe `corujinha.current` (NÃO o root). O root div é estático (apenas positioning). O círculo continua girando via SMIL animation no próprio SVG (40s, 360°) — independente da corujinha.
+- Moods revisados:
+  - `feliz`: timeline gsap com bounce (y -14, scale 1.06) + tilt -5/+5/0° (curto, só na animação inicial) + bob contínuo suave (-3px yoyo) — sem rotation contínua.
+  - `atencao`: shake rápido -2/+2° (0.08s cada) + bob contínuo -2px yoyo (1.4s) — sem rotation contínua.
+  - `falando`: apenas bob vertical -2px + scale 1.02 (sem rotation — antes tinha `rotation: 2` yoyo que era parte do problema).
+  - `pensando`: bob -3px yoyo 2s.
+  - `idle`: scale 1.03 yoyo 1.8s (sem rotation).
+- `gsap.set(el, { y: 0, rotation: 0, scale: 1 })` reset rápido antes de aplicar novo mood (evita tween fantasma).
+- `transformOrigin: "50% 70%"` no estilo inline do SVG (pivô abaixo do centro — animações mais naturais).
+
+FILE 2 — `src/components/docfacil/hero.tsx` (fix critical):
+- ROOT CAUSE da rotação: no `useGSAP` do hero havia `gsap.to("[data-hero='selo'] svg", { rotation: 360, duration: 36, repeat: -1 })` que selecionava TODOS os SVGs dentro de `[data-hero='selo']` — incluindo AMBOS os SVGs do Pet (círculo + corujinha). A corujinha girava 360° em 36s por causa disso. Removido.
+- O círculo já gira via SMIL no próprio SVG (40s, 360°) — não precisa do GSAP duplicar.
+- Comentário explicativo deixado no lugar do código removido.
+
+FILE 3 — `src/lib/types.ts` (extensão):
+- Adicionado tipo `EnderecoConfig` com 8 campos: `cepKey`, `logradouroKey`, `numeroKey`, `complementoKey?`, `bairroKey`, `cidadeKey`, `ufKey`, `saidaKey` (chave virtual no template que recebe a string composta).
+- Estendido `EtapaModelo` (variante `campo_grupo`) com `endereco?: EnderecoConfig` opcional.
+
+FILE 4 — `src/lib/normalizers.ts` (extensão grande):
+- Adicionado `normalizarLogradouro(entrada)`:
+  - Detecta primeiro token como tipo de logradouro conhecido (rua, avenida, av, av., travessa, tv, alameda, praça, pça, rodovia, rod, estrada, est, via, largo, lgo, beco, viela, quadra, qd — todos com e sem ponto final).
+  - Se reconhecido: normaliza para forma canônica ("Rua", "Avenida", "Travessa", "Alameda", "Praça", "Rodovia", "Estrada", "Via", "Largo", "Beco", "Viela", "Quadra") + Title Case no restante.
+  - Se NÃO reconhecido: assume "Rua" como prefixo padrão (mais comum no Brasil) + Title Case.
+  - Title Case preserva conectivos minúsculos (da, de, das, dos, do, e, ao, aos, à, às, na, no, nas, nos) — sempre em minúsculas em logradouros.
+  - Exemplos: "rua arnoldo beck" → "Rua Arnoldo Beck"; "arnoldo beck" → "Rua Arnoldo Beck"; "av. paulista" → "Avenida Paulista"; "praça da sé" → "Praça da Sé".
+- Adicionado `temPrefixoLogradouro(entrada)` para detectar prefixo (útil para UI).
+- Adicionado `composeEndereco(answers, config)`: monta string final no formato `"<logradouro>, <numero> [<complemento>] - <bairro>, <cidade>/<uf>, CEP <cep>"`. Campos vazios são omitidos graciosamente.
+- Adicionado `aplicarComposicaoEndereco(answers, modelo)`: percorre `modelo.etapas`, encontra todas com `endereco` configurado, compõe as strings e atribui às respectivas `saidaKey` no mapa de respostas. Retorna NOVO mapa (não muta o original).
+
+FILE 5 — `src/lib/modelos.ts` (rewrite completo):
+- Criada helper `camposEndereco(saidaKey, prefixoLabel)` que retorna `{ campos: CampoModelo[], endereco: EnderecoConfig }` — 7 campos padronizados (CEP, Rua, Número, Complemento opcional, Bairro, Cidade, UF) com perguntas amigáveis (ex.: "CEP do imóvel:", "Nome da rua da sua residência:").
+- Cada modelo reescrito com:
+  - Perguntas mais simples e diretas (pensando em pessoa idosa/leiga): "Seu nome completo:" em vez de "Nome completo do locador (quem está alugando):"; "O que está sendo vendido?" em vez de "O que está sendo vendido?"; etc.
+  - Microcopy com exemplos concretos: "Pode digitar com ou sem a palavra \"Rua\" — ajustamos para você."; "Pode digitar a sigla (SP) ou o nome (São Paulo)."; "Se não tiver número, digite S/N.".
+  - Placeholders com exemplos brasileiros realistas.
+- 3 modelos ganharam endereço em campos separados:
+  * `contrato-locacao`: etapa "Endereço do imóvel" com `saidaKey: "imovel"` (template continua usando `{{imovel}}`).
+  * `declaracao-residencia`: etapa "Endereço da sua residência" com `saidaKey: "endereco"` (template continua usando `{{endereco}}`).
+  * `uniao-estavel`: etapa "Endereço onde moram juntos" com `saidaKey: "endereco"` (template continua usando `{{endereco}}`). Também consolidada etapa "Pessoas da união e data de início" (pessoa1, pessoa2, inicio em 1 grupo só).
+- `uniao-estavel` reduziu de 2 etapas (Pessoas / Datas e endereço) para 2 etapas (Pessoas+data / Endereço) — endereço vira grupo separado.
+- Templates preservados 100% (continuam usando `{{endereco}}` / `{{imovel}}` — a string composta é atribuída via `aplicarComposicaoEndereco` em criar-view.tsx).
+
+FILE 6 — `src/components/docfacil/views/criar/types.ts` (extensão):
+- Importado `EnderecoConfig` de `@/lib/types`.
+- Estendido `EtapaModelo` (variante `grupo`) com `endereco?: EnderecoConfig` — espelha a lib/types.ts mas mantém o nome "grupo" (legacy).
+
+FILE 7 — `src/components/docfacil/views/criar-view.tsx` (extensão):
+- Importado `aplicarComposicaoEndereco` de `@/lib/normalizers`.
+- `etapaChat` tradução boundary agora propaga `endereco` (lib/types → criar/types) — `etapaAtual.endereco` vira `etapaChat.endereco`.
+- Adicionado `respostasComEndereco = useMemo(...)` que chama `aplicarComposicaoEndereco(answers, modelo)` — devolve um mapa com as `saidaKey` ("endereco" / "imovel") preenchidas com a string composta.
+- `PreviewA4` agora recebe `respostas={respostasComEndereco}` (em vez de `answers`) — preview ao vivo mostra o endereço composto.
+- `salvarDocumento` agora recebe `{ ...respostasComEndereco, ...extrasPorClausula }` — salva o documento já com o endereço composto na chave `saidaKey`.
+- `camposOpcionais` estendido para incluir os 7 campos individuais de endereço (cepKey, logradouroKey, numeroKey, bairroKey, cidadeKey, ufKey, complementoKey) — assim, se algum template por acaso referenciar `{{endereco_cep}}` etc., vira "" em vez de "______". A `saidaKey` (ex.: "endereco") continua não estando na lista de opcionais, então se estiver vazia mostra "______" (que é o comportamento desejado).
+
+FILE 8 — `src/components/docfacil/views/documento-detalhe-view.tsx` (extensão):
+- `camposOpcionais` estendido igual ao criar-view.tsx — inclui campos individuais de endereço. Documentos salvos com a nova estrutura mostram a string composta na `saidaKey` (não os campos separados).
+
+FILE 9 — `src/components/docfacil/views/criar/grupo-campos.tsx` (rewrite):
+- `camposEndereco` prop agora é do tipo `EnderecoConfig` (em vez do shape antigo sem `numeroKey`/`complementoKey`/`saidaKey`).
+- `detectarMascara` REFEITO — bug crítico: antes fazia `/cpf/.test(k) || /cpf/.test(p)` que detectava "CPF" em qualquer menção no label (ex.: "Seu RG e CPF (opcional):" → CPF mask → stripava "RG" e formatava parcial → inválido → bloqueava avançar). Agora: key é fonte autoritativa; pergunta só usa match stricter (`^palavra` no início).
+- `handleBlur` estendido:
+  - Para logradouroKey: chama `normalizarLogradouro(v)` e atualiza o valor se diferente.
+  - Para cepKey: busca ViaCEP, preenche logradouro (já normalizado!), bairro, cidade, uf; seta `cepEncontrado=true`; foca automaticamente no campo de número.
+- UI: badge "endereço encontrado" (verde, com Check icon) quando CEP encontrado; spinner "buscando CEP…" durante a requisição; borda verde no campo quando encontrado (em vez de borda padrão azul).
+- Layout endereço: CEP e Rua em linha própria (full width no grid 2-col); Número + Complemento dividem linha; Bairro + Cidade dividem linha; UF sozinho.
+- Animação de entrada: timeline GSAP com stagger — título → cada campo (y+opacity+scale, stagger 0.06s) → botão. Mais suave que a animação CSS anterior (`campoIn` keyframe removido).
+
+FILE 10 — `src/components/docfacil/views/criar/campo-input.tsx` (rewrite entry animation):
+- Animação CSS `campoIn` removida (era genérica).
+- useGSAP timeline: root (y+opacity+scale) → stagger de `[data-campo='el']` (input + erro/microcopy + botão). Eased `power3.out`, stagger 0.06s.
+- Elementos marcados com `data-campo="el"` para o stagger funcionar.
+
+FILE 11 — `src/components/docfacil/views/criar/chat-step.tsx` (pequena extensão):
+- `<GrupoCampos ... camposEndereco={etapa.endereco} />` — propaga o `EnderecoConfig` do etapaChat para o GrupoCampos.
+
+Verificação com Agent Browser:
+- Pet NÃO gira mais: `eval` em `document.querySelectorAll('svg[viewBox="0 0 100 100"]')[1]` (corujinha) retorna `transform: translate3d(0,0,0) scale(1.0038, 1.0038)` — sem rotation. O círculo (idx 0) continua girando via SMIL (matrix com rotation visible).
+- Fluxo /criar da Declaração de Residência:
+  1. Step 1 "Seus dados pessoais" — nome + RG/CPF opcional (campo RG não é mais mascarado como CPF — fix do detectarMascara).
+  2. Step 2 "Endereço da sua residência" — 7 campos separados: CEP, Rua, Número, Complemento (opcional), Bairro, Cidade, UF.
+  3. CEP "01001000" digitado → blur → ViaCEP busca → "endereço encontrado" badge + Rua "Praça da Sé" (normalizado), Bairro "Sé", Cidade "São Paulo", UF "SP" auto-preenchidos + foco pula para Número.
+  4. Rua digitada "rua arnoldo beck" → blur → "Rua Arnoldo Beck" (normalizado).
+  5. Rua digitada "arnoldo beck" → blur → "Rua Arnoldo Beck" (default "Rua" prefix).
+  6. Rua digitada "av. paulista" → blur → "Avenida Paulista" (canonical).
+  7. Finalizar → LoadingDocumento (1.5s) → SucessoView "Pronto!" + botão PDF.
+- Documento salvo verificado em /documento-detalhe: texto "resido no endereço: Rua Arnoldo Beck, 456 - Centro - São Paulo/SP - CEP 01001-000." — string composta perfeita, sem duplicação de "Rua".
+- Contrato de Locação: 3 etapas (Partes / Endereço do imóvel / Valores). Documento final: "imóvel situado em Avenida Paulista, 1000 - Bela Vista - São Paulo/SP - CEP 01001-000." — endereço composto com "Avenida Paulista" normalizado.
+- Mobile (390x844 iPhone 14): formulário renderiza corretamente, campos empilham em 1 coluna no mobile, 2 colunas no desktop.
+
+Lint: `bun run lint` → exit 0 (0 errors, 0 warnings).
+TypeScript: `bunx tsc --noEmit` → 0 erros nos arquivos modificados (erros pré-existentes em examples/, scripts/, skills/ continuam não-relacionados).
+Console do browser: apenas warnings GSAP "target not found" (pre-existing, não-fatais).
+
+Stage Summary:
+- Pet deixa de girar: bug raiz era `gsap.to("[data-hero='selo'] svg", { rotation: 360 })` no hero.tsx que girava AMBOS os SVGs do Pet (círculo + corujinha). Removido. Corujinha agora só faz bounce/scale conforme mood (idle/falando/feliz/atencao/pensando) — nunca rotation contínua. Círculo tracejado continua girando via SMIL animation no próprio SVG (40s, 360°) — independente e intencional.
+- 6 modelos reescritos com perguntas mais amigáveis (pessoa idosa/leiga): frases curtas, exemplos concretos, microcopy explicativa. Nenhum template body mudou (backward-compat com documentos salvos anteriormente).
+- 3 modelos (contrato-locacao, declaracao-residencia, uniao-estavel) ganharam endereço em 7 campos separados (CEP, Rua, Número, Complemento opcional, Bairro, Cidade, UF) com auto-fill ViaCEP no blur do CEP + auto-normalização do logradouro no blur da Rua.
+- `normalizarLogradouro` lida com 12 tipos de logradouro (rua, avenida, av, travessa, alameda, praça, rodovia, estrada, via, largo, beco, viela, quadra) + variantes abreviadas — normaliza para forma canônica + Title Case preservando conectivos. Default "Rua" quando usuário não digita prefixo. Resolve "rua arnoldo beck" / "arnoldo beck" / "av. paulista" → "Rua Arnoldo Beck" / "Rua Arnoldo Beck" / "Avenida Paulista".
+- `composeEndereco` + `aplicarComposicaoEndereco` montam a string final `"<logradouro>, <numero> [<complemento>] - <bairro>, <cidade>/<uf>, CEP <cep>"` e atribuem à `saidaKey` no mapa de respostas — template continua usando `{{endereco}}` ou `{{imovel}}` normalmente.
+- Animação de entrada dos campos: GSAP timeline com stagger (título → cada campo → botão) em vez da animação CSS genérica anterior. Eased `power3.out`, mais suave e amigável.
+- Fix crítico em `detectarMascara` (grupo-campos.tsx): antes detectava "CPF" em qualquer menção no label (ex.: "Seu RG e CPF (opcional):" virava CPF mask, quebrava o preenchimento). Agora key é fonte autoritativa; pergunta só usa match stricter no início.

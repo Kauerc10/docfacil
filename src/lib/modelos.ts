@@ -5,13 +5,15 @@
  * Cada modelo tem: slug, nome, descrição simples, categoria, tempo estimado,
  * etapas que o usuário vai precisar preencher (agrupadas em campo_grupo quando
  * relacionadas — ex.: partes, endereço, valores — para reduzir o número de
- * passos no fluxo Concierge de 20+ para 2-4 por modelo), e a estrutura do
+ * passos no fluxo Concierge de 20+ para 2-3 por modelo), e a estrutura do
  * documento (template) com placeholders que o fluxo /criar preenche.
  *
  * Tipos de etapa (TipoEtapa):
  *   - "campo"       = uma única pergunta (1 CampoModelo)
  *   - "campo_grupo" = vários campos relacionados em um único card
  *                     (ex.: endereço com CEP → logradouro → bairro → cidade → UF)
+ *                     Quando `endereco` está presente, ganha auto-fill ViaCEP +
+ *                     normalização de logradouro + composição automática.
  *   - "clausulas"   = lista de cláusulas dinâmicas opcionais (ClausulaDinamica[])
  *                     que o usuário marca/desmarca; cláusulas marcadas injetam
  *                     `{{clausula:id}}` no template.
@@ -21,10 +23,20 @@
  * view.tsx que ainda consomem `modelo.campos` diretamente). Não definir
  * `campos` manualmente — definir `etapas` e o forEach popula `campos`.
  *
- * Validadores e máscaras determinísticas (não-IA) continuam em
- * `views/criar/types.ts` (mascarar/validar CPF, CNPJ, CEP, estado) e em
- * `normalizers.ts` (normalizar Estado). Aqui apenas re-exportamos os de
- * estado pra conveniência de callers antigos.
+ * LINGUAGEM ACESSÍVEL: perguntas escritas para pessoa idosa, leiga e qualquer
+ * usuário — frases curtas, exemplos concretos, microcopy com dica extra.
+ *
+ * ENDEREÇO EM CAMPOS SEPARADOS: em vez de um textarea livre para "endereço
+ * completo", o usuário preenche CEP, Rua, Número, Complemento (opcional),
+ * Bairro, Cidade e UF separadamente. A string final é composta por
+ * `composeEndereco` (em `normalizers.ts`) e atribuída à `saidaKey` (ex.:
+ * "endereco" ou "imovel") no mapa de respostas — o template consome essa
+ * chave como `{{endereco}}` ou `{{imovel}}`.
+ *
+ * AUTO-CORREÇÃO DE RUA: o campo de logradouro passa por `normalizarLogradouro`
+ * no blur — se o usuário digitou "rua arnoldo beck" ou "arnoldo beck", ambos
+ * viram "Rua Arnoldo Beck". Isso evita "Rua Rua X" (repetido) ou "arnoldo beck"
+ * (sem prefixo) no documento final.
  */
 import { normalizarEstado, validarEstado } from "./normalizers";
 import type {
@@ -50,6 +62,40 @@ export type {
 export { normalizarEstado, validarEstado };
 
 // ============================================================================
+// CAMPOS DE ENDEREÇO REUTILIZÁVEIS — 7 campos padronizados
+// ============================================================================
+// Em vez de cada modelo definir seus próprios campos de endereço, usamos
+// este conjunto. A `saidaKey` varia por modelo (ex.: "endereco" para
+// declaração, "imovel" para locação) — passada como parâmetro.
+
+function camposEndereco(saidaKey: string, prefixoLabel = "") {
+  // prefixoLabel: "do imóvel" / "da sua residência" / "onde moram juntos" —
+  // usado para deixar as perguntas naturais em cada contexto.
+  const ctx = prefixoLabel ? ` ${prefixoLabel}` : "";
+  return {
+    campos: [
+      { key: `${saidaKey}_cep`, pergunta: `CEP${ctx}:`, placeholder: "Ex: 01234-567", microcopy: "Ao digitar o CEP, preenchemos a rua e o bairro automaticamente." } as CampoModelo,
+      { key: `${saidaKey}_rua`, pergunta: `Nome da rua${ctx}:`, placeholder: "Ex: das Flores", microcopy: "Pode digitar com ou sem a palavra \"Rua\" — ajustamos para você." } as CampoModelo,
+      { key: `${saidaKey}_numero`, pergunta: `Número${ctx}:`, placeholder: "Ex: 123", microcopy: "Se não tiver número, digite S/N." } as CampoModelo,
+      { key: `${saidaKey}_complemento`, pergunta: `Complemento${ctx} (opcional):`, placeholder: "Ex: Apto 45, Bloco B, Casa 2", obrigatorio: false } as CampoModelo,
+      { key: `${saidaKey}_bairro`, pergunta: `Bairro${ctx}:`, placeholder: "Ex: Centro" } as CampoModelo,
+      { key: `${saidaKey}_cidade`, pergunta: `Cidade${ctx}:`, placeholder: "Ex: São Paulo" } as CampoModelo,
+      { key: `${saidaKey}_uf`, pergunta: `Estado (UF)${ctx}:`, placeholder: "Ex: SP", microcopy: "Pode digitar a sigla (SP) ou o nome (São Paulo)." } as CampoModelo,
+    ] as CampoModelo[],
+    endereco: {
+      cepKey: `${saidaKey}_cep`,
+      logradouroKey: `${saidaKey}_rua`,
+      numeroKey: `${saidaKey}_numero`,
+      complementoKey: `${saidaKey}_complemento`,
+      bairroKey: `${saidaKey}_bairro`,
+      cidadeKey: `${saidaKey}_cidade`,
+      ufKey: `${saidaKey}_uf`,
+      saidaKey,
+    },
+  };
+}
+
+// ============================================================================
 // MODELOS — definição manual (etapas é source of truth; campos é derivado)
 // ============================================================================
 
@@ -69,20 +115,42 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
         tipo: "campo_grupo",
         tituloGrupo: "Quem está alugando o imóvel",
         campos: [
-          { key: "locador", pergunta: "Nome completo do locador (quem está alugando):", placeholder: "Ex: Maria Aparecida da Silva", microcopy: "Pode copiar direto do RG, sem abreviar." },
-          { key: "locatario", pergunta: "Nome completo do locatário (quem vai alugar):", placeholder: "Ex: João Pereira Santos" },
+          {
+            key: "locador",
+            pergunta: "Nome completo de quem está alugando (dono do imóvel):",
+            placeholder: "Ex: Maria Aparecida da Silva",
+            microcopy: "Escreva o nome completo, igual aparece no RG.",
+          },
+          {
+            key: "locatario",
+            pergunta: "Nome completo de quem vai morar (inquilino):",
+            placeholder: "Ex: João Pereira Santos",
+          },
         ],
       },
       {
-        tipo: "campo",
-        campo: { key: "imovel", pergunta: "Qual o endereço completo do imóvel?", placeholder: "Rua, número, bairro, cidade/UF", microcopy: "Inclua CEP se tiver.", tipo: "textarea" },
+        tipo: "campo_grupo",
+        tituloGrupo: "Endereço do imóvel",
+        ...camposEndereco("imovel", "do imóvel"),
       },
       {
         tipo: "campo_grupo",
         tituloGrupo: "Valores da locação",
         campos: [
-          { key: "valor", pergunta: "Valor mensal do aluguel (R$):", placeholder: "Ex: 1.450,00", tipo: "number" },
-          { key: "prazo", pergunta: "Prazo da locação (em meses):", placeholder: "Ex: 30", tipo: "number" },
+          {
+            key: "valor",
+            pergunta: "Valor do aluguel por mês (R$):",
+            placeholder: "Ex: 1.450,00",
+            tipo: "number",
+            microcopy: "Apenas números. Ex: 1450,00",
+          },
+          {
+            key: "prazo",
+            pergunta: "Quantos meses dura o contrato?",
+            placeholder: "Ex: 30",
+            tipo: "number",
+            microcopy: "O mais comum é 30 meses.",
+          },
         ],
       },
     ],
@@ -108,15 +176,27 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
     etapas: [
       {
         tipo: "campo_grupo",
-        tituloGrupo: "Suas informações",
+        tituloGrupo: "Seus dados pessoais",
         campos: [
-          { key: "nome", pergunta: "Nome completo:", placeholder: "Ex: Carlos Eduardo Lima" },
-          { key: "rg", pergunta: "RG e CPF (opcional):", placeholder: "Ex: RG 12.345.678-9 / CPF 123.456.789-00", obrigatorio: false },
+          {
+            key: "nome",
+            pergunta: "Seu nome completo:",
+            placeholder: "Ex: Carlos Eduardo Lima",
+            microcopy: "Escreva o nome completo, sem abreviar.",
+          },
+          {
+            key: "rg",
+            pergunta: "Seu RG e CPF (opcional):",
+            placeholder: "Ex: RG 12.345.678-9 / CPF 123.456.789-00",
+            obrigatorio: false,
+            microcopy: "Se quiser, pode colocar só o RG, ou só o CPF, ou os dois.",
+          },
         ],
       },
       {
-        tipo: "campo",
-        campo: { key: "endereco", pergunta: "Qual o seu endereço completo de residência?", placeholder: "Rua, número, bairro, cidade/UF, CEP", tipo: "textarea" },
+        tipo: "campo_grupo",
+        tituloGrupo: "Endereço da sua residência",
+        ...camposEndereco("endereco", "da sua residência"),
       },
     ],
     template: {
@@ -140,18 +220,38 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
     etapas: [
       {
         tipo: "campo_grupo",
-        tituloGrupo: "Partes",
+        tituloGrupo: "Quem empresta e quem recebe",
         campos: [
-          { key: "comodante", pergunta: "Nome de quem está emprestando (comodante):", placeholder: "Nome completo" },
-          { key: "comodatario", pergunta: "Nome de quem está recebendo (comodatário):", placeholder: "Nome completo" },
+          {
+            key: "comodante",
+            pergunta: "Nome de quem está emprestando (dono do bem):",
+            placeholder: "Ex: Antônio Souza",
+            microcopy: "Escreva o nome completo.",
+          },
+          {
+            key: "comodatario",
+            pergunta: "Nome de quem está recebendo (quem vai usar):",
+            placeholder: "Ex: Bruna Ferreira",
+          },
         ],
       },
       {
         tipo: "campo_grupo",
-        tituloGrupo: "Bem e prazo",
+        tituloGrupo: "O que está sendo emprestado",
         campos: [
-          { key: "bem", pergunta: "Descreva o bem emprestado:", placeholder: "Ex: Notebook Dell Inspiron, série 12345", tipo: "textarea" },
-          { key: "prazo", pergunta: "Por quanto tempo o bem fica emprestado?", placeholder: "Ex: 6 meses" },
+          {
+            key: "bem",
+            pergunta: "Descreva o bem emprestado:",
+            placeholder: "Ex: Notebook Dell Inspiron, cor prata, série 12345",
+            tipo: "textarea",
+            microcopy: "Quanto mais detalhes, melhor. Marca, modelo e série ajudam.",
+          },
+          {
+            key: "prazo",
+            pergunta: "Por quanto tempo o bem fica emprestado?",
+            placeholder: "Ex: 6 meses",
+            microcopy: "Pode escrever em meses, dias ou com data de devolução.",
+          },
         ],
       },
     ],
@@ -176,22 +276,47 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
     etapas: [
       {
         tipo: "campo_grupo",
-        tituloGrupo: "Partes",
+        tituloGrupo: "Quem vende e quem compra",
         campos: [
-          { key: "vendedor", pergunta: "Nome completo do vendedor:", placeholder: "Nome completo" },
-          { key: "comprador", pergunta: "Nome completo do comprador:", placeholder: "Nome completo" },
+          {
+            key: "vendedor",
+            pergunta: "Nome completo de quem está vendendo:",
+            placeholder: "Ex: Roberto Alves",
+          },
+          {
+            key: "comprador",
+            pergunta: "Nome completo de quem está comprando:",
+            placeholder: "Ex: Carla Mendes",
+          },
         ],
       },
       {
         tipo: "campo",
-        campo: { key: "bem", pergunta: "O que está sendo vendido?", placeholder: "Descreva o bem (marca, modelo, série)", tipo: "textarea" },
+        campo: {
+          key: "bem",
+          pergunta: "O que está sendo vendido?",
+          placeholder: "Ex: Honda CG 160, placa ABC-1234, ano 2022",
+          tipo: "textarea",
+          microcopy: "Descreva com o máximo de detalhes possível (marca, modelo, série, ano).",
+        },
       },
       {
         tipo: "campo_grupo",
-        tituloGrupo: "Valores",
+        tituloGrupo: "Valor e pagamento",
         campos: [
-          { key: "valor", pergunta: "Valor da venda (R$):", placeholder: "Ex: 25.000,00", tipo: "number" },
-          { key: "pagamento", pergunta: "Como será pago?", placeholder: "Ex: À vista, em 3x de R$ 8.333,33" },
+          {
+            key: "valor",
+            pergunta: "Valor total da venda (R$):",
+            placeholder: "Ex: 25.000,00",
+            tipo: "number",
+            microcopy: "Apenas números. Ex: 25000,00",
+          },
+          {
+            key: "pagamento",
+            pergunta: "Como vai ser pago?",
+            placeholder: "Ex: À vista, em 3x de R$ 8.333,33",
+            microcopy: "Exemplos: à vista, parcelado em 3x, 50% agora e 50% na entrega.",
+          },
         ],
       },
     ],
@@ -217,19 +342,30 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
     etapas: [
       {
         tipo: "campo_grupo",
-        tituloGrupo: "Pessoas",
+        tituloGrupo: "Pessoas da união e data de início",
         campos: [
-          { key: "pessoa1", pergunta: "Nome completo da primeira pessoa:", placeholder: "Nome completo" },
-          { key: "pessoa2", pergunta: "Nome completo da segunda pessoa:", placeholder: "Nome completo" },
+          {
+            key: "pessoa1",
+            pergunta: "Nome completo da primeira pessoa:",
+            placeholder: "Ex: Ana Paula Costa",
+          },
+          {
+            key: "pessoa2",
+            pergunta: "Nome completo da segunda pessoa:",
+            placeholder: "Ex: Bruno Oliveira",
+          },
+          {
+            key: "inicio",
+            pergunta: "Desde quando vivem juntos?",
+            placeholder: "Ex: 15 de março de 2020",
+            microcopy: "Pode escrever por extenso (15 de março de 2020) ou numérico (15/03/2020).",
+          },
         ],
       },
       {
         tipo: "campo_grupo",
-        tituloGrupo: "Datas e endereço",
-        campos: [
-          { key: "inicio", pergunta: "Desde quando vivem juntos?", placeholder: "Ex: 15 de março de 2020" },
-          { key: "endereco", pergunta: "Endereço onde moram juntos?", placeholder: "Endereço completo", tipo: "textarea" },
-        ],
+        tituloGrupo: "Endereço onde moram juntos",
+        ...camposEndereco("endereco", "onde moram juntos"),
       },
     ],
     template: {
@@ -253,15 +389,31 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
     etapas: [
       {
         tipo: "campo_grupo",
-        tituloGrupo: "Partes",
+        tituloGrupo: "Quem passa e quem recebe a procuração",
         campos: [
-          { key: "outorgante", pergunta: "Quem está passando a procuração (outorgante):", placeholder: "Nome completo e CPF" },
-          { key: "outorgado", pergunta: "Quem vai receber a procuração (outorgado):", placeholder: "Nome completo e CPF" },
+          {
+            key: "outorgante",
+            pergunta: "Seu nome e CPF (quem está passando a procuração):",
+            placeholder: "Ex: José Silva, CPF 123.456.789-00",
+            microcopy: "Você é quem está autorizando outra pessoa.",
+          },
+          {
+            key: "outorgado",
+            pergunta: "Nome e CPF de quem vai receber a procuração:",
+            placeholder: "Ex: Maria Souza, CPF 987.654.321-00",
+            microcopy: "É a pessoa que vai representar você.",
+          },
         ],
       },
       {
         tipo: "campo",
-        campo: { key: "poderes", pergunta: "Quais os poderes concedidos?", placeholder: "Ex: Assinar contrato de aluguel em meu nome", tipo: "textarea" },
+        campo: {
+          key: "poderes",
+          pergunta: "O que essa pessoa pode fazer por você?",
+          placeholder: "Ex: Assinar contrato de aluguel em meu nome",
+          tipo: "textarea",
+          microcopy: "Descreva com clareza — quanto mais específico, mais seguro.",
+        },
       },
     ],
     template: {

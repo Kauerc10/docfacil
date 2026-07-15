@@ -57,13 +57,11 @@ export function Hero() {
           "-=0.4"
         );
 
-      // continuous gentle rotation of the credibility seal
-      gsap.to("[data-hero='selo'] svg", {
-        rotation: 360,
-        duration: 36,
-        ease: "none",
-        repeat: -1,
-      });
+      // NOTA: o círculo tracejado do Pet já gira via SMIL animation no
+      // próprio SVG (40s, 360°). A corujinha NÃO gira — apenas bounce/scale
+      // conforme o mood. Antes havia aqui um `gsap.to("[data-hero='selo']
+      // svg", { rotation: 360 })` que girava AMBOS os SVGs do Pet — era
+      // isso que fazia o "pet girar". Removido.
     },
     { scope: root }
   );

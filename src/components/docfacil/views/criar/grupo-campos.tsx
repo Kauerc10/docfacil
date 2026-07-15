@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { ArrowRight, Loader2, MapPin } from "lucide-react";
+import { ArrowRight, Loader2, MapPin, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { normalizarEstado } from "@/lib/normalizers";
+import { normalizarEstado, normalizarLogradouro } from "@/lib/normalizers";
 import { buscarCep } from "@/lib/services/cep-service";
-import type { CampoModelo } from "@/lib/types";
+import type { CampoModelo, EnderecoConfig } from "@/lib/types";
 import type { InputRef, TipoMascara } from "./types";
 import { aplicarMascara, validarCEP, validarCPF, validarCNPJ } from "./types";
 
@@ -22,14 +22,13 @@ export interface GrupoCamposProps {
   onAvancar: () => void;
   isLast?: boolean;
   submitting?: boolean;
-  /** quando o grupo contém um campo CEP, busca o endereço e preenche os campos relacionados */
-  camposEndereco?: {
-    cepKey: string;
-    logradouroKey?: string;
-    bairroKey?: string;
-    cidadeKey?: string;
-    ufKey?: string;
-  };
+  /**
+   * Configuração de endereço — quando presente, habilita:
+   *  - auto-fill ViaCEP ao digitar CEP (preenche logradouro/bairro/cidade/uf)
+   *  - normalização automática do logradouro no blur (strip "rua"/"avenida"/etc.)
+   *  - layout otimizado com CEP e rua em linhas próprias
+   */
+  camposEndereco?: EnderecoConfig;
 }
 
 /**
@@ -38,10 +37,15 @@ export interface GrupoCamposProps {
  * - Grid 1-col mobile, 2-col desktop (cada campo ocupa 1 célula; textarea 2)
  * - CEP auto-fill via `buscarCep` (ViaCEP). Quando o usuário digita 8 dígitos
  *   e sai do campo, busca o endereço e preenche logradouro/bairro/cidade/uf.
+ * - Logradouro (rua) é normalizado no blur: "rua arnoldo beck" ou "arnoldo
+ *   beck" viram "Rua Arnoldo Beck" — sem duplicar ou faltar o prefixo.
  * - Máscaras automáticas por tipo (CPF, CNPJ, CEP, telefone, data, estado).
  * - Validação interna (CPF/CNPJ/CEP) — exibe erro abaixo do campo.
  * - Enter no ÚLTIMO campo avança. Enter nos outros pula para o próximo.
  * - Botão mostra "Finalizar" na última etapa, "Avançar" caso contrário.
+ *
+ * ANIMAÇÃO DE ENTRADA: cada campo entra em stagger (fade + slide-up + scale
+ * leve) — mais suave e amigável para o usuário idoso. O título também anima.
  */
 export function GrupoCampos({
   titulo,
@@ -57,16 +61,40 @@ export function GrupoCampos({
   const refs = useRef<Record<string, InputRef>>({});
   const [erros, setErros] = useState<Record<string, string | null>>({});
   const [buscandoCep, setBuscandoCep] = useState(false);
+  const [cepEncontrado, setCepEncontrado] = useState(false);
 
-  // Mount animation
+  // Mount animation — stagger suave do título + cada campo
   useGSAP(
     () => {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       if (!root.current) return;
-      gsap.fromTo(
-        root.current,
-        { y: 16, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.42, ease: "power3.out", delay: 0.05 }
+      const tl = gsap.timeline();
+      // título
+      tl.fromTo(
+        "[data-grupo='titulo']",
+        { y: 10, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.32, ease: "power3.out" }
+      );
+      // cada campo com stagger
+      tl.fromTo(
+        "[data-grupo='campo']",
+        { y: 18, opacity: 0, scale: 0.98 },
+        {
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          duration: 0.42,
+          ease: "power3.out",
+          stagger: 0.06,
+        },
+        "-=0.15"
+      );
+      // botão final
+      tl.fromTo(
+        "[data-grupo='acao']",
+        { y: 12, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.32, ease: "power3.out" },
+        "-=0.2"
       );
     },
     { scope: root }
@@ -77,19 +105,29 @@ export function GrupoCampos({
     const t = window.setTimeout(() => {
       const first = campos[0];
       if (first) refs.current[first.key]?.focus();
-    }, 60);
+    }, 80);
     return () => window.clearTimeout(t);
   }, [campos]);
 
   const detectarMascara = (c: CampoModelo): TipoMascara => {
     const k = c.key.toLowerCase();
     const p = c.pergunta.toLowerCase();
-    if (/cpf/.test(k) || /cpf/.test(p)) return "cpf";
-    if (/cnpj/.test(k) || /cnpj/.test(p)) return "cnpj";
-    if (/cep/.test(k) || /cep/.test(p)) return "cep";
-    if (/telefone|fone|celular|whats/.test(k) || /telefone|fone|celular|whats/.test(p)) return "telefone";
-    if (/data|nascimento/.test(k) || /data|nascimento/.test(p)) return "data";
-    if (/^uf$|estado/.test(k) || /sigla do estado/.test(p)) return "estado";
+    // 1. KEY é a fonte autoritativa — só aplica máscara CPF/CNPJ/CEP se a key
+    //    explicitamente diz isso. Evita falso positivo em campos como
+    //    "Seu RG e CPF (opcional):" (key "rg") — a menção a "CPF" no label
+    //    não significa que o campo deva ter máscara de CPF.
+    if (/cpf/.test(k)) return "cpf";
+    if (/cnpj/.test(k)) return "cnpj";
+    if (/cep/.test(k)) return "cep";
+    if (/telefone|fone|celular|whats/.test(k)) return "telefone";
+    if (/data|nascimento/.test(k)) return "data";
+    if (/_uf$|^uf$|estado/.test(k)) return "estado";
+    // 2. PERGUNTA — só para casos onde a key não ajuda (ex.: "telefone"
+    //    aparece no label mas a key é "contato"). Stricter: a pergunta
+    //    precisa começar com a palavra-chave (não apenas conter).
+    if (/^\s*(telefone|fone|celular|whats)/.test(p)) return "telefone";
+    if (/^\s*(data|nascimento)/.test(p)) return "data";
+    if (/sigla do estado/.test(p)) return "estado";
     if (c.tipo === "number") return "numero";
     return "texto";
   };
@@ -112,6 +150,10 @@ export function GrupoCampos({
       const novoErro = validar(c, mascarado);
       if (!novoErro) setErros((prev) => ({ ...prev, [c.key]: null }));
     }
+    // quando o usuário muda o CEP, esconde o check de "encontrado"
+    if (camposEndereco && c.key === camposEndereco.cepKey) {
+      setCepEncontrado(false);
+    }
   };
 
   const handleBlur = async (c: CampoModelo) => {
@@ -127,7 +169,13 @@ export function GrupoCampos({
       if (norm !== v) onFieldChange(c.key, norm);
     }
 
-    // 3. CEP auto-fill
+    // 3. auto-normaliza logradouro (rua) — strip/normaliza prefixo
+    if (camposEndereco && c.key === camposEndereco.logradouroKey) {
+      const norm = normalizarLogradouro(v);
+      if (norm !== v) onFieldChange(c.key, norm);
+    }
+
+    // 4. CEP auto-fill
     if (camposEndereco && c.key === camposEndereco.cepKey) {
       const nums = v.replace(/\D/g, "");
       if (nums.length === 8) {
@@ -135,10 +183,28 @@ export function GrupoCampos({
         try {
           const end = await buscarCep(nums);
           if (end) {
-            if (camposEndereco.logradouroKey) onFieldChange(camposEndereco.logradouroKey, end.logradouro);
-            if (camposEndereco.bairroKey) onFieldChange(camposEndereco.bairroKey, end.bairro);
-            if (camposEndereco.cidadeKey) onFieldChange(camposEndereco.cidadeKey, end.localidade);
-            if (camposEndereco.ufKey) onFieldChange(camposEndereco.ufKey, end.uf);
+            if (camposEndereco.logradouroKey && end.logradouro) {
+              // ViaCEP retorna "Rua das Flores" já com prefixo — normaliza
+              // para garantir formato consistente
+              onFieldChange(
+                camposEndereco.logradouroKey,
+                normalizarLogradouro(end.logradouro)
+              );
+            }
+            if (camposEndereco.bairroKey && end.bairro) {
+              onFieldChange(camposEndereco.bairroKey, end.bairro);
+            }
+            if (camposEndereco.cidadeKey && end.localidade) {
+              onFieldChange(camposEndereco.cidadeKey, end.localidade);
+            }
+            if (camposEndereco.ufKey && end.uf) {
+              onFieldChange(camposEndereco.ufKey, end.uf);
+            }
+            setCepEncontrado(true);
+            // foca no campo de número para o usuário continuar
+            if (camposEndereco.numeroKey) {
+              setTimeout(() => refs.current[camposEndereco.numeroKey]?.focus(), 50);
+            }
           }
         } catch {
           // silent — usuário pode preencher manualmente
@@ -167,11 +233,6 @@ export function GrupoCampos({
     let primeiroComErro: CampoModelo | null = null;
     for (const c of campos) {
       const v = values[c.key] ?? "";
-      const tipo = detectarMascara(c);
-      // required (só valida mascaraveis — required genérico é da view pai)
-      if (!v.trim() && tipo !== "texto") {
-        // não enforce required aqui; só valida formato se preenchido
-      }
       const erro = validar(c, v);
       if (erro) {
         novosErros[c.key] = erro;
@@ -194,12 +255,34 @@ export function GrupoCampos({
     onAvancar();
   };
 
-  return (
-    <div ref={root} className="space-y-4" style={{ animation: "campoIn 0.42s cubic-bezier(0.22,1,0.36,1)" }}>
-      <style>{`@keyframes campoIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+  // Para layout do endereço: CEP e Rua em linha própria (full width),
+  // Número e Complemento dividem linha, Bairro e Cidade dividem linha, UF sozinho.
+  const isEnderecoField = (key: string) => {
+    if (!camposEndereco) return false;
+    return (
+      key === camposEndereco.cepKey ||
+      key === camposEndereco.logradouroKey ||
+      key === camposEndereco.numeroKey ||
+      key === camposEndereco.complementoKey ||
+      key === camposEndereco.bairroKey ||
+      key === camposEndereco.cidadeKey ||
+      key === camposEndereco.ufKey
+    );
+  };
 
+  const isFullWidth = (key: string) => {
+    if (!camposEndereco) return false;
+    // CEP e logradouro (rua) ocupam linha própria no desktop
+    return key === camposEndereco.cepKey || key === camposEndereco.logradouroKey;
+  };
+
+  return (
+    <div ref={root} className="space-y-4">
       {titulo && (
-        <h3 className="font-[family-name:var(--font-jakarta)] text-base sm:text-lg font-bold text-ink">
+        <h3
+          data-grupo="titulo"
+          className="font-[family-name:var(--font-jakarta)] text-base sm:text-lg font-bold text-ink"
+        >
           {titulo}
         </h3>
       )}
@@ -210,17 +293,30 @@ export function GrupoCampos({
           const erro = erros[c.key];
           const tipo = detectarMascara(c);
           const buscando = buscandoCep && c.key === camposEndereco?.cepKey;
+          const encontrado = cepEncontrado && c.key === camposEndereco?.cepKey;
+          const isEnd = isEnderecoField(c.key);
+          const fullW = isFullWidth(c.key) || isTextarea;
           return (
             <div
               key={c.key}
-              className={cn("space-y-1.5", isTextarea && "sm:col-span-2")}
+              data-grupo="campo"
+              className={cn("space-y-1.5", fullW && "sm:col-span-2")}
             >
-              <label htmlFor={`g-${c.key}`} className="block text-sm font-medium text-ink/75">
+              <label
+                htmlFor={`g-${c.key}`}
+                className="block text-sm font-medium text-ink/75"
+              >
                 {c.pergunta}
                 {buscando && (
                   <span className="ml-2 inline-flex items-center gap-1 text-xs text-[var(--blue-royal)]">
                     <Loader2 className="w-3 h-3 animate-spin" />
                     buscando CEP…
+                  </span>
+                )}
+                {encontrado && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-xs text-[var(--selo-green)]">
+                    <Check className="w-3 h-3" />
+                    endereço encontrado
                   </span>
                 )}
               </label>
@@ -268,6 +364,8 @@ export function GrupoCampos({
                       "focus:shadow-[0_8px_24px_-12px_rgba(37,84,199,0.45)]",
                       erro
                         ? "border-[var(--coral)] focus:border-[var(--coral)]"
+                        : isEnd && encontrado
+                        ? "border-[var(--selo-green)] focus:border-[var(--selo-green)]"
                         : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]",
                       tipo === "cep" && "pr-10"
                     )}
@@ -299,7 +397,7 @@ export function GrupoCampos({
         })}
       </div>
 
-      <div className="pt-2 flex items-center gap-3">
+      <div data-grupo="acao" className="pt-2 flex items-center gap-3">
         <button
           type="button"
           onClick={handleAvancar}

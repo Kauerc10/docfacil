@@ -126,6 +126,7 @@ export function ChatStep({
             onAvancar={onAvancar}
             isLast={isLast}
             submitting={submitting}
+            camposEndereco={etapa.endereco}
           />
         )}
 

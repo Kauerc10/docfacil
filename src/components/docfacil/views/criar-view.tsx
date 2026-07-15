@@ -5,7 +5,7 @@ import { useNav } from "../nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { getModel } from "@/lib/services/models-service";
 import { createDocument } from "@/lib/services/documents-service";
-import { normalizarEstado } from "@/lib/normalizers";
+import { normalizarEstado, aplicarComposicaoEndereco } from "@/lib/normalizers";
 import { logger } from "@/lib/logger";
 import { UX_CONFIG } from "@/lib/constants";
 import type { Modelo, EtapaModelo } from "@/lib/types";
@@ -124,12 +124,23 @@ export function CriarView() {
 
   // Campos opcionais (obrigatorio === false) → viram string vazia no preview
   // em vez de "______________________" quando não preenchidos.
+  // Inclui também os campos individuais de endereço (ex.: "_cep", "_rua",
+  // "_numero", etc.) — o que aparece no template é a `saidaKey` (composta),
+  // não os campos separados.
   const camposOpcionais = useMemo(() => {
     if (!modelo?.etapas) return [];
     const out: string[] = [];
     for (const etapa of modelo.etapas) {
       if (etapa.tipo === "campo_grupo") {
         for (const c of etapa.campos) if (c.obrigatorio === false) out.push(c.key);
+        // campos individuais de endereço NÃO vão para o template — só a
+        // string composta (saidaKey). Marcamos como opcionais para que, se
+        // aparecerem em algum template, viram "" em vez de "______".
+        if (etapa.endereco) {
+          const e = etapa.endereco;
+          out.push(e.cepKey, e.logradouroKey, e.numeroKey, e.bairroKey, e.cidadeKey, e.ufKey);
+          if (e.complementoKey) out.push(e.complementoKey);
+        }
       } else if (etapa.tipo === "campo" && etapa.campo.obrigatorio === false) {
         out.push(etapa.campo.key);
       }
@@ -150,6 +161,17 @@ export function CriarView() {
     }
     return map;
   }, [modelo, clausulasSelecionadas]);
+
+  // === Composição de endereço =================================================
+  // Para cada `campo_grupo` com `endereco` configurado, monta a string final
+  // (ex.: "Rua das Flores, 123 - Centro, São Paulo/SP, CEP 01234-567") e
+  // atribui à `saidaKey` (ex.: "endereco" ou "imovel"). Essa string é o que
+  // o template consome via `{{endereco}}` ou `{{imovel}}`.
+  // Aplicada tanto para o PreviewA4 (live preview) quanto para createDocument (save).
+  const respostasComEndereco = useMemo(() => {
+    if (!modelo) return answers;
+    return aplicarComposicaoEndereco(answers, modelo);
+  }, [answers, modelo]);
 
   // === Pet mood cycle =======================================================
   // "falando" por padrão (initial state), "feliz" por 600ms ao avançar,
@@ -302,8 +324,9 @@ export function CriarView() {
     setTimeout(() => setPulseProgress(false), UX_CONFIG.PROGRESS_PULSE_DURATION);
 
     if (isLast) {
-      // Snapshot final: answers + extras de cláusulas achatados no mesmo mapa.
-      const respostasFinais: Record<string, string> = { ...answers };
+      // Snapshot final: answers + extras de cláusulas achatados no mesmo mapa
+      // + composição de endereço (string final em `saidaKey`).
+      const respostasFinais: Record<string, string> = { ...respostasComEndereco };
       for (const extraMap of Object.values(extrasPorClausula)) {
         for (const [k, v] of Object.entries(extraMap)) {
           respostasFinais[k] = v;
@@ -331,11 +354,13 @@ export function CriarView() {
   if (mostrandoLoading) return <LoadingDocumento nomeModelo={modelo.nome} />;
 
   // === Tradução modelos.ts EtapaModelo → criar/types.ts EtapaModelo =========
+  // Passa o `endereco` (EnderecoConfig) adiante para o GrupoCampos habilitar
+  // auto-fill ViaCEP + normalização de logradouro + composição no preview.
   const etapaChat: ChatEtapa | null = etapaAtual
     ? etapaAtual.tipo === "campo"
       ? { tipo: "pergunta", campo: etapaAtual.campo }
       : etapaAtual.tipo === "campo_grupo"
-      ? { tipo: "grupo", titulo: etapaAtual.tituloGrupo, campos: etapaAtual.campos }
+      ? { tipo: "grupo", titulo: etapaAtual.tituloGrupo, campos: etapaAtual.campos, endereco: etapaAtual.endereco }
       : { tipo: "clausulas", titulo: etapaAtual.titulo, clausulas: etapaAtual.clausulas }
     : null;
 
@@ -366,7 +391,7 @@ export function CriarView() {
           <PreviewA4
             titulo={modelo.template.titulo}
             corpo={modelo.template.corpo}
-            respostas={answers}
+            respostas={respostasComEndereco}
             clausulas={clausulasMap}
             camposOpcionais={camposOpcionais}
           />
