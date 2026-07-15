@@ -27,9 +27,8 @@ type Plano = {
   cta: string;
   ctaVariant: "outline" | "coral";
   destaque?: boolean;
-  destino:
-    | "modelos"
-    | "cadastro";
+  destino: "modelos" | "cadastro" | "checkout";
+  checkoutPlan?: "avulso" | "pro";
 };
 
 const PLANOS: Plano[] = [
@@ -61,7 +60,8 @@ const PLANOS: Plano[] = [
     ],
     cta: "Comprar um documento",
     ctaVariant: "outline",
-    destino: "modelos",
+    destino: "checkout",
+    checkoutPlan: "avulso",
   },
   {
     id: "pro",
@@ -79,7 +79,8 @@ const PLANOS: Plano[] = [
     cta: "Assinar Pro",
     ctaVariant: "coral",
     destaque: true,
-    destino: "cadastro",
+    destino: "checkout",
+    checkoutPlan: "pro",
   },
 ];
 
@@ -154,7 +155,7 @@ export function PlanosView() {
             <PlanCard
               key={plano.id}
               plano={plano}
-              onSelect={() => navigate(plano.destino)}
+              onSelect={() => plano.destino === "checkout" ? navigate("checkout", { plan: plano.checkoutPlan }) : navigate(plano.destino)}
             />
           ))}
         </div>

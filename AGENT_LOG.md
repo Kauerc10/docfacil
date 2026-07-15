@@ -43,3 +43,42 @@
 ### Ciclo 2 — Melhoria contínua (23:56 UTC)
 
 **Próximo:** Verificar acessibilidade, empty states, hover/focus states, ARIA labels
+
+### Ciclo 2 — Melhoria contínua (23:56 - 23:59 UTC)
+
+**Tempo decorrido total:** ~22 minutos
+
+**Feito adicional:**
+1. ✅ ARIA labels no header (avatar + Sair)
+2. ✅ Footer: "Termos" → "Termos de Uso" (coluna Suporte)
+3. ✅ Cookie banner testado (Aceitar todos → salva prefs → desaparece)
+4. ✅ Planos: preços verificados (R$0, R$9,90, R$24,90 + Mais Popular badge)
+5. ✅ Console: 0 erros, 0 warnings
+6. ✅ TypeScript: 0 erros em src/
+
+**Commits adicionais (3):**
+- `8f8b905` fix(a11y): aria-label no avatar e Sair
+- `695ad73` fix(footer): 'Termos' → 'Termos de Uso'
+- (AGENT_LOG update)
+
+**Estado atual do projeto:**
+- 124 arquivos TS/TSX, ~16.500 linhas
+- Lint: 0 erros, 0 warnings
+- TypeScript: 0 erros em src/
+- Dev server: rodando sem erros
+- 10 commits na branch 24h
+- Todas as 17 views funcionando
+- Pet mascote em hero + how-it-works + criar flow
+- Cookie banner funcional
+- Header com estado de login
+- Prisma schema modelado
+- Copy alinhada (sem prometer validade/selo)
+- Preços corretos (R$9,90 / R$24,90)
+
+**Próximos passos:**
+- Verificar se criar-view com campo_grupo + CEP auto-fill funciona
+- Verificar documento-detalhe com DetalhePreview
+- Verificar cadastro com TermsConsentModal
+- Verificar checkout view
+- Procurar mais melhorias de acessibilidade
+- Procurar inconsistências visuais
