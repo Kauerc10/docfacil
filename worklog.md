@@ -960,3 +960,177 @@ Stage Summary:
 - Cláusulas persistidas via convenção `__clausula_${id} = "true"` no mapa de respostas — backward-compatible (docs antigos sem cláusulas continuam funcionando, extração devolve array vazio).
 - `aplicarComposicaoModelo` agora compõe também separadores de RG: `<prefix>_rg_separador` = ", RG <valor>" ou "" — resolve o problema de "CPF 123{{rg}}" virar "CPF 12312.345" ou "CPF 123, RG 12.345" graciosamente.
 - Fix UX: `key={stepIndex}` no ChatStep força remount ao trocar de etapa — estado local (ex.: `cepEncontrado`) não vaza mais entre partes diferentes.
+
+---
+Task ID: LAPIDACAO-A
+Agent: main (ZCode)
+Task: Lapidar dinâmicas do chat, intuitividade e validação (FRENTE A — exceto A4 e B2)
+
+Work Log:
+Esta task implementa 6 melhorias no fluxo conversacional de criação de documentos. Base: branch `24` (clone fresco do GitHub). A4 (smart defaults/memória) e B2 (capa do PDF) foram explicitamente excluídos pelo usuário.
+
+A1 — Validação/máscara em CampoPergunta + campos extras de cláusulas:
+- Criado `src/components/docfacil/views/criar/use-campo-validado.ts` — hook reutilizável que encapsula `detectarMascara` + `aplicarMascara` + validação. Retorna `{ tipo, erro, handleChange, handleBlur, validar }`. Centraliza a lógica que antes só existia no GrupoCampos.
+- Movido `detectarMascara` de `grupo-campos.tsx` (local) para `types.ts` (exportado) — agora é single source of truth, consumido por GrupoCampos, CampoPergunta e ClausulaCard.
+- Adicionados `validarTelefone` (10/11 dígitos + celular começa com 9) e `validarData` (DD/MM/AAAA + sanidade mês/dia/ano) em `types.ts`.
+- Adicionado `validarPorTipo(tipo, valor)` em `types.ts` — dispatcher único: CPF/CNPJ/CEP/telefone/data.
+- `grupo-campos.tsx`: removido `detectarMascara` local (duplicado) e `validar` local; agora importa de `./types`. Import de `TipoMascara` removido (não usado diretamente).
+- `campo-input.tsx`: refatorado para usar `useCampoValidado`. Agora aplica máscara de CPF/CNPJ/CEP/telefone/data em campo único, valida no blur, e bloqueia Enter-to-advance quando há erro de formato.
+- `clausula-card.tsx`: criado sub-componente `CampoExtra` que usa `useCampoValidado` — CPF de fiador, telefone de testemunha, etc. em campos extras agora são formatados e validados igual aos campos principais.
+
+A2 — Auto-fill ViaCEP com fallback honesto:
+- `grupo-campos.tsx`: adicionado estado `cepFalhou`. Quando ViaCEP responde sem endereço OU lança exceção (rede/API down), mostra mensagem "Não encontramos esse CEP automaticamente — preencha o endereço abaixo" no label do campo CEP e foca no logradouro para preenchimento manual. Antes o `catch` era vazio (silêncio total).
+- `handleChange` agora reseta `cepFalhou` junto com `cepEncontrado` quando o usuário edita o CEP.
+
+A3 — fieldError propagado até CampoPergunta.erro (ativar shake):
+- `ChatStepProps` estendido com `fieldError?: string | null` e `extrasPorClausula?: Record<string, Record<string, string>>`.
+- `chat-step.tsx`: `CampoPergunta` agora recebe `erro={fieldError}` (ativa animação de shake GSAP elastic.out que estava morta). `ClausulasPergunta` agora recebe `extras={extrasPorClausula}` em vez de `extras={{}}` hardcoded (bug latente: extras de cláusulas não eram refletidos na UI após re-render).
+- `criar-view.tsx`: passa `fieldError` e `extrasPorClausula` ao ChatStep. `fieldError` renderizado como `<p role="alert">` apenas para cláusulas (para campo/grupo já é renderizado inline no input).
+
+A5 — Pet com contexto emocional mais rico:
+- Criado `src/components/docfacil/views/criar/pet-lines.ts` — falas contextuais: `PROGRESS_LINES` (meio/quase-fim do fluxo), `ERROR_LINES` (empatia em erro), `FINAL_CELEBRATION_LINES` (comemoração ao gerar), `PET_NAME = "Selo"` (nome do mascote).
+- `criar-view.tsx`: adicionado estado `petOverride` (string | null). `petText` agora combina fala de progresso + pergunta da etapa; em erro, o pet diz uma fala empática (ex.: "Hmm, esse CPF não bateu — confere os dígitos pra mim?") em vez da pergunta técnica. Override é limpo ao corrigir/avançar.
+- Na última etapa, `setPetMood("feliz")` é setado antes de salvar (comemoração antes do carimbo).
+
+A6 — Skip typing + remoção de latência artificial:
+- `use-typing-text.ts`: adicionado `skip()` callback que revela o texto completo instantaneamente. Corrigido bug do `deps` (agora spread no array de dependências do effect). Adicionado `clearTimer` via `useCallback` para cleanup robusto.
+- `chat-step.tsx`: balão do pet agora é clicável (`onClick={handleSkip}`) com `role="button"`, `title="Clique para revelar o texto completo"`, e hover border sutil. Revela o texto completo imediatamente.
+- `criar-view.tsx`: removido `setTimeout(1500)` artificial no `salvarDocumento`. `createDocument` agora é chamado imediatamente; LoadingDocumento aparece apenas durante a persistência real. Removido `advanceTimer` ref e cleanup effect não mais necessários. `useRef` removido dos imports.
+
+A7 — Stepper dots clicáveis (navegação não-destrutiva):
+- `criar/layout.tsx`: `CriarLayoutProps` estendido com `onStepClick?: (targetStep: number) => void`. Adicionados stepper dots abaixo da barra de progresso (apenas quando `total >= 3`): etapas atuais/passadas são clicáveis (azul-royal/selo-green), futuras não (cinza, cursor-not-allowed). Cada dot tem `aria-label`, `aria-current="step"` no ativo.
+- `criar-view.tsx`: passa `onStepClick` que faz `setStepIndex(target)` clamped em `[0, stepIndex]` (só permite revisar etapas já visitadas), limpando erro/override e voltando mood para "falando".
+
+Stage Summary:
+- Fluxo conversacional agora é mais confiável e humano: CPFs em qualquer campo (inclusive extras de cláusulas) são formatados e validados; erros de ViaCEP têm feedback honesto; o shake de erro funciona onde o usuário olha; o pet tem personalidade (empatia em erro, celebração ao final, falas de progresso); digitação pode ser pulada com clique; sem latência artificial; navegação entre etapas é não-destrutiva via stepper dots.
+- 1 novo arquivo: `use-campo-validado.ts` (hook de validação reutilizável), 1 novo arquivo: `pet-lines.ts` (falas contextuais do mascote).
+- 6 arquivos modificados: `types.ts` (detectarMascara + validadores telefone/data/validarPorTipo), `campo-input.tsx` (usa hook), `grupo-campos.tsx` (fallback CEP + remove duplicação), `clausula-card.tsx` (CampoExtra com hook), `chat-step.tsx` (fieldError + extras reais + skip), `layout.tsx` (stepper dots), `criar-view.tsx` (petOverride + sem latência + onStepClick), `use-typing-text.ts` (skip + fix deps).
+- Validação pendente: build/lint não puderam ser executados (sem node_modules/bun neste ambiente). Recomenda-se `bun install && bun run lint && bun run build` localmente para validar antes de commitar.
+
+---
+Task ID: LAPIDACAO-B
+Agent: main (ZCode)
+Task: Lapidar geração de PDF — estética premium, formatação e estrutura (FRENTE B — exceto B2)
+
+Work Log:
+Esta task implementa 9 melhorias no gerador de PDF (`src/lib/pdf/generator.ts`). B2 (capa do PDF) foi explicitamente excluído pelo usuário. Apenas 1 arquivo modificado, mas profundamente refatorado.
+
+B10 — Eliminar duplicação do docDefinition (PRÉ-REQUISITO):
+- Criada função `buildDocDefinition(modelo, respostas, options)` — single source of truth. Antes o docDefinition era duplicado idêntico em `gerarEBaixarPDF` (linhas 616-704) e `gerarPDFBuffer` (734-822). Agora ambas consomem a mesma função. Qualquer ajuste de estilo futuro é feito em 1 lugar.
+- `gerarEBaixarPDF` agora aceita múltiplas formas de chamada (backward-compat total):
+  * `gerarEBaixarPDF(modelo, respostas)`
+  * `gerarEBaixarPDF(modelo, respostas, "nome-arquivo")`
+  * `gerarEBaixarPDF(modelo, respostas, { watermark: true })`
+  * `gerarEBaixarPDF(modelo, respostas, "nome", { watermark: true })` ← callers antigos (sucesso-view, use-documento-actions)
+
+B1 — Tipografia premium:
+- `defaultStyle.fontSize`: 13 → 12 (respiro mais confortável em A4).
+- `defaultStyle.lineHeight`: 1.5 → 1.6 (documentos legais respiram melhor).
+- `docTitle.characterSpacing`: 1.2 → 1.5 (título mais "carimbado").
+- `docTitle.fontSize`: mantido 16 bold sans-serif (hierarquia editorial: sans títulos + serif-ish corpo).
+- `sectionHeading` (heading1 "1. DAS PARTES"): 13 → 13.5 + characterSpacing 0.5.
+- `clauseHeading` (heading2 "Cláusula Primeira"): 13 → 12 (subordinado visualmente ao heading1).
+- `body.fontSize`: 13 → 12, lineHeight 1.5 → 1.6.
+- `label`, `signature`: 13 → 12 (alinhados ao corpo).
+- `legalQuote.fontSize`: 11 → 10.5, mantém italics + cinza.
+- `footerText.characterSpacing`: 0.3 (tipografia refinada no rodapé).
+- Nota: mantida fonte Roboto (única disponível no VFS do pdfmake sem custom font embedding). Tamanhos e leading ajustados para máximo conforto de leitura.
+
+B4 — Header/footer com identidade mais forte:
+- Header de continuação: adicionado símbolo "D" (bold, azul-marinho) + separador "·" + título da página → identidade de marca no topo de cada página > 1.
+- Double rule (efeito "double rule" clássico de documentos formais): linha principal 1pt + linha fina 0.4pt abaixo, tanto no header quanto sob o título.
+- Footer: "Gerado por DocFacil" → "Gerado por DocFacil · K-HUB" (branding reforçado).
+
+B5 — Melhor hierarquia visual de cláusulas:
+- `heading1` (seção principal): agora renderizado com FILETE LATERAL (columns com canvas rect 2pt azul-marinho à esquerda) + texto sectionHeading à direita. Cria distinção visual clara entre seções principais e cláusulas.
+- `heading2` (cláusula): sem filete, menor (12pt), subordinado visualmente.
+- Ambos `unbreakable: true` (não quebra título do conteúdo do heading).
+
+B6 — Controle de órfãs/viúvas e quebra inteligente:
+- Bloco de fechamento (assinaturas): `unbreakable: true` apenas quando `closingNodes.length <= 4`. Para documentos com 4+ signatários/testemunhas, permite quebrar entre páginas (evita grandes espaços em branco no fim da página anterior).
+
+B7 — Recuo de primeira linha nativo:
+- `textRuns({ indentFirstLine: true })`: trocado o hack de 10 espaços ASCII (`"          "`) por 10 NBSP (`\u00a0`). NBSP é tipograficamente correto (não colapsa) e mais robusto que espaços preservados via `preserveLeadingSpaces`.
+
+B8 — Detecção de citações legais mais ampla:
+- Criada constante `LEGAL_QUOTE_REGEX` + helper `isLegalQuote(text)`.
+- Regex case-insensitive cobrindo: `art.\d`, `lei n?\d`, `código \w`, `CP`, `CC`, `CDC`, `CF/88`, `constituição federal`, `pena de`.
+- Antes: só capturava parágrafos que COMEÇAVAM com `"` E continham "Art." ou "Pena" (perdia "art. 299 do Código Penal" minúsculo, "dispõe o art. 5º, CF/88", etc.).
+- Agora: qualquer parágrafo que case o regex vira `legalQuote` (italics, recuo lateral, cinza), com ou sem aspas.
+
+B9 — Suporte a listas:
+- `renderLineNode`: adicionado `bulletMatch` antes do colonMatch. Linhas começando com `-`, `•` ou `*` viram itens de lista (`ul`) do pdfmake. Coleta itens consecutivos em um único `ul`.
+- Marcadores `-` nos templates agora renderizam como bullet points em vez de parágrafos justificados.
+
+B3 — Selo notarial como marca d'água real:
+- Substituído o `watermark` nativo (texto "DOCFACIL" diagonal, 5% opacidade) por um `background` que desenha um CARIMBO CIRCULAR via canvas:
+  * Círculo externo (ellipse r=130, lineWidth 2.5, azul-royal, opacidade 0.08).
+  * Círculo interno tracejado (r=112, dash 5/4, lineWidth 1) — estilo carimbo notarial.
+  * Texto centralizado: "DOCFACIL" (28pt bold, characterSpacing 3) + separador "•" + "VALIDADE LEGAL" (11pt, characterSpacing 2).
+- Reforça a metáfora de marca (selo/carimbo) no PDF free, muito mais premium que texto diagonal.
+
+Stage Summary:
+- Gerador de PDF agora produz documentos mais profissionais e premium: tipografia 12pt com lineHeight 1.6 (conforto de leitura), hierarquia visual clara (seções com filete lateral azul-marinho + cláusulas subordinadas), header com identidade de marca (símbolo "D" + double rule), footer com K-HUB, citações legais detectadas amplamente (art./lei/código/CP/CC/CDC/CF), listas com bullet points, recuo de primeira linha tipograficamente correto (NBSP), quebra inteligente de assinaturas (não trava 4+ signatários juntos), e marca d'água em formato de carimbo circular (selo notarial) no plano free.
+- Arquitetura: `buildDocDefinition` é agora a única fonte do docDefinition (eliminada duplicação entre gerarEBaixarPDF e gerarPDFBuffer).
+- 1 arquivo modificado: `src/lib/pdf/generator.ts` (profundamente refatorado: buildDocDefinition extraído, estilos reajustados, renderLineNode ampliado com heading1 filete + listas + citações ampliadas, background com carimbo circular).
+- Validação pendente: build/lint não puderam ser executados (sem node_modules/bun neste ambiente). Recomenda-se `bun install && bun run lint && bun run build` localmente antes de commitar. Validar visualmente um PDF gerado de cada plano (free com carimbo, pago sem) e de um documento com 4+ signatários.
+
+---
+Task ID: LAPIDACAO-MOD
+Agent: main (ZCode)
+Task: Modularizar generator.ts (monolito ~950 linhas → 7 arquivos) + validar build
+
+Work Log:
+O usuário pediu para instalar o ambiente e validar o build localmente antes de commitar, e modularizar o monolito `generator.ts` seguindo boas práticas.
+
+INSTALAÇÃO DO AMBIENTE:
+- Detectado que nenhum runtime JS estava disponível (node, npm, bun, pnpm — todos ausentes).
+- Instalado Bun 1.3.14 via PowerShell (`irm bun.sh/install.ps1 | iex`) → `C:\Users\suelen.morais\.bun\bin\bun.exe`.
+- `bun install` executado: 920 packages instalados em 282s. Dependências todas resolvidas.
+
+VALIDAÇÃO PRÉ-MODULARIZAÇÃO:
+- `bun run lint`: 0 erros, 10 warnings (todas `Unused eslint-disable directive` pré-existentes).
+- `bun run build`: compilou com sucesso (TypeScript passou), mas revelou 1 ERRO DE TIPO que passou despercebido na revisão manual:
+  - `clausula-card.tsx:201` — `useCampoValidado(campo, value, onExtraChange)` falhava porque `onExtraChange` tem assinatura `(fieldKey, value) => void` (2 args) mas o hook espera `(v: string) => void` (1 arg).
+  - FIX: criado wrapper adaptador `(v) => onExtraChange(campo.key, v)` que amarra o fieldKey na chamada.
+- Após o fix: build compilou (✓ 17.9s → ✓ 11.0s), TypeScript passou, 12 páginas estáticas geradas.
+- Nota: o erro `cp: illegal option -- r` no final do script `build` é incompatibilidade do `cp -r` (sintaxe GNU) com o MSYS/Git Bash — NÃO é erro de código. Em Linux/CI funciona normalmente.
+
+MODULARIZAÇÃO (seguindo o padrão do `document-engine/`):
+O monolito `src/lib/pdf/generator.ts` (~950 linhas) foi dividido em 7 arquivos com responsabilidade única:
+
+1. `types.ts` (folha base) — `GerarPDFOptions`, `PdfMakeModule`, `PdfMakeContext`. Importa `Modelo` de `../types`.
+
+2. `fonts.ts` — Configuração de fontes Roboto / VFS do pdfmake. `extractVfs`, `aliasFont`, `configurePdfMakeFonts`. Defensivo: cria aliases quando variantes faltam, lança erro só se NENHUMA fonte existir.
+
+3. `loader.ts` — Singleton do pdfmake. `loadPdfmake()` (lazy import + cache via `pdfmakePromise`), `preloadPdfmake()`. Cria contexto mutável para driblar o freeze de namespace do Next.js/ESM.
+
+4. `content-builder.ts` (~450 linhas, a maior extração) — Lógica de template → nós pdfmake. Contém:
+   - Geometria A4: `cm()`, `CM_TO_PT`, `CONTENT_WIDTH` (exportadas — styles.ts precisa).
+   - Texto: `normalizePdfText`, `splitStrongSegments` (detecção de nomes próprios), `textRuns` (recuo NBSP).
+   - Citações: `LEGAL_QUOTE_REGEX`, `isLegalQuote`.
+   - Estrutura: `findClosingSectionIndex`, `renderLineNode` (heading1 com filete lateral, heading2, signature, witness, legalQuote, bullet lists, label:valor), `buildSignatureColumns`, `buildContent` (orquestrador do conteúdo).
+   - Re-exports `extractClausulasSelecionadas`, `computeCamposOpcionais` (conveniência).
+
+5. `styles.ts` — `buildDocDefinition(modelo, respostas, options)`. Single source of truth para toda a aparência: pageSize, margens, defaultStyle, estilos nomeados (docTitle, sectionHeading, body, etc.), header (double rule + símbolo "D"), footer (· K-HUB), background (carimbo circular). Importa `buildContent` + geometria de `./content-builder`.
+
+6. `generate.ts` (orquestrador) — `gerarEBaixarPDF` + `gerarPDFBuffer`. Backward-compat: aceita 4 formas de chamada (sem opções, string, objeto, string+objeto). Importa `loadPdfmake` de `./loader`, `buildDocDefinition` de `./styles`.
+
+7. `index.ts` (barrel público) — Re-exports: `gerarEBaixarPDF`, `gerarPDFBuffer`, `preloadPdfmake`, `GerarPDFOptions`. Header JSDoc descrevendo arquitetura + consumers. Segue exatamente o padrão do `document-engine/index.ts`.
+
+8. `generator.ts` (thin re-export, backward-compat) — Reduzido de ~950 linhas para 14 linhas. Re-exporta de `./generate` + `./loader` + `./types`. Mantido para que callers existentes (`@/lib/pdf/generator`) continuem funcionando sem mudança. Marcado como `@deprecated` no header — novos imports devem usar `@/lib/pdf`.
+
+VALIDAÇÃO PÓS-MODULARIZAÇÃO:
+- `bun run lint`: 0 erros, 10 warnings (nenhuma nova dos arquivos PDF — todas pré-existentes em outros arquivos).
+- `bun run build`: ✓ Compilou em 13.6s, ✓ TypeScript passou, ✓ 12 páginas estáticas geradas. Zero erros de tipo.
+
+Stage Summary:
+- Monolito `generator.ts` (~950 linhas) → 7 arquivos modulares + 1 thin re-export. Cada arquivo tem responsabilidade única e header JSDoc explicando seu papel.
+- Arquitetura segue fielmente o padrão do `document-engine/`: barrel puro, módulos por responsabilidade, imports relativos entre irmãos, types.ts como folha base, orquestrador no topo do grafo.
+- Zero breaking changes: callers existentes (`@/lib/pdf/generator`) continuam funcionando via thin re-export. Novos imports devem usar `@/lib/pdf`.
+- Ambiente validado: Bun 1.3.14 instalado, 920 dependências instaladas, lint (0 erros) e build (compila + TS passa) confirmados.
+- Bug de tipo corrigido durante validação: `clausula-card.tsx` wrapper adaptador para `useCampoValidado` (assinatura 2-arg → 1-arg).
+- Próximo passo: commit das mudanças (FRENTE A + FRENTE B + modularização) — aguardando confirmação do usuário.
+
+
+
