@@ -84,6 +84,7 @@ export function CriarView() {
   }, [slug]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadModel();
   }, [loadModel]);
 

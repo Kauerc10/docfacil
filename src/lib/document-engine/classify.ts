@@ -71,6 +71,11 @@ export function classifyLine(linha: string): LinhaClassificada {
     return { tipo: "heading2", texto: trimmed };
   }
 
+  // Linhas de testemunha (ex: "1) ______________" ou "Nome: _________________")
+  if (/^\d+\)\s*_{3,}/.test(trimmed) || /nome:\s*_{3,}/i.test(trimmed) || /cpf:\s*_{3,}/i.test(trimmed)) {
+    return { tipo: "witness", texto: trimmed };
+  }
+
   // Linha de assinatura (underscores)
   if (/_{5,}/.test(trimmed)) {
     return { tipo: "signature", texto: trimmed };

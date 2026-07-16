@@ -16,6 +16,7 @@ export function useTypingText(
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setText("");
     setDone(false);
     if (typeof window === "undefined") { setText(fullText); setDone(true); return; }

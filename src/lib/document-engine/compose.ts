@@ -93,7 +93,7 @@ export function aplicarComposicaoModelo(
         if (isRgField) {
           const prefix = c.key === "rg" ? "" : c.key.slice(0, -3); // remove "_rg"
           const sepKey = prefix ? `${prefix}_rg_separador` : "rg_separador";
-          next[sepKey] = composeOptionalField(next[c.key] ?? "", ", RG");
+          next[sepKey] = composeOptionalField(next[c.key] ?? "", ", portador(a) do RG nº");
         }
       }
     }
@@ -105,8 +105,8 @@ export function aplicarComposicaoModelo(
  * Compõe um campo opcional com prefixo: retorna "" se vazio, ou "<prefixo> <valor>" se preenchido.
  * Útil para templates inline onde o campo opcional precisa de separador quando presente.
  *
- * Ex.: composeOptionalField("12.345.678-9", ", RG") → ", RG 12.345.678-9"
- *      composeOptionalField("", ", RG") → ""
+ * Ex.: composeOptionalField("12.345.678-9", ", portador(a) do RG nº") → ", portador(a) do RG nº 12.345.678-9"
+ *      composeOptionalField("", ", portador(a) do RG nº") → ""
  */
 export function composeOptionalField(
   valor: string,

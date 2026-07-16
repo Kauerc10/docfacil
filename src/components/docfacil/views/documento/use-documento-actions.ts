@@ -8,6 +8,8 @@ import {
 } from "@/lib/services/documents-service";
 import { gerarEBaixarPDF } from "@/lib/pdf/generator";
 import { useNav } from "@/components/docfacil/nav-context";
+import { useAuth } from "@/lib/auth-context";
+import { shouldWatermark } from "@/lib/services/plan-service";
 import type { Documento, Modelo } from "@/lib/types";
 
 export type ActionLoading = "download" | "duplicate" | "delete" | null;
@@ -45,6 +47,7 @@ export function useDocumentoActions(
   modelo: Modelo | null
 ): UseDocumentoActionsResult {
   const { navigate } = useNav();
+  const { user } = useAuth();
   const [actionLoading, setActionLoading] = useState<ActionLoading>(null);
 
   const handleEditar = useCallback(() => {
@@ -60,7 +63,9 @@ export function useDocumentoActions(
     }
     setActionLoading("download");
     try {
-      await gerarEBaixarPDF(modelo, doc.respostas, doc.modeloSlug);
+      await gerarEBaixarPDF(modelo, doc.respostas, doc.modeloSlug, {
+        watermark: shouldWatermark(user),
+      });
       toast.success("PDF gerado!", {
         description: `${modelo.nome} está pronto para impressão.`,
       });
@@ -70,7 +75,7 @@ export function useDocumentoActions(
     } finally {
       setActionLoading(null);
     }
-  }, [doc, modelo]);
+  }, [doc, modelo, user]);
 
   const handleDuplicar = useCallback(async () => {
     if (!doc) return;

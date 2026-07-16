@@ -13,6 +13,7 @@ export function Confetti({ duration = 3000 }: { duration?: number }) {
   const [visivel, setVisivel] = useState(true);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setVisivel(false); return; }
     const t = setTimeout(() => setVisivel(false), duration);
     return () => clearTimeout(t);

@@ -76,3 +76,8 @@ export {
   renderDocument,
   fillDocument,
 } from "./render";
+
+export {
+  computeCamposOpcionais,
+} from "./optional-fields";
+

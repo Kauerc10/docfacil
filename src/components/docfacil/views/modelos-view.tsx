@@ -49,6 +49,7 @@ export function ModelosView() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadModels();
   }, [loadModels]);
 

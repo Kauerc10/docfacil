@@ -54,7 +54,17 @@ export function fillTemplate(
     return PLACEHOLDER;
   });
 
+  // === PASSO 3: substitui [data de assinatura] por data atual ============
+  const dataHoje = new Date().toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  result = result.replace(/\[data de assinatura\]/g, dataHoje);
+
   // === Normalização pós-preenchimento ====================================
+  // Normaliza espaços antes de vírgula (ex: "Nome ," -> "Nome,")
+  result = result.replace(/\s+,\s*/g, ", ");
   // Remove espaços duplos (decorrentes de campos opcionais vazios) e
   // vírgulas vazias (", ," → ",").
   result = result.replace(/\s{2,}/g, " ").replace(/,\s*,/g, ",");

@@ -15,6 +15,7 @@ import { getModel } from "@/lib/services/models-service";
 import { getDocument } from "@/lib/services/documents-service";
 import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf/generator";
 import { logger } from "@/lib/logger";
+import { shouldWatermark } from "@/lib/services/plan-service";
 import { SUCCESS_MESSAGES, ERROR_MESSAGES } from "@/lib/constants";
 import type { Modelo } from "@/lib/types";
 import { PageShell, PageHeader } from "./page-shell";
@@ -77,6 +78,7 @@ export function SucessoView() {
   }, [slug, docId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
@@ -145,7 +147,9 @@ export function SucessoView() {
     if (!modelo || gerandoPdf) return;
     setGerandoPdf(true);
     try {
-      await gerarEBaixarPDF(modelo, respostas, modelo.slug);
+      await gerarEBaixarPDF(modelo, respostas, modelo.slug, {
+        watermark: shouldWatermark(user),
+      });
       toast.success(SUCCESS_MESSAGES.PDF_GENERATED, {
         description: `Seu ${modelo.nome} foi baixado.`,
       });
