@@ -39,15 +39,24 @@ export function ChatStep({
   onAvancar,
   isLast,
   submitting = false,
+  fieldError = null,
+  extrasPorClausula = {},
+  onSkipTyping,
 }: ChatStepProps) {
   const root = useRef<HTMLDivElement>(null);
 
   // Digitação progressiva do pet
-  const { text: petTextoDigitado, done: petDone } = useTypingText(
+  const { text: petTextoDigitado, done: petDone, skip: skipTypingLocal } = useTypingText(
     petText,
     UX_CONFIG.TYPING_SPEED,
     [petText, stepIndex]
   );
+
+  // Clique no balão → revela o texto completo instantaneamente
+  const handleSkip = () => {
+    skipTypingLocal();
+    onSkipTyping?.();
+  };
 
   // Anim: chat bubble + content entram suaves
   useGSAP(
@@ -86,9 +95,13 @@ export function ChatStep({
         </div>
         <div
           data-chat="bubble"
+          onClick={handleSkip}
+          role="button"
+          tabIndex={-1}
+          title="Clique para revelar o texto completo"
           className={cn(
-            "bg-surface border border-[var(--border)] rounded-2xl rounded-tl-sm",
-            "px-4 sm:px-5 py-3 sm:py-3.5 max-w-[88%] sm:max-w-[80%]"
+            "bg-surface border border-[var(--border)] rounded-2xl rounded-tl-sm cursor-pointer select-none",
+            "px-4 sm:px-5 py-3 sm:py-3.5 max-w-[88%] sm:max-w-[80%] transition-colors hover:border-[var(--blue-royal)]/30"
           )}
         >
           <p className="text-ink text-base sm:text-lg leading-relaxed font-medium">
@@ -112,6 +125,7 @@ export function ChatStep({
             onAvancar={onAvancar}
             isLast={isLast}
             submitting={submitting}
+            erro={fieldError}
           />
         )}
 
@@ -134,7 +148,7 @@ export function ChatStep({
           <ClausulasPergunta
             clausulas={etapa.clausulas}
             selecionadas={respostas.clausulasSelecionadas}
-            extras={{}}
+            extras={extrasPorClausula}
             onToggle={(id, sel) =>
               onClausulaFieldChange(id, { tipo: "toggle", selecionada: sel })
             }

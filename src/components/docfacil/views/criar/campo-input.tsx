@@ -7,6 +7,7 @@ import { ArrowRight, ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizarEstado } from "@/lib/normalizers";
 import type { CampoPerguntaProps } from "./types";
+import { useCampoValidado } from "./use-campo-validado";
 
 gsap.registerPlugin(useGSAP);
 
@@ -38,6 +39,13 @@ export function CampoPergunta({
   const inputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
+
+  // Máscara + validação determinística (CPF/CNPJ/CEP/telefone/data).
+  // erroLocal = erro de formato/dígito (validação interna).
+  // erro (prop) = erro de obrigatório (vindo do CriarView quando tenta avançar vazio).
+  // Exibimos erroLocal primeiro; se não houver, mostramos o erro do parent.
+  const { tipo, erro: erroLocal, handleChange, handleBlur } = useCampoValidado(campo, value, onChange);
+  const erroExibido = erroLocal ?? erro;
 
   // Mount: animação de entrada suave (fade + slide-up + scale leve).
   // Mais amigável que a animação anterior — eased spring-like curve.
@@ -86,12 +94,15 @@ export function CampoPergunta({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      onAvancar();
+      // Valida antes de avançar — se inválido, shake fica no campo e não avança.
+      if (!erroLocal) onAvancar();
     }
   };
 
-  const handleBlur = () => {
-    // Auto-normaliza estado no blur (SP, São Paulo, sp → SP)
+  const onblurComposto = () => {
+    // 1. validação interna do hook (formato/dígito)
+    handleBlur();
+    // 2. auto-normaliza estado no blur (SP, São Paulo, sp → SP)
     if (/estado|uf/i.test(campo.key) || /estado|uf/i.test(campo.pergunta)) {
       const normalizado = normalizarEstado(value);
       if (normalizado !== value) onChange(normalizado);
@@ -109,18 +120,18 @@ export function CampoPergunta({
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => handleChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            onBlur={handleBlur}
+            onBlur={onblurComposto}
             placeholder={campo.placeholder}
             aria-label={campo.pergunta}
-            aria-invalid={!!erro}
+            aria-invalid={!!erroExibido}
             rows={3}
             disabled={submitting}
             className={cn(
               "w-full min-h-[3.5rem] px-4 py-3 text-xl rounded-xl bg-surface border-2 outline-none transition-all resize-none disabled:opacity-60 placeholder:text-ink/40",
               "focus:shadow-[0_8px_24px_-12px_rgba(37,84,199,0.45)]",
-              erro
+              erroExibido
                 ? "border-[var(--coral)] focus:border-[var(--coral)]"
                 : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]"
             )}
@@ -131,16 +142,16 @@ export function CampoPergunta({
           <select
             ref={selectRef}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => handleChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            onBlur={handleBlur}
+            onBlur={onblurComposto}
             aria-label={campo.pergunta}
-            aria-invalid={!!erro}
+            aria-invalid={!!erroExibido}
             disabled={submitting}
             className={cn(
               "w-full h-14 pl-4 pr-10 text-xl rounded-xl bg-surface border-2 outline-none transition-all appearance-none disabled:opacity-60 cursor-pointer",
               "focus:shadow-[0_8px_24px_-12px_rgba(37,84,199,0.45)]",
-              erro
+              erroExibido
                 ? "border-[var(--coral)] focus:border-[var(--coral)]"
                 : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]",
               !value && "text-ink/40"
@@ -161,23 +172,23 @@ export function CampoPergunta({
           />
         </div>
       ) : (
-        <div data-campo="el">
+        <div data-campo="el" className="relative">
           <input
             ref={inputRef}
-            type="text"
+            type={tipo === "numero" ? "text" : "text"}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => handleChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            onBlur={handleBlur}
+            onBlur={onblurComposto}
             placeholder={campo.placeholder}
             aria-label={campo.pergunta}
-            aria-invalid={!!erro}
+            aria-invalid={!!erroExibido}
             inputMode={inputMode}
             disabled={submitting}
             className={cn(
               "w-full h-14 px-4 text-xl rounded-xl bg-surface border-2 outline-none transition-all disabled:opacity-60 placeholder:text-ink/40",
               "focus:shadow-[0_8px_24px_-12px_rgba(37,84,199,0.45)]",
-              erro
+              erroExibido
                 ? "border-[var(--coral)] focus:border-[var(--coral)]"
                 : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]"
             )}
@@ -185,14 +196,14 @@ export function CampoPergunta({
         </div>
       )}
 
-      {erro && (
+      {erroExibido && (
         <p data-campo="el" className="text-sm text-[var(--coral)] font-medium pl-1 flex items-center gap-1.5">
           <span aria-hidden="true">⚠</span>
-          {erro}
+          {erroExibido}
         </p>
       )}
 
-      {campo.microcopy && !erro && (
+      {campo.microcopy && !erroExibido && (
         <p data-campo="el" className="pen-note text-sm pl-1 flex items-start gap-1.5">
           <span aria-hidden="true" className="text-[var(--selo-green)] mt-px">•</span>
           <span>{campo.microcopy}</span>

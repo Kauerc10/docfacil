@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNav } from "../nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { getModel } from "@/lib/services/models-service";
@@ -23,6 +23,10 @@ import {
   CriarModeloNaoEncontrado,
 } from "./criar/loading-states";
 import { LoadingDocumento } from "../loading-documento";
+import {
+  getProgressLine,
+  getErrorLine,
+} from "./criar/pet-lines";
 
 /**
  * CriarView — thin orchestrator (~250 lines) for the DocFacil "Concierge" flow.
@@ -64,10 +68,11 @@ export function CriarView() {
   >({});
   const [petMood, setPetMood] = useState<PetMood>("falando");
   const [fieldError, setFieldError] = useState<string | null>(null);
+  // Override da fala do pet (usado para falas contextuais de erro/progresso).
+  // Quando null, o pet diz a pergunta da etapa.
+  const [petOverride, setPetOverride] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<"perguntas" | "visualizar">("perguntas");
   const [pulseProgress, setPulseProgress] = useState(false);
-
-  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // === Load model ===========================================================
   const loadModel = useCallback(async () => {
@@ -87,13 +92,6 @@ export function CriarView() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadModel();
   }, [loadModel]);
-
-  // Cleanup pending timers on unmount.
-  useEffect(() => {
-    return () => {
-      if (advanceTimer.current) clearTimeout(advanceTimer.current);
-    };
-  }, []);
 
   // === etapasEfetivas =======================================================
   // Static model.etapas — as cláusulas selecionadas NÃO geram etapas extras
@@ -193,6 +191,7 @@ export function CriarView() {
     setAnswers((prev) => ({ ...prev, [key]: value }));
     if (fieldError) {
       setFieldError(null);
+      setPetOverride(null);
       setPetMood("falando");
     }
   };
@@ -205,6 +204,7 @@ export function CriarView() {
     setAnswers((prev) => ({ ...prev, [fieldKey]: value }));
     if (fieldError) {
       setFieldError(null);
+      setPetOverride(null);
       setPetMood("falando");
     }
   };
@@ -232,6 +232,7 @@ export function CriarView() {
     }
     if (fieldError) {
       setFieldError(null);
+      setPetOverride(null);
       setPetMood("falando");
     }
   };
@@ -287,39 +288,41 @@ export function CriarView() {
     setSubmitting(true);
     setMostrandoLoading(true);
     setPetMood("pensando");
-    // LoadingDocumento animação é 1.5s — esperamos esse tempo mínimo antes
-    // de navegar pra sucesso, dando sensação de "preparando seu documento".
-    advanceTimer.current = setTimeout(async () => {
-      try {
-        const userId = user?.uid || "demo";
-        const doc = await createDocument({
-          modeloSlug: modelo.slug,
-          modeloNome: modelo.nome,
-          respostas: respostasFinais,
-          status: "concluido",
-          userId,
-        });
-        navigate("sucesso", { slug, id: doc.id });
-      } catch (e) {
-        logger.error("CriarView", "falha ao salvar documento", e, { slug });
-        // Não bloqueamos o usuário — navegamos mesmo assim pra que ele não
-        // perca o preenchimento. SucessoView lida com fallback.
-        setSubmitting(false);
-        setMostrandoLoading(false);
-        navigate("sucesso", { slug });
-      }
-    }, 1500);
+    // Sem latência artificial: chama createDocument imediatamente.
+    // LoadingDocumento aparece apenas durante a operação real de persistência.
+    try {
+      const userId = user?.uid || "demo";
+      const doc = await createDocument({
+        modeloSlug: modelo.slug,
+        modeloNome: modelo.nome,
+        respostas: respostasFinais,
+        status: "concluido",
+        userId,
+      });
+      navigate("sucesso", { slug, id: doc.id });
+    } catch (e) {
+      logger.error("CriarView", "falha ao salvar documento", e, { slug });
+      // Não bloqueamos o usuário — navegamos mesmo assim pra que ele não
+      // perca o preenchimento. SucessoView lida com fallback.
+      setSubmitting(false);
+      setMostrandoLoading(false);
+      navigate("sucesso", { slug });
+    }
   };
 
   const handleAvancar = () => {
     if (!etapaAtual || submitting) return;
     const erro = validarEtapaAtual();
     if (erro) {
+      // Empatia no erro: usa fala contextual em vez de mensagem genérica,
+      // mas mantém a mensagem técnica no fieldError para clareza.
       setFieldError(erro);
       setPetMood("atencao");
+      setPetOverride(getErrorLine());
       return;
     }
     setFieldError(null);
+    setPetOverride(null);
     normalizarEstadoSeAplicavel();
 
     // progress-pulse ao completar a etapa
@@ -327,6 +330,8 @@ export function CriarView() {
     setTimeout(() => setPulseProgress(false), UX_CONFIG.PROGRESS_PULSE_DURATION);
 
     if (isLast) {
+      // Comemoração: pet fica feliz e "fala" a celebração antes de gerar.
+      setPetMood("feliz");
       // Snapshot final:
       // 1. respostasComEndereco (campos individuais + composições de endereço + separadores RG)
       // 2. clausulasSelecionadas codificadas como __clausula_${id} = "true" (para persistência)
@@ -346,6 +351,7 @@ export function CriarView() {
 
     // Pet fica feliz brevemente ao avançar, depois volta a "falando".
     setPetMood("feliz");
+    setPetOverride(null);
     setTimeout(() => setPetMood("falando"), UX_CONFIG.PET_HAPPY_DURATION);
     setStepIndex((i) => Math.min(i + 1, totalEtapas - 1));
   };
@@ -373,7 +379,9 @@ export function CriarView() {
     : null;
 
   // Texto que o pet "fala" (digitado progressivamente) — por etapa.
-  const petText =
+  // Combina fala de progresso (meio/quase-fim) com a pergunta da etapa,
+  // dando personalidade sem esconder a informação que o usuário precisa.
+  const perguntaAtual =
     etapaAtual?.tipo === "campo"
       ? etapaAtual.campo.pergunta
       : etapaAtual?.tipo === "campo_grupo"
@@ -381,6 +389,11 @@ export function CriarView() {
       : etapaAtual?.tipo === "clausulas"
       ? etapaAtual.titulo ?? "Selecione as cláusulas opcionais:"
       : "Vamos começar?";
+
+  const progressLine = getProgressLine(stepIndex, totalEtapas);
+  const petTextBase = progressLine ? `${progressLine} ${perguntaAtual}` : perguntaAtual;
+  // Override tem prioridade (erro/contexto emocional), senão usa a base.
+  const petText = petOverride ?? petTextBase;
 
   const progressPct = totalEtapas > 0 ? (stepIndex / totalEtapas) * 100 : 0;
 
@@ -394,6 +407,13 @@ export function CriarView() {
       mobileTab={mobileTab}
       onMobileTabChange={setMobileTab}
       onVoltar={handleVoltar}
+      onStepClick={(target) => {
+        // Permite revisar etapas anteriores sem perder o progresso.
+        setStepIndex(Math.max(0, Math.min(target, stepIndex)));
+        setFieldError(null);
+        setPetOverride(null);
+        setPetMood("falando");
+      }}
       previewSlot={
         <div className="w-full max-w-[340px] mx-auto">
           <PreviewA4
@@ -422,9 +442,11 @@ export function CriarView() {
           onAvancar={handleAvancar}
           isLast={isLast}
           submitting={submitting}
+          fieldError={fieldError}
+          extrasPorClausula={extrasPorClausula}
         />
       )}
-      {fieldError && (
+      {fieldError && etapaAtual?.tipo === "clausulas" && (
         <p
           role="alert"
           className="mt-3 text-sm text-[var(--coral)] font-medium pl-1 flex items-center gap-1.5"

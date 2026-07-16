@@ -85,6 +85,12 @@ export interface ChatStepProps {
   isLast: boolean;
   /** true enquanto o documento está sendo salvo (botão mostra "Salvando…") */
   submitting?: boolean;
+  /** erro de validação vindo do parent (obrigatório) — exibido no CampoPergunta */
+  fieldError?: string | null;
+  /** extras de cláusulas por id — repassado ao ClausulasPergunta para refletir valores */
+  extrasPorClausula?: Record<string, Record<string, string>>;
+  /** callback quando o usuário clica no balão do pet (skip typing) */
+  onSkipTyping?: () => void;
 }
 
 export interface CampoPerguntaProps {
@@ -136,6 +142,38 @@ export interface PreviewA4Props {
   showWatermark?: boolean;
   /** className extra no root (sheet) */
   className?: string;
+}
+
+// ============================================================================
+// Detecção de máscara (key autoritativa, pergunta como fallback)
+// ============================================================================
+
+/**
+ * Detecta o tipo de máscara a aplicar a um campo.
+ *
+ * 1. KEY é a fonte autoritativa — só aplica máscara CPF/CNPJ/CEP se a key
+ *    explicitamente diz isso. Evita falso positivo em campos como
+ *    "Seu RG e CPF (opcional):" (key "rg") — a menção a "CPF" no label
+ *    não significa que o campo deva ter máscara de CPF.
+ * 2. PERGUNTA — só para casos onde a key não ajuda (ex.: "telefone"
+ *    aparece no label mas a key é "contato"). Stricter: a pergunta
+ *    precisa começar com a palavra-chave (não apenas conter).
+ * 3. tipo "number" → numero; senão texto.
+ */
+export function detectarMascara(c: CampoModelo): TipoMascara {
+  const k = c.key.toLowerCase();
+  const p = c.pergunta.toLowerCase();
+  if (/cpf/.test(k)) return "cpf";
+  if (/cnpj/.test(k)) return "cnpj";
+  if (/cep/.test(k)) return "cep";
+  if (/telefone|fone|celular|whats/.test(k)) return "telefone";
+  if (/data|nascimento/.test(k)) return "data";
+  if (/_uf$|^uf$|estado/.test(k)) return "estado";
+  if (/^\s*(telefone|fone|celular|whats)/.test(p)) return "telefone";
+  if (/^\s*(data|nascimento)/.test(p)) return "data";
+  if (/sigla do estado/.test(p)) return "estado";
+  if (c.tipo === "number") return "numero";
+  return "texto";
 }
 
 // ============================================================================
@@ -251,4 +289,46 @@ export function validarCEP(cep: string): string | null {
   if (nums.length === 0) return "Digite o CEP.";
   if (nums.length !== 8) return "CEP deve ter 8 dígitos.";
   return null;
+}
+
+/** Valida telefone (10 ou 11 dígitos com DDD). */
+export function validarTelefone(tel: string): string | null {
+  const nums = tel.replace(/\D/g, "");
+  if (nums.length === 0) return "Digite o telefone.";
+  if (nums.length < 10) return "Telefone incompleto (precisa do DDD + número).";
+  if (nums.length > 11) return "Telefone longo demais.";
+  // DDD 11 dígitos: celular (começa com 9 após DDD); 10 dígitos: fixo
+  if (nums.length === 11 && nums[2] !== "9") return "Celular deve começar com 9 após o DDD.";
+  return null;
+}
+
+/** Valida data no formato DD/MM/AAAA (e checagem básica de sanidade). */
+export function validarData(data: string): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(data);
+  if (!m) return "Use o formato DD/MM/AAAA.";
+  const [, dd, mm, aaaa] = m;
+  const d = parseInt(dd, 10);
+  const mes = parseInt(mm, 10);
+  const ano = parseInt(aaaa, 10);
+  if (mes < 1 || mes > 12) return "Mês inválido.";
+  if (d < 1 || d > 31) return "Dia inválido.";
+  if (ano < 1900 || ano > new Date().getFullYear()) return "Ano inválido.";
+  return null;
+}
+
+/**
+ * Valida um campo de acordo com o TipoMascara detectado.
+ * Retorna mensagem de erro em PT-BR, ou null se válido/vazio.
+ * (Campos vazios retornam null — o check de obrigatório é no submit.)
+ */
+export function validarPorTipo(tipo: TipoMascara, valor: string): string | null {
+  if (!valor.trim()) return null;
+  switch (tipo) {
+    case "cpf": return validarCPF(valor);
+    case "cnpj": return validarCNPJ(valor);
+    case "cep": return validarCEP(valor);
+    case "telefone": return validarTelefone(valor);
+    case "data": return validarData(valor);
+    default: return null;
+  }
 }

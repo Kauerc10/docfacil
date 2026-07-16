@@ -17,6 +17,8 @@ export interface CriarLayoutProps {
   onMobileTabChange: (tab: "perguntas" | "visualizar") => void;
   /** callback do botão Voltar */
   onVoltar: () => void;
+  /** navega para uma etapa anterior (só permite índices <= step atual) */
+  onStepClick?: (targetStep: number) => void;
   children: React.ReactNode;
   /** conteúdo da coluna direita (preview) */
   previewSlot: React.ReactNode;
@@ -40,9 +42,14 @@ export function CriarLayout({
   mobileTab,
   onMobileTabChange,
   onVoltar,
+  onStepClick,
   children,
   previewSlot,
 }: CriarLayoutProps) {
+  // Stepper dots: apenas para fluxos com 3+ etapas.
+  // Permite clicar em etapas já visitadas (<= step atual) para revisar;
+  // etapas futuras não são clicáveis (não foram preenchidas).
+  const showStepper = total >= 3 && onStepClick;
   return (
     <div className="min-h-screen pt-[72px] flex flex-col bg-paper">
       {/* === Top bar === */}
@@ -74,6 +81,33 @@ export function CriarLayout({
               style={{ width: `${progressPct}%` }}
             />
           </div>
+          {showStepper && (
+            <div className="mt-2 flex items-center gap-1.5">
+              {Array.from({ length: total }, (_, i) => {
+                const isCurrent = i === step;
+                const isPast = i < step;
+                const clickable = i <= step;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={!clickable}
+                    onClick={() => clickable && onStepClick!(i)}
+                    aria-label={`Ir para a etapa ${i + 1}`}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className={cn(
+                      "h-2 flex-1 max-w-[2.5rem] rounded-full transition-all",
+                      isCurrent
+                        ? "bg-[var(--blue-royal)] scale-y-125"
+                        : isPast
+                        ? "bg-[var(--selo-green)]/70 hover:bg-[var(--selo-green)] cursor-pointer"
+                        : "bg-[var(--border)] cursor-not-allowed"
+                    )}
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

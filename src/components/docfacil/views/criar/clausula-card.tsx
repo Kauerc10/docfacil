@@ -6,6 +6,8 @@ import { useGSAP } from "@gsap/react";
 import { ArrowRight, Check, ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ClausulaCardProps, ClausulasPerguntaProps } from "./types";
+import { useCampoValidado } from "./use-campo-validado";
+import type { CampoModelo } from "@/lib/types";
 
 gsap.registerPlugin(useGSAP);
 
@@ -164,67 +166,127 @@ export function ClausulaCard({
           onClick={(e) => e.stopPropagation()}
         >
           {clausula.camposExtras.map((campo) => (
-            <div key={campo.key} className="space-y-1.5">
-              <label
-                htmlFor={`extra-${clausula.id}-${campo.key}`}
-                className="block text-sm font-medium text-ink/75"
-              >
-                {campo.pergunta}
-              </label>
-              {campo.tipo === "textarea" ? (
-                <textarea
-                  id={`extra-${clausula.id}-${campo.key}`}
-                  value={extras[campo.key] ?? ""}
-                  onChange={(e) => onExtraChange(campo.key, e.target.value)}
-                  placeholder={campo.placeholder}
-                  rows={2}
-                  className="w-full min-h-[3rem] px-3 py-2 text-base rounded-lg bg-surface border-2 border-[var(--blue-soft)] focus:border-[var(--blue-royal)] outline-none transition-all resize-none placeholder:text-ink/40"
-                />
-              ) : campo.tipo === "select" && campo.opcoes ? (
-                <div className="relative">
-                  <select
-                    id={`extra-${clausula.id}-${campo.key}`}
-                    value={extras[campo.key] ?? ""}
-                    onChange={(e) => onExtraChange(campo.key, e.target.value)}
-                    className={cn(
-                      "w-full h-11 pl-3 pr-9 text-base rounded-lg bg-surface border-2 border-[var(--blue-soft)] focus:border-[var(--blue-royal)] outline-none transition-all appearance-none cursor-pointer",
-                      !(extras[campo.key] ?? "") && "text-ink/40"
-                    )}
-                  >
-                    <option value="" disabled>
-                      {campo.placeholder ?? "Selecione…"}
-                    </option>
-                    {campo.opcoes.map((op) => (
-                      <option key={op} value={op} className="text-ink">
-                        {op}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/50 pointer-events-none"
-                    aria-hidden="true"
-                  />
-                </div>
-              ) : (
-                <input
-                  id={`extra-${clausula.id}-${campo.key}`}
-                  type="text"
-                  value={extras[campo.key] ?? ""}
-                  onChange={(e) => onExtraChange(campo.key, e.target.value)}
-                  placeholder={campo.placeholder}
-                  inputMode={campo.tipo === "number" ? "decimal" : "text"}
-                  className="w-full h-11 px-3 text-base rounded-lg bg-surface border-2 border-[var(--blue-soft)] focus:border-[var(--blue-royal)] outline-none transition-all placeholder:text-ink/40"
-                />
-              )}
-              {campo.microcopy && (
-                <p className="text-xs text-ink/55 italic flex items-start gap-1">
-                  <span aria-hidden="true" className="text-[var(--selo-green)] mt-px">•</span>
-                  <span>{campo.microcopy}</span>
-                </p>
-              )}
-            </div>
+            <CampoExtra
+              key={campo.key}
+              clausulaId={clausula.id}
+              campo={campo}
+              value={extras[campo.key] ?? ""}
+              onExtraChange={onExtraChange}
+            />
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * CampoExtra — input de campo extra de cláusula com máscara + validação.
+ *
+ * Encapsula o hook useCampoValidado para que CPFs, CNPJs, CEPs, telefones
+ * e datas em campos extras (ex.: CPF do fiador, telefone da testemunha)
+ * sejam formatados e validados igual aos campos principais do GrupoCampos.
+ */
+function CampoExtra({
+  clausulaId,
+  campo,
+  value,
+  onExtraChange,
+}: {
+  clausulaId: string;
+  campo: CampoModelo;
+  value: string;
+  onExtraChange: (fieldKey: string, value: string) => void;
+}) {
+  // Adaptador: useCampoValidado espera (v: string) => void, mas onExtraChange
+  // precisa de (fieldKey, value). Amarramos o fieldKey aqui.
+  const { tipo, erro, handleChange, handleBlur } = useCampoValidado(campo, value, (v) =>
+    onExtraChange(campo.key, v)
+  );
+  const inputId = `extra-${clausulaId}-${campo.key}`;
+  const isTextarea = campo.tipo === "textarea";
+  const isSelect = campo.tipo === "select" && campo.opcoes && campo.opcoes.length > 0;
+
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={inputId} className="block text-sm font-medium text-ink/75">
+        {campo.pergunta}
+      </label>
+      {isTextarea ? (
+        <textarea
+          id={inputId}
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          onBlur={handleBlur}
+          placeholder={campo.placeholder}
+          rows={2}
+          aria-invalid={!!erro}
+          className={cn(
+            "w-full min-h-[3rem] px-3 py-2 text-base rounded-lg bg-surface border-2 outline-none transition-all resize-none placeholder:text-ink/40",
+            erro
+              ? "border-[var(--coral)] focus:border-[var(--coral)]"
+              : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]"
+          )}
+        />
+      ) : isSelect ? (
+        <div className="relative">
+          <select
+            id={inputId}
+            value={value}
+            onChange={(e) => handleChange(e.target.value)}
+            onBlur={handleBlur}
+            aria-invalid={!!erro}
+            className={cn(
+              "w-full h-11 pl-3 pr-9 text-base rounded-lg bg-surface border-2 outline-none transition-all appearance-none cursor-pointer",
+              erro
+                ? "border-[var(--coral)] focus:border-[var(--coral)]"
+                : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]",
+              !value && "text-ink/40"
+            )}
+          >
+            <option value="" disabled>
+              {campo.placeholder ?? "Selecione…"}
+            </option>
+            {campo.opcoes!.map((op) => (
+              <option key={op} value={op} className="text-ink">
+                {op}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/50 pointer-events-none"
+            aria-hidden="true"
+          />
+        </div>
+      ) : (
+        <input
+          id={inputId}
+          type="text"
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          onBlur={handleBlur}
+          placeholder={campo.placeholder}
+          inputMode={campo.tipo === "number" || tipo === "numero" ? "decimal" : "text"}
+          aria-invalid={!!erro}
+          className={cn(
+            "w-full h-11 px-3 text-base rounded-lg bg-surface border-2 outline-none transition-all placeholder:text-ink/40",
+            erro
+              ? "border-[var(--coral)] focus:border-[var(--coral)]"
+              : "border-[var(--blue-soft)] focus:border-[var(--blue-royal)]"
+          )}
+        />
+      )}
+      {erro && (
+        <p className="text-xs text-[var(--coral)] font-medium flex items-center gap-1.5">
+          <span aria-hidden="true">⚠</span>
+          {erro}
+        </p>
+      )}
+      {!erro && campo.microcopy && (
+        <p className="text-xs text-ink/55 italic flex items-start gap-1">
+          <span aria-hidden="true" className="text-[var(--selo-green)] mt-px">•</span>
+          <span>{campo.microcopy}</span>
+        </p>
       )}
     </div>
   );

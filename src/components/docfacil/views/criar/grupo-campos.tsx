@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 import { normalizarEstado, normalizarLogradouro } from "@/lib/normalizers";
 import { buscarCep } from "@/lib/services/cep-service";
 import type { CampoModelo, EnderecoConfig } from "@/lib/types";
-import type { InputRef, TipoMascara } from "./types";
-import { aplicarMascara, validarCEP, validarCPF, validarCNPJ } from "./types";
+import type { InputRef } from "./types";
+import { aplicarMascara, detectarMascara, validarPorTipo } from "./types";
 
 gsap.registerPlugin(useGSAP);
 
@@ -62,6 +62,7 @@ export function GrupoCampos({
   const [erros, setErros] = useState<Record<string, string | null>>({});
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [cepEncontrado, setCepEncontrado] = useState(false);
+  const [cepFalhou, setCepFalhou] = useState(false);
 
   // Mount animation — stagger suave do título + cada campo
   useGSAP(
@@ -109,36 +110,9 @@ export function GrupoCampos({
     return () => window.clearTimeout(t);
   }, [campos]);
 
-  const detectarMascara = (c: CampoModelo): TipoMascara => {
-    const k = c.key.toLowerCase();
-    const p = c.pergunta.toLowerCase();
-    // 1. KEY é a fonte autoritativa — só aplica máscara CPF/CNPJ/CEP se a key
-    //    explicitamente diz isso. Evita falso positivo em campos como
-    //    "Seu RG e CPF (opcional):" (key "rg") — a menção a "CPF" no label
-    //    não significa que o campo deva ter máscara de CPF.
-    if (/cpf/.test(k)) return "cpf";
-    if (/cnpj/.test(k)) return "cnpj";
-    if (/cep/.test(k)) return "cep";
-    if (/telefone|fone|celular|whats/.test(k)) return "telefone";
-    if (/data|nascimento/.test(k)) return "data";
-    if (/_uf$|^uf$|estado/.test(k)) return "estado";
-    // 2. PERGUNTA — só para casos onde a key não ajuda (ex.: "telefone"
-    //    aparece no label mas a key é "contato"). Stricter: a pergunta
-    //    precisa começar com a palavra-chave (não apenas conter).
-    if (/^\s*(telefone|fone|celular|whats)/.test(p)) return "telefone";
-    if (/^\s*(data|nascimento)/.test(p)) return "data";
-    if (/sigla do estado/.test(p)) return "estado";
-    if (c.tipo === "number") return "numero";
-    return "texto";
-  };
-
   const validar = (c: CampoModelo, v: string): string | null => {
-    const tipo = detectarMascara(c);
     if (!v.trim()) return null; // required check happens at submit
-    if (tipo === "cpf") return validarCPF(v);
-    if (tipo === "cnpj") return validarCNPJ(v);
-    if (tipo === "cep") return validarCEP(v);
-    return null;
+    return validarPorTipo(detectarMascara(c), v);
   };
 
   const handleChange = (c: CampoModelo, raw: string) => {
@@ -150,9 +124,10 @@ export function GrupoCampos({
       const novoErro = validar(c, mascarado);
       if (!novoErro) setErros((prev) => ({ ...prev, [c.key]: null }));
     }
-    // quando o usuário muda o CEP, esconde o check de "encontrado"
+    // quando o usuário muda o CEP, esconde o check de "encontrado" e o aviso de falha
     if (camposEndereco && c.key === camposEndereco.cepKey) {
       setCepEncontrado(false);
+      setCepFalhou(false);
     }
   };
 
@@ -180,9 +155,10 @@ export function GrupoCampos({
       const nums = v.replace(/\D/g, "");
       if (nums.length === 8) {
         setBuscandoCep(true);
+        setCepFalhou(false);
         try {
           const end = await buscarCep(nums);
-          if (end) {
+          if (end && (end.logradouro || end.localidade)) {
             if (camposEndereco.logradouroKey && end.logradouro) {
               // ViaCEP retorna "Rua das Flores" já com prefixo — normaliza
               // para garantir formato consistente
@@ -205,9 +181,19 @@ export function GrupoCampos({
             if (camposEndereco.numeroKey) {
               setTimeout(() => refs.current[camposEndereco.numeroKey]?.focus(), 50);
             }
+          } else {
+            // ViaCEP respondeu mas não encontrou o CEP
+            setCepFalhou(true);
+            if (camposEndereco.logradouroKey) {
+              setTimeout(() => refs.current[camposEndereco.logradouroKey]?.focus(), 50);
+            }
           }
         } catch {
-          // silent — usuário pode preencher manualmente
+          // rede/API indisponível — feedback honesto em vez de silêncio
+          setCepFalhou(true);
+          if (camposEndereco.logradouroKey) {
+            setTimeout(() => refs.current[camposEndereco.logradouroKey]?.focus(), 50);
+          }
         } finally {
           setBuscandoCep(false);
         }
@@ -295,6 +281,7 @@ export function GrupoCampos({
           const tipo = detectarMascara(c);
           const buscando = buscandoCep && c.key === camposEndereco?.cepKey;
           const encontrado = cepEncontrado && c.key === camposEndereco?.cepKey;
+          const falhou = cepFalhou && c.key === camposEndereco?.cepKey;
           const isEnd = isEnderecoField(c.key);
           const fullW = isFullWidth(c.key) || isTextarea;
           return (
@@ -318,6 +305,11 @@ export function GrupoCampos({
                   <span className="ml-2 inline-flex items-center gap-1 text-xs text-[var(--selo-green)]">
                     <Check className="w-3 h-3" />
                     endereço encontrado
+                  </span>
+                )}
+                {falhou && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-xs text-ink/55">
+                    Não encontramos esse CEP automaticamente — preencha o endereço abaixo
                   </span>
                 )}
               </label>
