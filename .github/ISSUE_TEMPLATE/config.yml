@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Dúvida ou suporte
+    url: https://wa.me/5511999990000
+    about: Pra tirar dúvidas de uso ou falar com o time, chama no WhatsApp.
+  - name: 🔒 Vulnerabilidade de segurança
+    url: mailto:dpo@khub.com.br
+    about: Encontrou falha de segurança? NÃO abre issue pública — escreve pro DPO.

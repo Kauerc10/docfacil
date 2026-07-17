@@ -1,0 +1,61 @@
+# Release — cria uma GitHub Release automática quando uma tag v* é empurrada.
+#
+# Fluxo:
+#   git tag -a v0.2.0 -m "..."
+#   git push origin v0.2.0
+# → esta Action cria a Release no GitHub com as notas do CHANGELOG.md.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 📦 Criar GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📄 Extrair notas do CHANGELOG
+        id: changelog
+        run: |
+          # Pega o nome da tag sem o prefixo "v" (ex: v0.1.0 → 0.1.0)
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Extraindo notas da versão $VERSION do CHANGELOG.md..."
+
+          # Extrai o bloco da versão (entre "## [<versão>]" e o próximo "## ")
+          NOTES=$(awk -v ver="$VERSION" '
+            $0 ~ "## \\[" ver "\\]" { found=1; next }
+            /^## \[/ && found { exit }
+            found { print }
+          ' CHANGELOG.md)
+
+          if [ -z "$NOTES" ]; then
+            echo "⚠️  Versão $VERSION não encontrada no CHANGELOG.md. Usando mensagem da tag."
+            NOTES=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")
+          fi
+
+          # Preserva quebras de linha no output do step
+          DELIMITER="$(openssl rand -hex 8)"
+          echo "notes<<$DELIMITER" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "$DELIMITER" >> "$GITHUB_OUTPUT"
+
+      - name: 🏷️ Criar Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.notes }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: false

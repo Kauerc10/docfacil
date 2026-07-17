@@ -1,0 +1,17 @@
+# CODEOWNERS — quem é automaticamente requisitado pra revisar mudanças.
+#
+# Formato: <caminho>  <@usuario ou @time>
+# O GitHub usa isso pra exigir review approval dos donos antes do merge
+# (quando branch protection com "Require review from Code Owners" está ligada).
+#
+# Ajuste os usuários abaixo conforme o time crescer.
+
+# Tudo no repositório exige review do tech lead
+*                           @Kauerc10
+
+# Áreas sensíveis (auto-review obrigatório)
+/src/lib/pdf/              @Kauerc10
+/src/lib/document-engine/  @Kauerc10
+/.github/                  @Kauerc10
+/firestore.rules           @Kauerc10
+/prisma/                   @Kauerc10

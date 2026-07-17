@@ -1,0 +1,62 @@
+name: 🐛 Bug
+description: Reporta algo quebrado no DocFacil
+title: "[bug] "
+labels: ["bug", "triagem"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar! Quanto mais detalhe, mais rápido a gente resolve.
+        Antes de abrir, confere se já não existe uma issue aberta pra isso.
+  - type: textarea
+    id: o-que-aconteceu
+    attributes:
+      label: O que aconteceu?
+      description: Descreve o problema em uma frase.
+      placeholder: "Ex: Ao clicar em baixar PDF, nada acontece."
+    validations:
+      required: true
+  - type: textarea
+    id: o-que-esperava
+    attributes:
+      label: O que você esperava que acontecesse?
+      placeholder: "Ex: O PDF deveria baixar normalmente."
+    validations:
+      required: true
+  - type: textarea
+    id: passos
+    attributes:
+      label: Como reproduzir
+      description: Passo a passo pra gente conseguir replicar.
+      placeholder: |
+        1. Loguei com...
+        2. Fui em Modelos...
+        3. Cliquei em...
+    validations:
+      required: true
+  - type: dropdown
+    id: ambiente
+    attributes:
+      label: Ambiente
+      options:
+        - Produção (khub.com.br)
+        - Homologação
+        - Local (dev)
+        - Não sei dizer
+    validations:
+      required: true
+  - type: input
+    id: navegador
+    attributes:
+      label: Navegador / dispositivo
+      placeholder: "Ex: Chrome 125 no Android, Safari no iPhone 14"
+  - type: textarea
+    id: evidencias
+    attributes:
+      label: Evidências
+      description: Print, vídeo, ou log do console. Arrasta pra cá.
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto adicional
+      description: Mais alguma coisa que possa ajudar? Plano do usuário, modelo de documento, etc.

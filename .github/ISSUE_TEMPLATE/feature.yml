@@ -1,0 +1,46 @@
+name: ✨ Feature / Melhoria
+description: Sugere uma nova funcionalidade ou melhoria
+title: "[feature] "
+labels: ["enhancement", "triagem"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+       Conta pra gente o que vc imaginou. Não precisa ser técnico — descreve
+        a experiência que vc quer proporcionar pro usuário.
+  - type: textarea
+    id: problema
+    attributes:
+      label: Que problema isso resolve?
+      description: Qual dor ou frustração do usuário essa feature ataca?
+      placeholder: "Ex: O usuário não consegue editar um documento depois de pronto e precisa refazer do zero."
+    validations:
+      required: true
+  - type: textarea
+    id: solucao
+    attributes:
+      label: Como vc imagina que deveria funcionar?
+      description: Descreve o fluxo ideal, do ponto de vista do usuário.
+      placeholder: "Ex: Um botão 'Editar respostas' no detalhe do documento que reabre o assistente..."
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Já pensou em alguma alternativa?
+      description: Outras formas de resolver o mesmo problema que vc considerou.
+  - type: dropdown
+    id: impacto
+    attributes:
+      label: Qual o impacto esperado?
+      options:
+        - 🔴 Crítico (bloqueia o uso do produto)
+        - 🟡 Importante (melhora muito a experiência)
+        - 🟢 Bom ter (polimento / conveniência)
+    validations:
+      required: true
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Referências / mockups
+      description: Link de figma, print de outro app que faz parecido, rascunho... o que ajudar.

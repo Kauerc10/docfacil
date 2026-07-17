@@ -1,0 +1,63 @@
+# CI — roda em todo Pull Request e push para main/24.
+# Barreira mínima: o PR só mergeia se tudo aqui passar verde.
+name: CI
+
+on:
+  pull_request:
+    branches: [main, 24]
+  push:
+    branches: [main, 24]
+
+# Cancela runs antigas da mesma branch quando um novo push chega.
+# Economiza minutos de CI e evira resultado stale.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint + TypeCheck + Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🥟 Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      # Cache da pasta .bun para installs subsequentes voarem.
+      - name: 💾 Cache bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+
+      - name: 📦 Install dependências
+        run: bun install --frozen-lockfile
+
+      - name: 🔍 ESLint
+        run: bun run lint
+        # Warnings não quebram o CI — só erros.
+        continue-on-error: false
+
+      # Typecheck separado do build pra mensagem de erro mais clara.
+      - name: 🔬 TypeScript (typecheck)
+        run: bunx tsc --noEmit
+
+      - name: 🏗️ Next.js Build
+        run: bun run build:ci
+        env:
+          # Variáveis mínimas pra o build não explodir (Firebase em modo demo).
+          NEXT_PUBLIC_FIREBASE_API_KEY: ""
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ""
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ""
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ""
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ""
+          NEXT_PUBLIC_FIREBASE_APP_ID: ""
