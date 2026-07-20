@@ -8,8 +8,8 @@ Plataforma SaaS de geração de documentos legais para o público leigo brasilei
 Sem juridiquês, sem fricção — o assistente conversacional guia o preenchimento
 e o PDF sai formatado, profissional e pronto para uso.
  
-[![CI](https://img.shields.io/github/actions/workflow/status/Kauerc10/docfacil/ci.yml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/Kauerc10/docfacil/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Kauerc10/docfacil?style=flat-square&logo=github&sort=semver)](https://github.com/Kauerc10/docfacil/releases)
+[![CI](https://github.com/Kauerc10/docfacil/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Kauerc10/docfacil/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/badge/release-v1.0.0-blue?style=flat-square&logo=github)](https://github.com/Kauerc10/docfacil/releases)
 [![License](https://img.shields.io/badge/license-proprietary-%23ff6a4d?style=flat-square)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/typescript-5-blue?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/next.js-16-black?style=flat-square&logo=nextdotjs)](https://nextjs.org/)
