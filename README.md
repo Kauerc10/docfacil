@@ -1,255 +1,263 @@
 <div align="center">
-
-# 📄 DocFacil
-
-### Documentos legais prontos como numa conversa.
-
-Plataforma de geração de documentos legais (contratos, declarações, procurações) para o público leigo — sem juridiquês, sem fricção, com a credibilidade de cartório e o calor de atendimento humano.
-
+ 
+<img src="public/logo.svg" alt="DocFacil" width="280" />
+ 
+**Documentos legais prontos como numa simples conversa.**
+ 
+Plataforma SaaS de geração de documentos legais para o público leigo brasileiro.
+Sem juridiquês, sem fricção — o assistente conversacional guia o preenchimento
+e o PDF sai formatado, profissional e pronto para uso.
+ 
+[![CI](https://img.shields.io/github/actions/workflow/status/Kauerc10/docfacil/ci.yml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/Kauerc10/docfacil/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Kauerc10/docfacil?style=flat-square&logo=github&sort=semver)](https://github.com/Kauerc10/docfacil/releases)
+[![License](https://img.shields.io/badge/license-proprietary-%23ff6a4d?style=flat-square)](./LICENSE)
+[![TypeScript](https://img.shields.io/badge/typescript-5-blue?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/next.js-16-black?style=flat-square&logo=nextdotjs)](https://nextjs.org/)
+[![Bun](https://img.shields.io/badge/bun-1.3-%23fbf0df?style=flat-square&logo=bun)](https://bun.sh/)
+ 
+Produto da **[K-HUB Soluções Digitais](https://khub.com.br)**
+ 
 </div>
-
+ 
 ---
-
-## 🏢 Sobre
-
-O **DocFacil** é um produto da **K-HUB Soluções Digitais**. O projeto adota a direção de produto **"Concierge Digital + Ateliê de Documentos"**: um chat conversacional guiado como espinha dorsal da experiência de preenchimento, com preview do documento sendo montado em tempo real.
-
-O público-alvo inclui pessoas mais velhas e com baixa intimidade com tecnologia, então a UI é **óbvia antes de ser bonita** — mas com identidade própria para não parecer "mais um SaaS genérico".
-
-### ✨ Diferencial de marca
-
-Para fugir do clichê de IA genérica (gradientes roxo/azul, blobs flutuantes), a marca adota a metáfora do **selo/carimbo notarial** como elemento de assinatura visual:
-
-- Ícone de carregamento = carimbo "batendo"
-- Tela de sucesso = carimbo estampa o documento (clímax da experiência)
-- Marca d'água sutil nos previews de documento
-- Fundo com leve textura de papel (grão sutil, nunca branco estéril)
-
+ 
+## ✨ Visão geral
+ 
+O DocFacil nasceu da frustração de quem precisa de um contrato simples e
+acaba preso em modelos genéricos do Google, advogados caros ou plataformas
+complicadas. A proposta é outra:
+ 
+- 🦉 **Chat conversacional** — responde perguntas como uma pessoa, não como um formulário
+- 📄 **Preview ao vivo** — vê o documento sendo montado enquanto responde
+- 🖨️ **PDF premium** — tipografia profissional, hierarquia visual, citações legais formatadas
+- 🔒 **LGPD compliant** — consentimento com hash SHA-256, DPO, portabilidade
+- 💬 **Humano quando precisa** — WhatsApp real como diferencial de marca
+ 
+O público-alvo inclui pessoas com pouca intimidade com tecnologia. A UI é
+**óbvia antes de ser bonita** — mas com identidade própria (metáfora do selo
+notarial carimbado, textura de papel, corujinha mascote).
+ 
 ---
-
-## 🚀 Stack & Tecnologias
-
-| Camada | Tecnologia |
-|---|---|
-| **Framework** | [Next.js 16](https://nextjs.org/) (App Router) |
-| **Linguagem** | TypeScript 5 |
-| **Estilo** | Tailwind CSS 4 + [shadcn/ui](https://ui.shadcn.com/) (New York) |
-| **Animações** | [GSAP 3](https://gsap.com/) + `@gsap/react` (ScrollTrigger) |
-| **UI Icons** | Lucide React + ícones desenhados sob medida |
-| **Fontes** | Plus Jakarta Sans (display) + Inter (corpo, 18px base) |
-| **Banco de Dados** | Prisma ORM (SQLite dev) + Prisma Client |
-| **Auth** | NextAuth.js v4 (disponível) |
-| **State** | Zustand + TanStack Query |
-| **Package Manager** | [Bun](https://bun.sh/) |
-
----
-
-## 📦 Instalação & Desenvolvimento
-
-### Pré-requisitos
-
-- [Bun](https://bun.sh/) `>= 1.1`
-- Node.js `>= 20` (recomendado)
-- Git
-
-### Setup local
-
-```bash
-# 1. Clonar o repositório
-git clone git@github.com:khub-solucoes/docfacil.git
-cd docfacil
-
-# 2. Instalar dependências
-bun install
-
-# 3. Configurar variáveis de ambiente
-cp .env.example .env
-# edite .env com seus valores (DATABASE_URL, NEXTAUTH_SECRET, etc.)
-
-# 4. Configurar o banco de dados
-bun run db:push
-
-# 5. Rodar o servidor de desenvolvimento
-bun run dev
-```
-
-A aplicação estará disponível em `http://localhost:3000`.
-
-### Scripts disponíveis
-
-| Script | Descrição |
-|---|---|
-| `bun run dev` | Inicia o servidor de desenvolvimento (porta 3000) |
-| `bun run lint` | Roda o ESLint para verificar qualidade do código |
-| `bun run build` | Build de produção |
-| `bun run start` | Inicia o servidor de produção |
-| `bun run db:push` | Sincroniza o schema Prisma com o banco |
-| `bun run db:generate` | Gera o Prisma Client |
-| `bun run db:migrate` | Cria uma nova migration |
-| `bun run db:reset` | Reseta o banco (cuidado!) |
-
----
-
-## 🗂️ Estrutura do Projeto
-
-```
-docfacil/
-├── src/
-│   ├── app/                          # App Router (Next.js 16)
-│   │   ├── layout.tsx                # Layout raiz (fontes, metadata, bg paper)
-│   │   ├── page.tsx                  # Home page
-│   │   ├── globals.css               # Design system DocFacil (tokens, utilities)
-│   │   └── api/                      # API routes
-│   │
-│   ├── components/
-│   │   ├── docfacil/                 # Componentes de marca (DocFacil)
-│   │   │   ├── selo.tsx              # Carimbo notarial (assinatura visual)
-│   │   │   ├── header.tsx            # Header fixo c/ shrink no scroll
-│   │   │   ├── hero.tsx              # Hero c/ timeline GSAP
-│   │   │   ├── catalog.tsx           # Grid de documentos (dog-ear cards)
-│   │   │   ├── how-it-works.tsx      # 3 passos + demo split-screen
-│   │   │   ├── ai-banner.tsx         # Faixa Gerador IA
-│   │   │   ├── social-proof.tsx      # Depoimentos + pills de confiança
-│   │   │   ├── success-showcase.tsx  # CLÍMAX: carimbo estampa o doc
-│   │   │   ├── footer.tsx            # Footer navy c/ WhatsApp
-│   │   │   ├── whatsapp-button.tsx   # CTA flutuante sempre visível
-│   │   │   └── gsap-safety.tsx       # Rede de segurança p/ animações
-│   │   │
-│   │   └── ui/                       # shadcn/ui (componentes base)
-│   │
-│   ├── lib/
-│   │   ├── db.ts                     # Prisma Client
-│   │   └── utils.ts                  # Utilities (cn, etc.)
-│   │
-│   └── hooks/                        # Hooks customizados
-│
-├── prisma/
-│   └── schema.prisma                 # Schema do banco de dados
-│
-├── public/                           # Assets estáticos
-├── mini-services/                    # Microserviços (websocket, etc.)
-└── docs/                             # Documentação adicional
-```
-
----
-
-## 🎨 Design System
-
-### Paleta de cores
-
-| Token | HEX | Uso |
+ 
+## 🛠️ Stack técnica
+ 
+| Camada | Tecnologia | Observação |
 |---|---|---|
-| `bg-paper` | `#FAF7F2` | Fundo principal (marfim quente com textura) |
-| `bg-surface` | `#FFFFFF` | Cards, inputs, superfícies |
-| `ink` | `#0E2340` | Texto principal, títulos |
-| `navy` | `#14315C` | Header, footer, faixas escuras |
-| `blue-royal` | `#2554C7` | CTAs de navegação, links |
-| `blue-soft` | `#E7EEFC` | Hovers, tags |
-| `selo-green` | `#3E8E6E` | Progresso, checkmarks |
-| `green-tint` | `#E7F3EC` | Banners de sucesso |
-| `coral` | `#FF6A4D` | **CTA final de conversão (1 por tela)** |
-
-### Regra de proporção (60-30-10 adaptado)
-
-- **Azul/ink domina ~70%** da interface
-- **Verde** aparece só em feedback pontual (~10%)
-- **Coral** no máximo um botão por tela (~5%)
-- Resto é `bg-paper`/branco
-
-### Tipografia
-
-- **Títulos:** Plus Jakarta Sans (SemiBold/Bold)
-- **Corpo/UI:** Inter (Regular/Medium), base **18px** (acessibilidade)
-- **Inputs:** 20-22px
-- Line-height 1.5+, contraste forte, poucos tamanhos na tela
-
+| **Framework** | [Next.js 16](https://nextjs.org/) | App Router, roteamento híbrido SSR + SPA |
+| **Linguagem** | [TypeScript 5](https://www.typescriptlang.org/) | Strict mode em todo o projeto |
+| **Estilo** | [Tailwind CSS 4](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) | Design system custom, New York variant |
+| **Animações** | [GSAP 3](https://gsap.com/) + @gsap/react | ScrollTrigger, mood animations |
+| **PDF** | [pdfmake 0.3](https://pdfmake.github.io/) | 7 módulos, tipografia legal, carimbo |
+| **Auth + DB** | [Firebase](https://firebase.google.com/) (Auth + Firestore) | Fallback demo via localStorage |
+| **IA** | Provider-agnostic | Interface swapável (OpenAI / Gemini / Anthropic) |
+| **CEP** | [ViaCEP API](https://viacep.com.br/) | Auto-fill de endereços |
+| **Pagamentos** | Stripe (preparado) | Checkout service, webhook ready |
+| **Package Manager** | [Bun 1.3](https://bun.sh/) | Instalação + scripts |
+ 
 ---
-
-## ♿ Acessibilidade
-
-O DocFacil é construído com foco em acessibilidade para o público leigo:
-
-- ✅ `prefers-reduced-motion` respeitado em todas as animações GSAP
-- ✅ Contraste alto (texto `ink` sobre `bg-paper`)
-- ✅ Base tipográfica de 18px (não 16px)
-- ✅ Targets de toque mínimos de 44px
-- ✅ HTML semântico (`main`, `header`, `nav`, `section`, `footer`)
-- ✅ ARIA labels em elementos interativos
-- ✅ Foco visual claro em inputs e botões
-- ✅ Layout responsivo mobile-first
-
+ 
+## 📁 Estrutura do projeto
+ 
+```
+src/
+├── app/                              # Next.js App Router
+│   ├── layout.tsx                    # Layout raiz (fontes, meta, Toaster)
+│   ├── page.tsx                      # Router SPA (NavProvider → views)
+│   ├── globals.css                   # Design system tokens + utilities
+│   ├── robots.ts / sitemap.ts        # SEO crawling
+│   ├── api/                          # API routes (IA, consentimento)
+│   └── (marketing)/                  # Rotas SSR crawláveis (termos, privacidade…)
+│
+├── components/
+│   ├── docfacil/                     # 🎨 Componentes de marca
+│   │   ├── pet.tsx                   #   Mascote corujinha "Selo"
+│   │   ├── selo.tsx                  #   Carimbo notarial (3 variantes)
+│   │   ├── logo.tsx                  #   Wordmark D + "ocFacil"
+│   │   ├── header.tsx / footer.tsx   #   Nav fixa + footer navy
+│   │   ├── hero.tsx / catalog.tsx    #   Home: hero animado + grid
+│   │   ├── cookie-banner.tsx         #   Cookie consent LGPD
+│   │   └── terms-consent-modal.tsx   #   Modal de consentimento
+│   │
+│   ├── docfacil/views/               # 📱 Views (17 telas)
+│   │   ├── criar/                    #   Subcomponentes do fluxo de criação
+│   │   │   ├── campo-input.tsx        #     Input com máscara + validação
+│   │   │   ├── grupo-campos.tsx       #     Multi-campos (CEP auto-fill)
+│   │   │   ├── clausula-card.tsx      #     Cláusulas dinâmicas
+│   │   │   ├── preview-a4.tsx         #     Preview A4 com flip 3D
+│   │   │   ├── chat-step.tsx          #     Bolha de chat + pet
+│   │   │   ├── layout.tsx             #     Split-screen + stepper
+│   │   │   └── types.ts / use-*.ts    #     Tipos e hooks compartilhados
+│   │   └── documento/                #   Subcomponentes de detalhe
+│   │       ├── detalhe-preview.tsx    #     A4 paginado do documento salvo
+│   │       └── use-documento-actions.ts #   Hook de ações (PDF, duplicar…)
+│   │
+│   └── ui/                           # shadcn/ui (componentes base)
+│
+├── lib/
+│   ├── document-engine/              # ⚙️ Motor de documentos (6 módulos)
+│   │   ├── classify.ts                #   Classifica linhas do template
+│   │   ├── compose.ts / render.ts     #   Composição + render
+│   │   ├── paginate.ts / template.ts  #   Paginação + templates
+│   │   └── types.ts / index.ts        #   Tipos + barrel
+│   │
+│   ├── pdf/                           # 🖨️ Geração de PDF (7 módulos)
+│   │   ├── content-builder.ts         #   Transforma template → nós pdfmake
+│   │   ├── styles.ts                  #   DocDefinition (A4, tipografia)
+│   │   ├── fonts.ts / loader.ts        #   Fontes Roboto + singleton
+│   │   ├── generate.ts / index.ts      #   Orquestrador + barrel público
+│   │   └── types.ts                   #   Tipos
+│   │
+│   ├── services/                      # 🔌 Camada de serviços
+│   │   ├── documents-service.ts       #   CRUD de documentos
+│   │   ├── models-service.ts          #   Catálogo de modelos
+│   │   ├── users-service.ts           #   Perfis + pagamentos
+│   │   ├── checkout-service.ts        #   Checkout + planos
+│   │   ├── consent-service.ts         #   Consentimento LGPD
+│   │   ├── cep-service.ts             #   Busca CEP (ViaCEP)
+│   │   └── ai/                        #   Provider de IA (swapável)
+│   │
+│   ├── legal/                         # ⚖️ Conteúdo legal SSR
+│   ├── auth-context.tsx               #   Auth provider (Firebase + demo)
+│   ├── company.ts                     #   Dados da empresa (single source)
+│   ├── constants.ts                   #   Constantes centralizadas
+│   ├── pricing.ts                     #   Preços e planos
+│   ├── modelos.ts                     #   Catálogo de modelos legais
+│   └── types.ts                       #   Tipos compartilhados
+│
+├── hooks/                             # Hooks customizados
+│
+public/
+│   ├── logo.svg                       # Logo SVG
+│   └── logo-docfacil.png              # Logo PNG
+│
+.github/
+│   ├── workflows/                     # CI + Release automático
+│   ├── ISSUE_TEMPLATE/                 # Templates de bug e feature
+│   ├── PULL_REQUEST_TEMPLATE.md        # Template de PR
+│   ├── CODEOWNERS                     # Review obrigatório por área
+│   └── dependabot.yml                 # Updates automáticos de deps
+```
+ 
 ---
-
-## 🤝 Contribuindo
-
-Este é um repositório **privado** da K-HUB Soluções Digitais. Apenas colaboradores autorizados podem contribuir.
-
-### Fluxo de trabalho (Git Flow simplificado)
-
+ 
+## 🚀 Quick start
+ 
 ```bash
-# 1. Criar branch a partir de main
-git checkout main
-git pull origin main
-git checkout -b feat/sua-feature
-
-# 2. Desenvolver + commitar (Conventional Commits)
-git commit -m "feat(modelos): adiciona catálogo completo"
-
-# 3. Push + abrir Pull Request
-git push -u origin feat/sua-feature
+# Clonar
+git clone https://github.com/Kauerc10/docfacil.git
+cd docfacil
+ 
+# Instalar dependências
+bun install
+ 
+# Configurar variáveis de ambiente
+cp .env.example .env
+# Edite o .env (opcional — sem Firebase o app roda em demo mode)
+ 
+# Rodar
+bun run dev
+# → http://localhost:3000
 ```
-
-### Conventional Commits
-
-```
-feat:      nova funcionalidade
-fix:       correção de bug
-docs:      documentação
-style:     formatação (sem mudança de lógica)
-refactor:  refactor sem mudança de comportamento
-test:      testes
-chore:     build, deps, configs
-perf:      performance
-```
-
-### Antes de abrir PR
-
-- [ ] `bun run lint` sem erros
-- [ ] Self-review feito
-- [ ] Sem `console.log` ou código morto
-- [ ] Documentação atualizada (se necessário)
-- [ ] Testes manuais no browser (desktop + mobile)
-
+ 
+> **Sem configurar o Firebase**, o app roda em **demo mode** com dados locais
+> e localStorage. Basta instalar e rodar para explorar.
+ 
+### Scripts
+ 
+| Comando | O que faz |
+|---|---|
+| `bun run dev` | Servidor de desenvolvimento (porta 3000) |
+| `bun run build` | Build de produção |
+| `bun run build:ci` | Build leve (CI — sem cp que quebra no Windows) |
+| `bun run start` | Servidor de produção |
+| `bun run lint` | ESLint |
+| `bun run typecheck` | TypeScript type-check (`tsc --noEmit`) |
+ 
 ---
-
-## 🔒 Licença & Propriedade Intelectual
-
+ 
+## 🎨 Design system
+ 
+### Paleta
+ 
+| Token | Cor | Uso |
+|---|---|---|
+| `bg-paper` | `#FAF7F2` | Fundo principal (marfim com textura) |
+| `ink` | `#0E2340` | Texto, títulos |
+| `navy` | `#14315C` | Header, footer, faixas |
+| `blue-royal` | `#2554C7` | CTAs de navegação |
+| `selo-green` | `#3E8E6E` | Progresso, confirmação |
+| `coral` | `#FF6A4D` | **1 CTA de conversão por tela** |
+ 
+### Tipografia
+ 
+- **Plus Jakarta Sans** — títulos (SemiBold/Bold)
+- **Inter** — corpo e UI (base 18px para acessibilidade)
+- **Inputs** — 20-22px (público leigo)
+ 
+---
+ 
+## 🗺️ Roadmap
+ 
+[![Project](https://img.shields.io/badge/roadmap-project_board-6e40c9?style=flat-square&logo=github)](https://github.com/users/Kauerc10/projects/3)
+ 
+| Versão | Escopo | Status |
+|---|---|---|
+| [v0.1.0](https://github.com/Kauerc10/docfacil/releases/tag/v0.1.0) | MVP — fluxo completo, PDF, Firebase | ✅ Lançado |
+| [v0.2.0](https://github.com/Kauerc10/docfacil/milestone/1) | IA real, dados empresa, UX polish | 🏗️ Em desenvolvimento |
+| [v0.3.0](https://github.com/Kauerc10/docfacil/milestone/2) | Stripe/Pix, deploy produção, testes | 📋 Planejado |
+| [v1.0.0](https://github.com/Kauerc10/docfacil/milestone/3) | GA — onboarding, performance, LGPD completo | 🔮 Futuro |
+ 
+---
+ 
+## 🤝 Contribuindo
+ 
+Repositório privado da **K-HUB Soluções Digitais**. Consulte o
+[`CONTRIBUTING.md`](./CONTRIBUTING.md) para o fluxo completo de trabalho.
+ 
+Resumo rápido:
+ 
+```
+main ← (PR com review + CI verde) ← feat/fix/chore/*
+```
+ 
+- **Conventional Commits** (`feat(chat): adiciona validação de CPF`)
+- **Squash merge only** — `main` sempre com histórico limpo
+- **CI obrigatório** — lint + typecheck + build em toda PR
+- **CODEOWNERS** — review automático em `pdf/`, `document-engine/`, `.github/`
+ 
+---
+ 
+## 📋 Documentos do projeto
+ 
+| Arquivo | O que é |
+|---|---|
+| [`CHANGELOG.md`](./CHANGELOG.md) | Histórico de versões (Keep a Changelog) |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Guia de contribuição e boas práticas |
+| [`LICENSE`](./LICENSE) | Licença proprietária K-HUB |
+| [`worklog.md`](./worklog.md) | Log detalhado de desenvolvimento |
+| [`.env.example`](./.env.example) | Template de variáveis de ambiente |
+ 
+---
+ 
+## 📜 Licença
+ 
 Copyright © 2026 **K-HUB Soluções Digitais**. Todos os direitos reservados.
-
-Este software é proprietário e confidencial. O uso, cópia, modificação ou
-distribuição não autorizada é estritamente proibido. Consulte o arquivo
-[`LICENSE`](./LICENSE) para detalhes completos.
-
-**"DocFacil"** e o logotipo do selo são marcas comerciais da K-HUB Soluções Digitais.
-
+ 
+Software proprietário e confidencial. Consulte o
+[`LICENSE`](./LICENSE) para detalhes.
+ 
+**"DocFacil"** é marca comercial da K-HUB Soluções Digitais.
+ 
 ---
-
-## 📞 Contato
-
+ 
 <div align="center">
-
+ 
 **K-HUB Soluções Digitais**
-
-🌐 [khub.com.br](https://khub.com.br)
+ 
 📧 contato@khub.com.br
 💬 [WhatsApp](https://wa.me/5511999990000)
-
+ 
+<sub>Construído com 💙 no Brasil</sub>
+ 
 </div>
-
----
-
-<div align="center">
-
-<sub>Feito com 💙 pela equipe K-HUB Soluções Digitais</sub>
-
-</div>
+ 
