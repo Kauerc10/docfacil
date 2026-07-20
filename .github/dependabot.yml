@@ -1,0 +1,42 @@
+version: 2
+registries: {}
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "deps"
+    groups:
+      production:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "eslint*"
+          - "@types/*"
+          - "typescript"
+      dev:
+        patterns:
+          - "eslint*"
+          - "@types/*"
+          - "typescript"
+          - "prettier*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "America/Sao_Paulo"
+    labels:
+      - "dependencies"
+      - "scope:infra"
+    commit-message:
+      prefix: "deps(ci)"
