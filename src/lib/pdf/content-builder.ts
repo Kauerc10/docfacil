@@ -49,6 +49,14 @@ export function normalizePdfText(value: string): string {
     .replace(/[""]/g, '"')
     .replace(/['']/g, "'")
     .replace(/[–—]/g, "-")
+    // Limpeza de resquícios de LaTeX / símbolos matemáticos
+    .replace(/\\?R\\\$/g, "R$")
+    .replace(/\$S1^{\\circ}\$|\\S1°|\$1\^\{\\circ\}\$/g, "§ 1º")
+    .replace(/§\s*1[º°o]/gi, "§ 1º")
+    .replace(/n\^\{\\circ\}/g, "nº")
+    .replace(/\$(\d+)\^\{\\circ\}\$/g, "$1º")
+    .replace(/\$([a-zA-Z()]+)\$/g, "$1")
+    .replace(/\\/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { Menu, X } from "lucide-react";
@@ -22,8 +22,13 @@ export function Header() {
   const root = useRef<HTMLElement>(null);
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { view, navigate } = useNav();
   const { user, signOut } = useAuth();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useGSAP(
     () => {
@@ -93,7 +98,7 @@ export function Header() {
 
         {/* Right actions */}
         <div className="flex items-center gap-2.5">
-          {user ? (
+          {mounted && user ? (
             <>
               <button
                 onClick={() => go("perfil")}

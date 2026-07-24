@@ -169,6 +169,11 @@ export function detectarMascara(c: CampoModelo): TipoMascara {
   if (/telefone|fone|celular|whats/.test(k)) return "telefone";
   if (/data|nascimento/.test(k)) return "data";
   if (/_uf$|^uf$|estado/.test(k)) return "estado";
+  // Campos de contagem de tempo/prazo (meses, dias, prazo): sempre número inteiro
+  if (/meses|prazo|dia_vencimento|quantidade|dias/.test(k)) return "numero";
+  // Campos monetários: detectados por palavras-chave de valor monetário ou R$ na pergunta
+  if (/valor|honorar|preco|multa|deposito/.test(k) || (k.includes("caucao") && !k.includes("meses"))) return "moeda";
+  if (/r\$/.test(p)) return "moeda";
   if (/^\s*(telefone|fone|celular|whats)/.test(p)) return "telefone";
   if (/^\s*(data|nascimento)/.test(p)) return "data";
   if (/sigla do estado/.test(p)) return "estado";
@@ -180,7 +185,7 @@ export function detectarMascara(c: CampoModelo): TipoMascara {
 // Máscaras determinísticas (espelham normalizers.ts onde aplicável)
 // ============================================================================
 
-export type TipoMascara = "cpf" | "cnpj" | "cep" | "telefone" | "data" | "estado" | "numero" | "texto";
+export type TipoMascara = "cpf" | "cnpj" | "cep" | "telefone" | "data" | "estado" | "numero" | "moeda" | "texto";
 
 /** Aplica a máscara apropriada para o tipo. Texto/numero = passa direto. */
 export function aplicarMascara(valor: string, tipo: TipoMascara): string {
@@ -199,9 +204,11 @@ export function aplicarMascara(valor: string, tipo: TipoMascara): string {
     case "estado":
       // máscara não aplica — só normaliza para maiúsculas e limita 2 chars
       return valor.toUpperCase().slice(0, 2).replace(/[^A-Z]/g, "");
+    case "moeda":
+      return aplicarMascaraMoeda(nums);
     case "numero":
-      // mantém dígitos, vírgula, ponto
-      return valor.replace(/[^0-9.,]/g, "");
+      // mantém apenas dígitos inteiros (ex: 3, 12, 30)
+      return valor.replace(/\D/g, "");
     case "texto":
     default:
       return valor;
@@ -238,6 +245,32 @@ function aplicarMascaraData(nums: string): string {
   if (s.length <= 2) return s;
   if (s.length <= 4) return `${s.slice(0, 2)}/${s.slice(2)}`;
   return `${s.slice(0, 2)}/${s.slice(2, 4)}/${s.slice(4)}`;
+}
+
+/**
+ * Formata um valor monetário no padrão BRL (Real brasileiro).
+ *
+ * Estratégia "centavos à direita" (igual terminais POS):
+ *   - Extrai somente dígitos do input
+ *   - Interpreta os últimos 2 dígitos como centavos
+ *   - Os dígitos restantes são os reais, separados por ponto a cada 3 casas
+ *   - Resultado: "1.000,93", "12,00", "0,05"
+ *
+ * Limite máximo: 13 dígitos (R$ 99.999.999.999,99) para evitar overflow.
+ */
+function aplicarMascaraMoeda(nums: string): string {
+  // Limita a 13 dígitos para evitar valores absurdos
+  const s = nums.slice(0, 13);
+  if (s.length === 0) return "";
+  // Pad à esquerda para garantir pelo menos 3 chars (ex: "5" → "005")
+  const padded = s.padStart(3, "0");
+  const intPart = padded.slice(0, -2);
+  const decPart = padded.slice(-2);
+  // Remove zeros à esquerda da parte inteira, mas mantém pelo menos "0"
+  const intClean = intPart.replace(/^0+/, "") || "0";
+  // Adiciona separadores de milhar (ponto)
+  const intFormatted = intClean.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${intFormatted},${decPart}`;
 }
 
 // ============================================================================

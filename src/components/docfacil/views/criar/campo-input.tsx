@@ -111,7 +111,7 @@ export function CampoPergunta({
 
   const isTextarea = campo.tipo === "textarea";
   const isSelect = campo.tipo === "select" && campo.opcoes && campo.opcoes.length > 0;
-  const inputMode = campo.tipo === "number" ? "decimal" : "text";
+  const inputMode = (campo.tipo === "number" || tipo === "moeda") ? "decimal" : "text";
 
   return (
     <div ref={root} className="space-y-2">

@@ -386,7 +386,7 @@ export function GrupoCampos({
                     onKeyDown={(e) => handleKeyDown(e, idx)}
                     placeholder={c.placeholder}
                     aria-invalid={!!erro}
-                    inputMode={c.tipo === "number" ? "decimal" : "text"}
+                    inputMode={(c.tipo === "number" || tipo === "moeda") ? "decimal" : "text"}
                     disabled={submitting}
                     className={cn(
                       "w-full h-12 px-4 text-base rounded-xl bg-surface border-2 outline-none transition-all disabled:opacity-60 placeholder:text-ink/40",
