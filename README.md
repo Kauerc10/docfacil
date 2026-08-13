@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📄 DocFacil
+# DocFacil
 
 ### Documentos legais prontos como numa conversa.
 
@@ -55,15 +55,18 @@ Para fugir do clichê de IA genérica (gradientes roxo/azul, blobs flutuantes), 
 ### Setup local
 
 ```bash
-# 1. Clonar o repositório
-git clone git@github.com:khub-solucoes/docfacil.git
+# 1. Clonar o repositório público
+git clone https://github.com/Kauerc10/docfacil.git
 cd docfacil
 
 # 2. Instalar dependências
 bun install
 
 # 3. Configurar variáveis de ambiente
+# macOS/Linux
 cp .env.example .env
+# PowerShell
+Copy-Item .env.example .env
 # edite .env com seus valores (DATABASE_URL, NEXTAUTH_SECRET, etc.)
 
 # 4. Configurar o banco de dados
@@ -81,6 +84,8 @@ A aplicação estará disponível em `http://localhost:3000`.
 |---|---|
 | `bun run dev` | Inicia o servidor de desenvolvimento (porta 3000) |
 | `bun run lint` | Roda o ESLint para verificar qualidade do código |
+| `bun run test` | Executa os testes unitários do motor de documentos |
+| `bun run test:coverage` | Executa os testes com relatório de cobertura |
 | `bun run build` | Build de produção |
 | `bun run start` | Inicia o servidor de produção |
 | `bun run db:push` | Sincroniza o schema Prisma com o banco |
@@ -182,7 +187,7 @@ O DocFacil é construído com foco em acessibilidade para o público leigo:
 
 ## 🤝 Contribuindo
 
-Este é um repositório **privado** da K-HUB Soluções Digitais. Apenas colaboradores autorizados podem contribuir.
+Este é o repositório público do produto DocFacil. Issues e pull requests são bem-vindos; propostas que envolvam regras jurídicas, dados pessoais ou integrações de produção devem ser discutidas antes da implementação.
 
 ### Fluxo de trabalho (Git Flow simplificado)
 
@@ -215,6 +220,8 @@ perf:      performance
 ### Antes de abrir PR
 
 - [ ] `bun run lint` sem erros
+- [ ] `bun run test` sem falhas
+- [ ] `bun run typecheck` sem erros
 - [ ] Self-review feito
 - [ ] Sem `console.log` ou código morto
 - [ ] Documentação atualizada (se necessário)
