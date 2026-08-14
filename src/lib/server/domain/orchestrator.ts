@@ -151,6 +151,14 @@ export async function generateDocumentArtifact(
     watermarked: boolean;
     orderId?: string;
   };
+  let freeQuota:
+    | {
+        userId: string;
+        startOfMonthTimestamp: number;
+        initialCount: number;
+        limit: number;
+      }
+    | undefined;
   let documentId: string;
   let targetVersion: number;
 
@@ -245,6 +253,14 @@ export async function generateDocumentArtifact(
         userProfile: profile,
         currentMonthlyCount: monthlyCount,
       });
+      if (entitlementDecision.entitlement === "free") {
+        freeQuota = {
+          userId: principal.userId,
+          startOfMonthTimestamp: startOfMonth,
+          initialCount: monthlyCount,
+          limit: 3,
+        };
+      }
     }
 
     const owner =
@@ -360,6 +376,7 @@ export async function generateDocumentArtifact(
         ? { tokenHash: guestAccessTokenHash }
         : undefined,
       guestAccessPath,
+      freeQuota,
       now,
     });
 

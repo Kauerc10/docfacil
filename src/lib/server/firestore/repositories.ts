@@ -549,12 +549,20 @@ export class FirestoreGenerationCommitRepository implements IGenerationCommitRep
       const orderRef = input.singlePurchase
         ? this.db.collection("orders").doc(input.singlePurchase.orderId)
         : null;
+      const freeQuotaRef = input.freeQuota
+        ? this.db
+            .collection("free_generation_quotas")
+            .doc(input.freeQuota.userId)
+            .collection("months")
+            .doc(String(input.freeQuota.startOfMonthTimestamp))
+        : null;
       const accessRef = input.guestAccess
         ? this.db.collection("access_links").doc(input.guestAccess.tokenHash)
         : null;
 
       const documentSnapshot = await tx.get(documentRef);
       const orderSnapshot = orderRef ? await tx.get(orderRef) : null;
+      const freeQuotaSnapshot = freeQuotaRef ? await tx.get(freeQuotaRef) : null;
 
       if (!documentSnapshot.exists) {
         throw new BackendError(
@@ -584,7 +592,36 @@ export class FirestoreGenerationCommitRepository implements IGenerationCommitRep
 
       }
 
+      let nextFreeQuotaCount: number | undefined;
+      if (input.freeQuota) {
+        const storedCount = freeQuotaSnapshot?.data()?.count;
+        const currentCount =
+          typeof storedCount === "number" ? storedCount : input.freeQuota.initialCount;
+        if (currentCount >= input.freeQuota.limit) {
+          throw new BackendError(
+            "FREE_LIMIT_REACHED",
+            402,
+            "Você atingiu o limite mensal do plano grátis."
+          );
+        }
+        nextFreeQuotaCount = currentCount + 1;
+      }
+
       tx.set(artifactRef, input.artifact);
+
+      if (input.freeQuota && freeQuotaRef && nextFreeQuotaCount !== undefined) {
+        tx.set(
+          freeQuotaRef,
+          {
+            userId: input.freeQuota.userId,
+            startOfMonthTimestamp: input.freeQuota.startOfMonthTimestamp,
+            count: nextFreeQuotaCount,
+            updatedAt: input.now,
+            ...(freeQuotaSnapshot?.exists ? {} : { createdAt: input.now }),
+          },
+          { merge: true }
+        );
+      }
 
       tx.update(documentRef, {
         respostas: input.respostas,

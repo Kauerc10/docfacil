@@ -537,6 +537,7 @@ export class InMemoryGenerationCommitRepository implements IGenerationCommitRepo
   private readonly accessRepo: InMemoryAccessRepository;
   private readonly ordersRepo: InMemoryOrdersRepository;
   private readonly requestsRepo: InMemoryGenerationRequestsRepository;
+  private readonly freeQuotaCounts = new Map<string, number>();
   private failNextError: Error | null = null;
 
   constructor(
@@ -589,7 +590,26 @@ export class InMemoryGenerationCommitRepository implements IGenerationCommitRepo
       }
     }
 
+    let freeQuotaKey: string | undefined;
+    let nextFreeQuotaCount: number | undefined;
+    if (input.freeQuota) {
+      freeQuotaKey = `${input.freeQuota.userId}:${input.freeQuota.startOfMonthTimestamp}`;
+      const currentCount =
+        this.freeQuotaCounts.get(freeQuotaKey) ?? input.freeQuota.initialCount;
+      if (currentCount >= input.freeQuota.limit) {
+        throw new BackendError(
+          "FREE_LIMIT_REACHED",
+          402,
+          "Você atingiu o limite mensal do plano grátis."
+        );
+      }
+      nextFreeQuotaCount = currentCount + 1;
+    }
+
     // Atomic execution
+    if (freeQuotaKey && nextFreeQuotaCount !== undefined) {
+      this.freeQuotaCounts.set(freeQuotaKey, nextFreeQuotaCount);
+    }
     await this.docsRepo.saveArtifact(input.documentId, input.artifact);
     await this.docsRepo.updateDocumentRespostas(
       input.documentId,

@@ -108,6 +108,12 @@ export interface CommitGeneratedArtifactInput {
     tokenHash: string;
   };
   guestAccessPath?: string;
+  freeQuota?: {
+    userId: string;
+    startOfMonthTimestamp: number;
+    initialCount: number;
+    limit: number;
+  };
   now: number;
 }
 

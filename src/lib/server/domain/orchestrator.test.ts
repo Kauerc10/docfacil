@@ -274,6 +274,43 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
     ]);
   });
 
+  it("enforces the last free monthly slot atomically across concurrent finalizations", async () => {
+    usersRepo.setUser("usr_free", { plano: "gratis" });
+    const deps = {
+      repositories: {
+        documents: docsRepo,
+        access: accessRepo,
+        orders: ordersRepo,
+        generationRequests: genRequestsRepo,
+        users: usersRepo,
+        generationCommit: commitRepo,
+      },
+      storage,
+    };
+    const generateFreeDocument = (requestId: string, name: string) =>
+      generateDocumentArtifact({
+        requestId,
+        principal: { type: "user", userId: "usr_free" },
+        modeloSlug: "declaracao-residencia",
+        respostas: { ...validGuestAnswers, declarante_nome: name },
+        deps,
+      });
+
+    await generateFreeDocument("550e8400-e29b-41d4-a716-446655440030", "Primeira");
+    await generateFreeDocument("550e8400-e29b-41d4-a716-446655440031", "Segunda");
+
+    const attempts = await Promise.allSettled([
+      generateFreeDocument("550e8400-e29b-41d4-a716-446655440032", "Terceira"),
+      generateFreeDocument("550e8400-e29b-41d4-a716-446655440033", "Quarta"),
+    ]);
+
+    expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
+    expect(attempts.filter((attempt) => attempt.status === "rejected")[0]?.reason).toMatchObject({
+      code: "FREE_LIMIT_REACHED",
+      status: 402,
+    });
+  });
+
   it("does not promote version or consume order if R2 upload fails", async () => {
     const failingStorage = {
       putArtifact: async () => {
