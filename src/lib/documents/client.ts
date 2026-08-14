@@ -1,4 +1,4 @@
-import { auth } from "../firebase";
+import { auth, getClientAppCheckToken } from "../firebase";
 
 export interface GuestDraftData {
   answers: Record<string, string>;
@@ -91,6 +91,15 @@ async function getAuthHeaders(): Promise<HeadersInit> {
     } catch {
       // Continue without auth header
     }
+  }
+
+  try {
+    const appCheckToken = await getClientAppCheckToken();
+    if (appCheckToken) {
+      headers["X-Firebase-AppCheck"] = appCheckToken;
+    }
+  } catch {
+    // Continue
   }
 
   return headers;
