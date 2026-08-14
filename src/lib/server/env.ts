@@ -25,6 +25,7 @@ const serverEnvSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   R2_BUCKET_NAME: z.string().min(1).default("docfacil-pdfs"),
   ALLOW_DEMO_BILLING: booleanString.default(false),
+  ALLOW_IN_MEMORY_ARTIFACT_STORAGE: booleanString.default(false),
   APP_CHECK_ENFORCED: booleanString.default(false),
   NEXT_PUBLIC_APP_URL: z.string().url().optional().default("http://localhost:3000"),
 });

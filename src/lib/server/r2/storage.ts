@@ -220,6 +220,63 @@ export class InMemoryArtifactStorage implements ArtifactStorage {
   }
 }
 
+export interface ArtifactStorageConfig {
+  nodeEnv: string;
+  allowInMemory?: boolean;
+  r2AccountId?: string;
+  r2AccessKeyId?: string;
+  r2SecretAccessKey?: string;
+  r2BucketName?: string;
+  r2Endpoint?: string;
+}
+
+export function createArtifactStorageFromConfig(config: ArtifactStorageConfig): ArtifactStorage {
+  const hasR2Creds =
+    Boolean(config.r2AccountId) &&
+    Boolean(config.r2AccessKeyId) &&
+    Boolean(config.r2SecretAccessKey) &&
+    Boolean(config.r2BucketName);
+
+  const hasPartialR2Creds =
+    (Boolean(config.r2AccountId) || Boolean(config.r2AccessKeyId) || Boolean(config.r2SecretAccessKey)) &&
+    !hasR2Creds;
+
+  if (hasPartialR2Creds) {
+    throw new BackendError(
+      "SERVER_MISCONFIGURED",
+      500,
+      "Credenciais do Cloudflare R2 incompletas no servidor."
+    );
+  }
+
+  if (hasR2Creds) {
+    const s3Client = new S3Client({
+      region: "auto",
+      endpoint: config.r2Endpoint || `https://${config.r2AccountId}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: config.r2AccessKeyId!,
+        secretAccessKey: config.r2SecretAccessKey!,
+      },
+    });
+
+    return new R2ArtifactStorage(s3Client, config.r2BucketName!);
+  }
+
+  if (config.nodeEnv === "test") {
+    return new InMemoryArtifactStorage();
+  }
+
+  if (config.nodeEnv !== "production" && config.allowInMemory) {
+    return new InMemoryArtifactStorage();
+  }
+
+  throw new BackendError(
+    "SERVER_MISCONFIGURED",
+    500,
+    "Armazenamento de artefatos R2 não configurado."
+  );
+}
+
 let artifactStorageSingleton: ArtifactStorage | null = null;
 
 export function getArtifactStorage(): ArtifactStorage {
@@ -228,25 +285,18 @@ export function getArtifactStorage(): ArtifactStorage {
   }
 
   const env = getServerEnv();
-
-  if (
-    env.R2_ACCOUNT_ID &&
-    env.R2_ACCESS_KEY_ID &&
-    env.R2_SECRET_ACCESS_KEY
-  ) {
-    const s3Client = new S3Client({
-      region: "auto",
-      endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: env.R2_ACCESS_KEY_ID,
-        secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-      },
-    });
-
-    artifactStorageSingleton = new R2ArtifactStorage(s3Client, env.R2_BUCKET_NAME);
-  } else {
-    artifactStorageSingleton = new InMemoryArtifactStorage();
-  }
+  artifactStorageSingleton = createArtifactStorageFromConfig({
+    nodeEnv: env.NODE_ENV,
+    allowInMemory: env.ALLOW_IN_MEMORY_ARTIFACT_STORAGE,
+    r2AccountId: env.R2_ACCOUNT_ID,
+    r2AccessKeyId: env.R2_ACCESS_KEY_ID,
+    r2SecretAccessKey: env.R2_SECRET_ACCESS_KEY,
+    r2BucketName: env.R2_BUCKET_NAME,
+  });
 
   return artifactStorageSingleton;
+}
+
+export function setArtifactStorageForTesting(storage: ArtifactStorage | null): void {
+  artifactStorageSingleton = storage;
 }
