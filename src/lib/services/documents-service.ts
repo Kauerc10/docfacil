@@ -145,34 +145,23 @@ export async function deleteDocument(id: string): Promise<void> {
   await deleteDocumentApi(id);
 }
 
-export async function duplicateDocument(id: string): Promise<Documento | null> {
+export interface DuplicateDraftResult {
+  modeloSlug: string;
+  respostas: Record<string, string>;
+  clausulasSelecionadas: string[];
+}
+
+export async function duplicateDocument(id: string): Promise<DuplicateDraftResult | null> {
   if (!IS_FIREBASE_CONFIGURED || id.startsWith("demo-")) {
     const original = loadDemoDocs().find((d) => d.id === id);
     if (!original) return null;
-    const now = Date.now();
-    const novo: Documento = {
-      ...original,
-      id: `demo-${now}`,
-      status: "rascunho",
-      criadoEm: now,
-      atualizadoEm: now,
+    return {
+      modeloSlug: original.modeloSlug,
+      respostas: original.respostas || {},
+      clausulasSelecionadas: [],
     };
-    const docs = loadDemoDocs();
-    docs.unshift(novo);
-    saveDemoDocs(docs);
-    return novo;
   }
 
   const result = await duplicateDocumentApi(id);
-  const now = Date.now();
-  return {
-    id: `draft-${now}`,
-    modeloSlug: result.duplicateDraft.modeloSlug,
-    modeloNome: result.duplicateDraft.modeloSlug,
-    respostas: result.duplicateDraft.respostas,
-    status: "rascunho",
-    userId: "",
-    criadoEm: now,
-    atualizadoEm: now,
-  };
+  return result.duplicateDraft;
 }

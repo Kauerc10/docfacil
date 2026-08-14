@@ -10,6 +10,8 @@ import {
   getDocumentDownloadUrl,
   shareDocument,
   revokeDocumentShare,
+  saveGuestDraft,
+  getOrCreateFinalizationRequestId,
 } from "@/lib/documents/client";
 import { gerarEBaixarPDF } from "@/lib/pdf/generator";
 import { useNav } from "@/components/docfacil/nav-context";
@@ -120,12 +122,21 @@ export function useDocumentoActions(
     if (!doc) return;
     setActionLoading("duplicate");
     try {
-      const novo = await duplicateDocument(doc.id);
-      if (novo) {
-        toast.success("Documento duplicado!", {
-          description: "A cópia foi salva como rascunho.",
+      const draft = await duplicateDocument(doc.id);
+      if (draft) {
+        const requestId = getOrCreateFinalizationRequestId(draft.modeloSlug);
+        saveGuestDraft(draft.modeloSlug, {
+          requestId,
+          modeloSlug: draft.modeloSlug,
+          answers: draft.respostas,
+          stepIndex: 0,
+          clausulasSelecionadas: draft.clausulasSelecionadas || [],
+          extrasPorClausula: {},
         });
-        navigate("dashboard");
+        toast.success("Documento duplicado!", {
+          description: "Respostas carregadas no formulário para você revisar e gerar.",
+        });
+        navigate("criar", { slug: draft.modeloSlug });
       } else {
         toast.error("Não foi possível duplicar o documento.");
         setActionLoading(null);

@@ -87,6 +87,23 @@ export function CriarView() {
     try {
       const m = await getModel(slug);
       setModelo(m);
+      if (slug) {
+        const draft = loadGuestDraft(slug);
+        if (draft) {
+          if (draft.answers && Object.keys(draft.answers).length > 0) {
+            setAnswers(draft.answers);
+          }
+          if (draft.clausulasSelecionadas && draft.clausulasSelecionadas.length > 0) {
+            setClausulasSelecionadas(draft.clausulasSelecionadas);
+          }
+          if (draft.extrasPorClausula) {
+            setExtrasPorClausula(draft.extrasPorClausula);
+          }
+          if (typeof draft.stepIndex === "number" && draft.stepIndex >= 0) {
+            setStepIndex(draft.stepIndex);
+          }
+        }
+      }
     } catch (e) {
       logger.error("CriarView", "falha ao carregar modelo", e, { slug });
       setModelo(null);
