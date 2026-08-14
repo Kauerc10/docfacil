@@ -100,11 +100,3 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
     amount,
   };
 }
-
-export async function checkPaymentStatus(orderId: string): Promise<{
-  paid: boolean;
-  status: "pending" | "paid" | "failed" | "refunded";
-}> {
-  // Sem queries falsas de ?paid=1. Em demo/backend, status vem de pedido verificado.
-  return { paid: Boolean(orderId), status: orderId ? "paid" : "pending" };
-}
