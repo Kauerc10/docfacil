@@ -13,7 +13,13 @@ import { useNav } from "../nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { getModel } from "@/lib/services/models-service";
 import { getDocument } from "@/lib/services/documents-service";
-import { getDocumentDownloadUrl } from "@/lib/documents/client";
+import {
+  finalizeDocument,
+  loadGuestDraft,
+  clearGuestDraft,
+  clearFinalizationRequestId,
+  getDocumentDownloadUrl,
+} from "@/lib/documents/client";
 import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf/generator";
 import { logger } from "@/lib/logger";
 import { shouldWatermark } from "@/lib/services/plan-service";
@@ -53,10 +59,48 @@ export function SucessoView() {
   const [copied, setCopied] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [showConfetti, setShowConfetti] = useState(true);
+  const [finalizingGuest, setFinalizingGuest] = useState(false);
 
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [respostas, setRespostas] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+
+  const orderId = params.orderId;
+
+  useEffect(() => {
+    async function processGuestOrder() {
+      if (!user && orderId && slug && !finalizingGuest) {
+        const draft = loadGuestDraft(slug);
+        if (!draft) return;
+
+        setFinalizingGuest(true);
+        try {
+          const result = await finalizeDocument({
+            requestId: draft.requestId,
+            modeloSlug: draft.modeloSlug || slug,
+            respostas: draft.answers,
+            clausulasSelecionadas: draft.clausulasSelecionadas,
+            guestContact: draft.guestContact,
+            orderId,
+          });
+
+          if (result.document?.guestAccessPath) {
+            clearGuestDraft(slug);
+            clearFinalizationRequestId(slug);
+            if (typeof window !== "undefined") {
+              window.location.assign(result.document.guestAccessPath);
+            }
+          }
+        } catch (err) {
+          logger.error("SucessoView", "falha na finalizacao do pedido guest", err);
+          toast.error("Ocorreu uma instabilidade ao gerar seu documento pago. Tente novamente.");
+          setFinalizingGuest(false);
+        }
+      }
+    }
+
+    processGuestOrder();
+  }, [user, orderId, slug, finalizingGuest]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -182,6 +226,24 @@ export function SucessoView() {
   };
 
   // --- Loading skeleton ---
+  if (finalizingGuest) {
+    return (
+      <PageShell className="bg-[var(--green-tint)]/40 min-h-screen">
+        <div className="grid place-items-center min-h-[60vh] px-4">
+          <div className="text-center max-w-md">
+            <Loader2 className="w-10 h-10 text-[var(--coral)] animate-spin mx-auto" />
+            <h2 className="mt-4 font-[family-name:var(--font-jakarta)] text-2xl font-bold text-ink">
+              Gerando seu documento seguro…
+            </h2>
+            <p className="mt-2 text-sm text-ink/70">
+              Estamos finalizando seu PDF e preparando seu link de acesso permanente.
+            </p>
+          </div>
+        </div>
+      </PageShell>
+    );
+  }
+
   if (loading) {
     return (
       <PageShell className="bg-[var(--green-tint)]/40 min-h-screen">

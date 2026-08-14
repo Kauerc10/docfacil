@@ -156,18 +156,25 @@ export function reconstructAndValidateResponses(
   // Coleta campos virtuais / saídas de endereço configuradas nas etapas
   if (modelo.etapas) {
     for (const etapa of modelo.etapas) {
-      if (etapa.tipo === "campo_grupo") {
+      if (etapa.tipo === "campo") {
+        allowedKeys.add(etapa.campo.key);
+        if (!optionalSet.has(etapa.campo.key) && etapa.campo.obrigatorio !== false) {
+          requiredKeys.add({ key: etapa.campo.key, label: etapa.campo.pergunta || etapa.campo.key });
+        }
+      } else if (etapa.tipo === "campo_grupo") {
         if (etapa.endereco?.saidaKey) {
           allowedKeys.add(etapa.endereco.saidaKey);
-          if (!optionalSet.has(etapa.endereco.saidaKey)) {
-            requiredKeys.add({
-              key: etapa.endereco.saidaKey,
-              label: etapa.tituloGrupo || etapa.endereco.saidaKey,
-            });
-          }
         }
         for (const c of etapa.campos) {
           allowedKeys.add(c.key);
+          if (!optionalSet.has(c.key) && c.obrigatorio !== false) {
+            requiredKeys.add({ key: c.key, label: c.pergunta || c.key });
+          }
+          if (c.key === "rg" || c.key.endsWith("_rg")) {
+            const prefix = c.key === "rg" ? "" : c.key.slice(0, -3);
+            const sepKey = prefix ? `${prefix}_rg_separador` : "rg_separador";
+            allowedKeys.add(sepKey);
+          }
         }
       } else if (etapa.tipo === "clausulas") {
         for (const clausula of etapa.clausulas) {

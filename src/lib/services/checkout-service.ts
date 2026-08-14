@@ -50,11 +50,15 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
       // continue
     }
 
+    if (!params.userEmail) {
+      throw new Error("Informe seu e-mail para prosseguir com o pagamento.");
+    }
+
     const res = await fetch("/api/checkout/demo", {
       method: "POST",
       headers,
       body: JSON.stringify({
-        guestContact: { email: params.userEmail || "guest@docfacil.com" },
+        guestContact: { email: params.userEmail },
         autoPay: true,
       }),
     });

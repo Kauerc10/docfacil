@@ -9,6 +9,7 @@ export interface GuestDraftData {
   stepIndex: number;
   clausulasSelecionadas: string[];
   extrasPorClausula: Record<string, Record<string, string>>;
+  guestContact?: { email?: string; phone?: string };
   updatedAt: number;
 }
 

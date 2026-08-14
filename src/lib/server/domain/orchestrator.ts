@@ -166,6 +166,14 @@ export async function generateDocumentArtifact(
     targetVersion = 1;
 
     if (principal.type === "guest") {
+      if (!guestContact?.email && !guestContact?.phone) {
+        await repos.generationRequests.markFailed(requestId, "INVALID_REQUEST");
+        throw new BackendError(
+          "INVALID_REQUEST",
+          400,
+          "Contato (e-mail ou telefone) é obrigatório para compra e finalização como visitante."
+        );
+      }
       if (!orderId) {
         await repos.generationRequests.markFailed(requestId, "PAYMENT_REQUIRED");
         throw new BackendError(
