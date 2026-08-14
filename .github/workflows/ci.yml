@@ -42,25 +42,27 @@ jobs:
       - name: 📦 Install dependências
         run: bun install --frozen-lockfile
 
-      - name: 🧪 Testes unitários
+      - name: 🧪 Testes unitários do Backend e Domínio
         run: bun run test
+
+      - name: 🛡️ Testes de Firestore Security Rules
+        run: bun run test:rules
 
       - name: 🔍 ESLint
         run: bun run lint
-        # Warnings não quebram o CI — só erros.
         continue-on-error: false
 
-      # Typecheck separado do build pra mensagem de erro mais clara.
       - name: 🔬 TypeScript (typecheck)
-        run: bunx tsc --noEmit
+        run: bun run typecheck
 
       - name: 🏗️ Next.js Build
         run: bun run build:ci
         env:
-          # Variáveis mínimas pra o build não explodir (Firebase em modo demo).
           NEXT_PUBLIC_FIREBASE_API_KEY: ""
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ""
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ""
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "docfacil-ci"
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ""
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ""
           NEXT_PUBLIC_FIREBASE_APP_ID: ""
+          FIREBASE_PROJECT_ID: "docfacil-ci"
+          R2_BUCKET_NAME: "docfacil-pdfs"
