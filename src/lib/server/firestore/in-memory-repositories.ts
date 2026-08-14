@@ -189,6 +189,14 @@ export class InMemoryAccessRepository implements IAccessRepository {
       }
     }
   }
+
+  public async recordAccess(tokenHash: string): Promise<void> {
+    const link = this.links.get(tokenHash);
+    if (link) {
+      link.accessCount = (link.accessCount || 0) + 1;
+      link.lastAccessedAt = Date.now();
+    }
+  }
 }
 
 export class InMemoryOrdersRepository implements IOrdersRepository {

@@ -43,6 +43,7 @@ export interface IAccessRepository {
   ): Promise<AccessLinkRecord | null>;
   revokeAccessLink(tokenHash: string): Promise<void>;
   revokeDocumentShareLinks(documentId: string): Promise<void>;
+  recordAccess(tokenHash: string): Promise<void>;
 }
 
 export interface IOrdersRepository {

@@ -229,6 +229,13 @@ export class FirestoreAccessRepository implements IAccessRepository {
     }
     await batch.commit();
   }
+
+  public async recordAccess(tokenHash: string): Promise<void> {
+    await this.db.collection("access_links").doc(tokenHash).update({
+      accessCount: FieldValue.increment(1),
+      lastAccessedAt: Date.now(),
+    });
+  }
 }
 
 export class FirestoreOrdersRepository implements IOrdersRepository {

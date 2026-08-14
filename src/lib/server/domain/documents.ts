@@ -56,6 +56,9 @@ export interface AccessLinkRecord {
   active: boolean;
   createdByUserId?: string;
   createdAt: number;
+  expiresAt?: number;
+  accessCount?: number;
+  lastAccessedAt?: number;
   revokedAt?: number;
 }
 

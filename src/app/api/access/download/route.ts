@@ -44,6 +44,23 @@ export async function POST(req: Request) {
       );
     }
 
+    if (link.expiresAt && Date.now() > link.expiresAt) {
+      throw new BackendError(
+        "ACCESS_LINK_INVALID",
+        410,
+        "Este link de acesso expirou."
+      );
+    }
+
+    const doc = await repos.documents.getDocument(link.documentId);
+    if (!doc || doc.status === "deleted") {
+      throw new BackendError(
+        "DOCUMENT_NOT_FOUND",
+        404,
+        "O documento associado a este link foi removido."
+      );
+    }
+
     const artifact = await repos.documents.getArtifact(
       link.documentId,
       link.version
@@ -56,6 +73,8 @@ export async function POST(req: Request) {
         "O arquivo PDF associado a este link não foi encontrado."
       );
     }
+
+    await repos.access.recordAccess(tokenHash);
 
     const storage = getArtifactStorage();
     const downloadUrl = await storage.getDownloadUrl({

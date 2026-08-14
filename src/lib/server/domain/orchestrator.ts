@@ -318,6 +318,7 @@ export async function generateDocumentArtifact(
         version: targetVersion,
         active: true,
         createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
       });
       guestAccessToken = token;
       guestAccessPath = `/d/${token}`;
