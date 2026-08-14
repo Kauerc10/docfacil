@@ -42,6 +42,7 @@
     "db:reset": "prisma migrate reset",
     "seed:models": "bun run scripts/seed-models.ts",
     "test:rules": "firebase emulators:exec --only firestore \"RUN_FIRESTORE_RULES=true bun test src/test/rules/firestore.rules.test.ts\"",
+    "test:firestore-commit": "firebase emulators:exec --only firestore \"RUN_FIRESTORE_COMMIT_TESTS=true bun test src/test/server/firestore/generation-commit.firestore.test.ts\"",
     "test:e2e": "firebase emulators:exec --only firestore \"playwright test\"",
     "firestore:rules": "firebase deploy --only firestore:rules"
   },
