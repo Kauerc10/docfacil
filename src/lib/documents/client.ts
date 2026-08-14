@@ -147,9 +147,6 @@ export async function finalizeDocument(input: {
     throw new Error(err.error?.message || "Falha ao gerar documento.");
   }
 
-  // Clear guest draft on success
-  clearGuestDraft(input.modeloSlug);
-
   return await res.json();
 }
 

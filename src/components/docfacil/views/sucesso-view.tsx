@@ -79,18 +79,20 @@ export function SucessoView() {
           const result = await finalizeDocument({
             requestId: draft.requestId,
             modeloSlug: draft.modeloSlug || slug,
-            respostas: draft.answers,
+            respostas: buildGuestFinalizationAnswers(draft),
             clausulasSelecionadas: draft.clausulasSelecionadas,
             guestContact: draft.guestContact,
             orderId,
           });
 
-          if (result.document?.guestAccessPath) {
-            clearGuestDraft(slug);
-            clearFinalizationRequestId(slug);
-            if (typeof window !== "undefined") {
-              window.location.assign(result.document.guestAccessPath);
-            }
+          if (!result.document?.guestAccessPath) {
+            throw new Error("Magic link guest ausente após finalização.");
+          }
+
+          clearGuestDraft(slug);
+          clearFinalizationRequestId(slug);
+          if (typeof window !== "undefined") {
+            window.location.assign(result.document.guestAccessPath);
           }
         } catch (err) {
           logger.error("SucessoView", "falha na finalizacao do pedido guest", err);
