@@ -98,7 +98,47 @@ export class FirestoreDocumentsRepository implements IDocumentsRepository {
     if (error) {
       updates.lastGenerationError = error;
     }
+    if (state !== "generating") {
+      updates.generationRequestId = FieldValue.delete();
+    }
     await this.db.collection("documents").doc(documentId).update(updates);
+  }
+
+  public async reserveNextVersion(documentId: string, requestId: string): Promise<number> {
+    const documentRef = this.db.collection("documents").doc(documentId);
+
+    return await this.db.runTransaction(async (tx) => {
+      const snapshot = await tx.get(documentRef);
+      if (!snapshot.exists) {
+        throw new BackendError(
+          "DOCUMENT_NOT_FOUND",
+          404,
+          "Documento não encontrado durante a reserva de versão."
+        );
+      }
+
+      const document = snapshot.data() as DocumentRecord;
+      if (document.artifactState === "generating") {
+        if (document.generationRequestId === requestId) {
+          return document.targetVersion!;
+        }
+        throw new BackendError(
+          "GENERATION_IN_PROGRESS",
+          409,
+          "Uma geração deste documento já está em andamento."
+        );
+      }
+
+      const targetVersion = (document.currentVersion || 0) + 1;
+      tx.update(documentRef, {
+        targetVersion,
+        artifactState: "generating",
+        generationRequestId: requestId,
+        updatedAt: Date.now(),
+        lastGenerationError: FieldValue.delete(),
+      });
+      return targetVersion;
+    });
   }
 
   public async promoteCurrentVersion(documentId: string, version: number): Promise<void> {
@@ -405,7 +445,25 @@ export class FirestoreGenerationRequestsRepository
     return await this.db.runTransaction(async (tx) => {
       const snap = await tx.get(docRef);
       if (snap.exists) {
-        return { request: snap.data() as GenerationRequestRecord, isNew: false };
+        const existing = snap.data() as GenerationRequestRecord;
+        const now = Date.now();
+        if (
+          existing.status === "processing" &&
+          existing.expiresAt !== undefined &&
+          existing.expiresAt <= now
+        ) {
+          const reclaimed: GenerationRequestRecord = {
+            ...initData,
+            requestId,
+            status: "processing",
+            createdAt: now,
+            updatedAt: now,
+            expiresAt: now + 24 * 60 * 60 * 1000,
+          };
+          tx.set(docRef, reclaimed);
+          return { request: reclaimed, isNew: true };
+        }
+        return { request: existing, isNew: false };
       }
 
       const now = Date.now();
@@ -534,6 +592,7 @@ export class FirestoreGenerationCommitRepository implements IGenerationCommitRep
         targetVersion: input.targetVersion,
         artifactState: "ready",
         updatedAt: input.now,
+        generationRequestId: FieldValue.delete(),
         lastGenerationError: FieldValue.delete(),
       });
 

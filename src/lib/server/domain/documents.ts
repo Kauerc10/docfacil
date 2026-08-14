@@ -25,6 +25,7 @@ export interface DocumentRecord {
     watermarked: boolean;
   };
   artifactState: ArtifactState;
+  generationRequestId?: string;
   currentVersion: number | null;
   targetVersion: number | null;
   lastGenerationError?: { code: string; at: number };

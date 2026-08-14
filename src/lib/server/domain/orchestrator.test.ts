@@ -222,6 +222,58 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
     expect(doc?.respostas.declarante_nome).toBe("Maria Silva Souza");
   });
 
+  it("serializes concurrent Pro regenerations before they can both write version 2", async () => {
+    usersRepo.setUser("usr_pro", { plano: "pro" });
+    const deps = {
+      repositories: {
+        documents: docsRepo,
+        access: accessRepo,
+        orders: ordersRepo,
+        generationRequests: genRequestsRepo,
+        users: usersRepo,
+        generationCommit: commitRepo,
+      },
+      storage,
+    };
+
+    const initial = await generateDocumentArtifact({
+      requestId: "550e8400-e29b-41d4-a716-446655440020",
+      principal: { type: "user", userId: "usr_pro" },
+      modeloSlug: "declaracao-residencia",
+      respostas: validGuestAnswers,
+      deps,
+    });
+
+    const attempts = await Promise.allSettled([
+      generateDocumentArtifact({
+        requestId: "550e8400-e29b-41d4-a716-446655440021",
+        principal: { type: "user", userId: "usr_pro" },
+        modeloSlug: "declaracao-residencia",
+        respostas: { ...validGuestAnswers, declarante_nome: "Primeira" },
+        existingDocumentId: initial.documentId,
+        deps,
+      }),
+      generateDocumentArtifact({
+        requestId: "550e8400-e29b-41d4-a716-446655440022",
+        principal: { type: "user", userId: "usr_pro" },
+        modeloSlug: "declaracao-residencia",
+        respostas: { ...validGuestAnswers, declarante_nome: "Segunda" },
+        existingDocumentId: initial.documentId,
+        deps,
+      }),
+    ]);
+
+    expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
+    expect(attempts.filter((attempt) => attempt.status === "rejected")[0]?.reason).toMatchObject({
+      code: "GENERATION_IN_PROGRESS",
+      status: 409,
+    });
+    expect((await docsRepo.listArtifacts(initial.documentId)).map((artifact) => artifact.version)).toEqual([
+      1,
+      2,
+    ]);
+  });
+
   it("does not promote version or consume order if R2 upload fails", async () => {
     const failingStorage = {
       putArtifact: async () => {

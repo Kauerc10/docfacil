@@ -219,4 +219,30 @@ describe("GenerationRequestsRepository (Idempotency)", () => {
     expect(completed?.status).toBe("completed");
     expect(completed?.result?.guestAccessPath).toBe("/d/token123");
   });
+
+  it("reclaims an expired processing request so the same idempotency key can retry", async () => {
+    const originalNow = Date.now;
+    let now = 1_700_000_000_000;
+    Date.now = () => now;
+
+    try {
+      const initData = {
+        operation: "initial" as const,
+        principalKey: "guest:retryable",
+        documentId: "pending",
+        targetVersion: 1,
+      };
+
+      await repo.getOrCreateRequest("req_expired", initData);
+      now += 24 * 60 * 60 * 1000 + 1;
+
+      const reclaimed = await repo.getOrCreateRequest("req_expired", initData);
+
+      expect(reclaimed.isNew).toBe(true);
+      expect(reclaimed.request.status).toBe("processing");
+      expect(reclaimed.request.expiresAt).toBe(now + 24 * 60 * 60 * 1000);
+    } finally {
+      Date.now = originalNow;
+    }
+  });
 });

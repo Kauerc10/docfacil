@@ -185,7 +185,13 @@ export async function generateDocumentArtifact(
     }
 
     documentId = existingDocumentId;
-    targetVersion = (existingDoc.currentVersion || 0) + 1;
+    try {
+      targetVersion = await repos.documents.reserveNextVersion(documentId, requestId);
+    } catch (err: unknown) {
+      const errorCode = err instanceof BackendError ? err.code : "GENERATION_FAILED";
+      await repos.generationRequests.markFailed(requestId, errorCode).catch(() => {});
+      throw err;
+    }
     entitlementDecision = { entitlement: "pro", watermarked: false };
   } else {
     // Novo documento

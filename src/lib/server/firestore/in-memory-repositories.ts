@@ -124,8 +124,41 @@ export class InMemoryDocumentsRepository implements IDocumentsRepository {
       if (error) {
         doc.lastGenerationError = error;
       }
+      if (state !== "generating") {
+        delete doc.generationRequestId;
+      }
       doc.updatedAt = Date.now();
     }
+  }
+
+  public async reserveNextVersion(documentId: string, requestId: string): Promise<number> {
+    const doc = this.docs.get(documentId);
+    if (!doc) {
+      throw new BackendError(
+        "DOCUMENT_NOT_FOUND",
+        404,
+        "Documento não encontrado durante a reserva de versão."
+      );
+    }
+
+    if (doc.artifactState === "generating") {
+      if (doc.generationRequestId === requestId) {
+        return doc.targetVersion!;
+      }
+      throw new BackendError(
+        "GENERATION_IN_PROGRESS",
+        409,
+        "Uma geração deste documento já está em andamento."
+      );
+    }
+
+    const nextVersion = (doc.currentVersion || 0) + 1;
+    doc.targetVersion = nextVersion;
+    doc.artifactState = "generating";
+    doc.generationRequestId = requestId;
+    doc.updatedAt = Date.now();
+    delete doc.lastGenerationError;
+    return nextVersion;
   }
 
   public async promoteCurrentVersion(documentId: string, version: number): Promise<void> {
@@ -399,6 +432,23 @@ export class InMemoryGenerationRequestsRepository
   ): Promise<{ request: GenerationRequestRecord; isNew: boolean }> {
     const existing = this.requests.get(requestId);
     if (existing) {
+      const now = Date.now();
+      if (
+        existing.status === "processing" &&
+        existing.expiresAt !== undefined &&
+        existing.expiresAt <= now
+      ) {
+        const reclaimed: GenerationRequestRecord = {
+          ...initData,
+          requestId,
+          status: "processing",
+          createdAt: now,
+          updatedAt: now,
+          expiresAt: now + 24 * 60 * 60 * 1000,
+        };
+        this.requests.set(requestId, reclaimed);
+        return { request: JSON.parse(JSON.stringify(reclaimed)), isNew: true };
+      }
       return { request: JSON.parse(JSON.stringify(existing)), isNew: false };
     }
 

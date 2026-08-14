@@ -22,6 +22,7 @@ export interface IDocumentsRepository {
     state: ArtifactState,
     error?: { code: string; at: number }
   ): Promise<void>;
+  reserveNextVersion(documentId: string, requestId: string): Promise<number>;
   promoteCurrentVersion(documentId: string, version: number): Promise<void>;
   saveArtifact(documentId: string, artifact: DocumentArtifactRecord): Promise<void>;
   getArtifact(documentId: string, version: number): Promise<DocumentArtifactRecord | null>;
