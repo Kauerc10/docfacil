@@ -236,7 +236,7 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
       provider: "demo",
       product: "avulso",
       amountCents: 1990,
-      buyer: { type: "guest" },
+      buyer: { type: "guest", email: "guest@example.com" },
       status: "paid",
       createdAt: Date.now(),
     });

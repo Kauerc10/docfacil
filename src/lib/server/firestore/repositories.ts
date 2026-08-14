@@ -2,6 +2,7 @@ import "server-only";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { getAdminFirestore } from "../firebase-admin";
 import { BackendError } from "../errors";
+import { createOrderBuyerPrincipalKey } from "../billing/order-identity";
 import type {
   IDocumentsRepository,
   IAccessRepository,
@@ -297,6 +298,14 @@ export class FirestoreOrdersRepository implements IOrdersRepository {
       }
 
       const order = { ...snap.data(), id: snap.id } as OrderRecord;
+
+      if (createOrderBuyerPrincipalKey(order.buyer) !== params.principalKey) {
+        throw new BackendError(
+          "ORDER_FORBIDDEN",
+          403,
+          "Este pagamento não pertence ao solicitante."
+        );
+      }
 
       if (order.status === "reserved" && order.reservedByRequestId === params.requestId) {
         return order;

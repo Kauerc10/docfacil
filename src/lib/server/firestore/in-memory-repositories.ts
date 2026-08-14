@@ -18,6 +18,7 @@ import type {
   ArtifactState,
 } from "../domain/documents";
 import { BackendError } from "../errors";
+import { createOrderBuyerPrincipalKey } from "../billing/order-identity";
 
 /**
  * globalThis store — garante que page.tsx (Server Component) e API routes
@@ -307,6 +308,14 @@ export class InMemoryOrdersRepository implements IOrdersRepository {
     const order = this.orders.get(params.orderId);
     if (!order) {
       throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido de compra não encontrado.");
+    }
+
+    if (createOrderBuyerPrincipalKey(order.buyer) !== params.principalKey) {
+      throw new BackendError(
+        "ORDER_FORBIDDEN",
+        403,
+        "Este pagamento não pertence ao solicitante."
+      );
     }
 
     if (order.status === "reserved" && order.reservedByRequestId === params.requestId) {

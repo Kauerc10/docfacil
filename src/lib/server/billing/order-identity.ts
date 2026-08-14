@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import type { OrderRecord } from "../domain/documents";
 
 export function normalizeEmail(email?: string): string {
   if (!email) return "";
@@ -24,4 +25,12 @@ export function createBuyerFingerprint(input: {
   };
 
   return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+}
+
+export function createOrderBuyerPrincipalKey(buyer: OrderRecord["buyer"]): string {
+  if (buyer.type === "user") {
+    return `user:${buyer.userId}`;
+  }
+
+  return `guest:${createBuyerFingerprint(buyer)}`;
 }

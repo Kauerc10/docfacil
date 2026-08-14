@@ -1,6 +1,11 @@
 import { describe, expect, it, beforeEach } from "bun:test";
 import { InMemoryOrdersRepository } from "@/lib/server/firestore/in-memory-repositories";
 import { BackendError } from "@/lib/server/errors";
+import { createBuyerFingerprint } from "@/lib/server/billing/order-identity";
+
+function guestPrincipalKey(email: string): string {
+  return `guest:${createBuyerFingerprint({ email })}`;
+}
 
 describe("Atomic Order Reservation & Lifecycle", () => {
   let ordersRepo: InMemoryOrdersRepository;
@@ -22,7 +27,7 @@ describe("Atomic Order Reservation & Lifecycle", () => {
     const reserved = await ordersRepo.reservePaidOrder({
       orderId: order.id!,
       requestId: "req_1",
-      principalKey: "guest:fingerprint1",
+      principalKey: guestPrincipalKey("guest@example.com"),
     });
 
     expect(reserved.status).toBe("reserved");
@@ -42,14 +47,14 @@ describe("Atomic Order Reservation & Lifecycle", () => {
     await ordersRepo.reservePaidOrder({
       orderId: order.id!,
       requestId: "req_1",
-      principalKey: "guest:fingerprint1",
+      principalKey: guestPrincipalKey("guest@example.com"),
     });
 
     expect(
       ordersRepo.reservePaidOrder({
         orderId: order.id!,
         requestId: "req_2",
-        principalKey: "guest:fingerprint2",
+        principalKey: guestPrincipalKey("guest@example.com"),
       })
     ).rejects.toThrow(BackendError);
   });
@@ -67,13 +72,13 @@ describe("Atomic Order Reservation & Lifecycle", () => {
     const res1 = await ordersRepo.reservePaidOrder({
       orderId: order.id!,
       requestId: "req_1",
-      principalKey: "guest:fingerprint1",
+      principalKey: guestPrincipalKey("guest@example.com"),
     });
 
     const res2 = await ordersRepo.reservePaidOrder({
       orderId: order.id!,
       requestId: "req_1",
-      principalKey: "guest:fingerprint1",
+      principalKey: guestPrincipalKey("guest@example.com"),
     });
 
     expect(res2.id).toBe(res1.id);
@@ -93,7 +98,7 @@ describe("Atomic Order Reservation & Lifecycle", () => {
     await ordersRepo.reservePaidOrder({
       orderId: order.id!,
       requestId: "req_1",
-      principalKey: "guest:fingerprint1",
+      principalKey: guestPrincipalKey("guest@example.com"),
     });
 
     await ordersRepo.releaseReservedOrder({
@@ -104,5 +109,26 @@ describe("Atomic Order Reservation & Lifecycle", () => {
     const released = await ordersRepo.getOrder(order.id!);
     expect(released?.status).toBe("paid");
     expect(released?.reservedByRequestId).toBeUndefined();
+  });
+
+  it("rejects a paid guest order when the buyer fingerprint belongs to another guest", async () => {
+    const order = await ordersRepo.createOrder({
+      provider: "demo",
+      product: "avulso",
+      amountCents: 990,
+      buyer: { type: "guest", email: "owner@example.com" },
+      status: "paid",
+      createdAt: Date.now(),
+    });
+
+    await expect(
+      ordersRepo.reservePaidOrder({
+        orderId: order.id!,
+        requestId: "req_attacker",
+        principalKey: guestPrincipalKey("attacker@example.com"),
+      })
+    ).rejects.toMatchObject({ code: "ORDER_FORBIDDEN", status: 403 });
+
+    expect((await ordersRepo.getOrder(order.id!))?.status).toBe("paid");
   });
 });
