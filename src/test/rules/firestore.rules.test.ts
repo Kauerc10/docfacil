@@ -197,8 +197,12 @@ describe.skipIf(!RUN_FIRESTORE_RULES)("Firestore Security Rules", () => {
 
   describe("consents rules", () => {
     it("allows an authenticated user to record and read only their own consent", async () => {
-      const alice = testEnv.authenticatedContext("alice");
-      const bob = testEnv.authenticatedContext("bob");
+      const alice = testEnv.authenticatedContext("alice", {
+        email: "alice@example.com",
+      });
+      const bob = testEnv.authenticatedContext("bob", {
+        email: "bob@example.com",
+      });
 
       await assertSucceeds(
         alice.firestore().collection("consents").doc("alice-terms-v1").set({
