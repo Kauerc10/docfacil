@@ -12,6 +12,12 @@ test.describe("Guest Purchase and Download Flow", () => {
     await expect(nameInput).toBeVisible({ timeout: 15000 });
     await nameInput.fill("Maria da Silva");
 
+    const nacSelect = page.locator("#g-declarante_nacionalidade, select[name*='nacionalidade']").first();
+    if (await nacSelect.isVisible()) await nacSelect.selectOption({ label: "Brasileiro(a)" });
+
+    const ecSelect = page.locator("#g-declarante_estado_civil, select[name*='estado_civil']").first();
+    if (await ecSelect.isVisible()) await ecSelect.selectOption({ label: "Solteiro(a)" });
+
     const profInput = page.locator("#g-declarante_profissao, #declarante_profissao, input[placeholder*='Comerciante']").first();
     if (await profInput.isVisible()) await profInput.fill("Engenheira");
 
@@ -110,6 +116,10 @@ test.describe("Guest Purchase and Download Flow", () => {
     const locadorNome = page.locator("#g-locador_nome, #locador_nome, input[placeholder*='Maria']").first();
     await expect(locadorNome).toBeVisible({ timeout: 15000 });
     await locadorNome.fill("Carlos Santos");
+    const locadorNac = page.locator("#g-locador_nacionalidade, select[name*='nacionalidade']").first();
+    if (await locadorNac.isVisible()) await locadorNac.selectOption({ label: "Brasileiro(a)" });
+    const locadorEc = page.locator("#g-locador_estado_civil, select[name*='estado_civil']").first();
+    if (await locadorEc.isVisible()) await locadorEc.selectOption({ label: "Solteiro(a)" });
     const locadorCpf = page.locator("#g-locador_cpf, #locador_cpf, input[placeholder*='123.456.789-00']").first();
     if (await locadorCpf.isVisible()) await locadorCpf.fill("111.222.333-44");
     const locadorProf = page.locator("#g-locador_profissao, #locador_profissao, input[placeholder*='Comerciante']").first();
@@ -120,6 +130,10 @@ test.describe("Guest Purchase and Download Flow", () => {
     const locatarioNome = page.locator("#g-locatario_nome, #locatario_nome, input[placeholder*='Maria']").first();
     await expect(locatarioNome).toBeVisible({ timeout: 10000 });
     await locatarioNome.fill("Juliana Lima");
+    const locatarioNac = page.locator("#g-locatario_nacionalidade, select[name*='nacionalidade']").first();
+    if (await locatarioNac.isVisible()) await locatarioNac.selectOption({ label: "Brasileiro(a)" });
+    const locatarioEc = page.locator("#g-locatario_estado_civil, select[name*='estado_civil']").first();
+    if (await locatarioEc.isVisible()) await locatarioEc.selectOption({ label: "Solteiro(a)" });
     const locatarioCpf = page.locator("#g-locatario_cpf, #locatario_cpf, input[placeholder*='123.456.789-00']").first();
     if (await locatarioCpf.isVisible()) await locatarioCpf.fill("555.666.777-88");
     const locatarioProf = page.locator("#g-locatario_profissao, #locatario_profissao, input[placeholder*='Comerciante']").first();
