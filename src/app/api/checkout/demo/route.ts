@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireAppCheck, resolvePrincipal } from "@/lib/server/security";
 import { getDemoBillingProvider } from "@/lib/server/billing/demo-provider";
 import { BackendError } from "@/lib/server/errors";
+import { planPriceToCents } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
     const provider = getDemoBillingProvider();
     const order = await provider.createOrder({
       product: "avulso",
-      amountCents: 1990,
+      amountCents: planPriceToCents("avulso"),
       buyer,
     });
 

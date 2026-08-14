@@ -12,7 +12,7 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow create: if request.auth != null
         && request.auth.uid == uid
-        && (!request.resource.data.keys().hasAny(['plano']) || request.resource.data.plano == 'free');
+        && (!request.resource.data.keys().hasAny(['plano']) || request.resource.data.plano == 'gratis');
       allow update: if request.auth != null
         && request.auth.uid == uid
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plano', 'role', 'subscription']);
