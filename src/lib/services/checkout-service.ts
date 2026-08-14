@@ -30,13 +30,42 @@ const IS_PRODUCTION_CONFIGURED = Boolean(
 export async function createCheckout(params: CheckoutParams): Promise<CheckoutResult> {
   const provider = params.provider || ACTIVE_PROVIDER;
   const amount = PLAN_PRICES[params.plan];
-  const orderId = `df-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   if (provider === "demo" || !IS_PRODUCTION_CONFIGURED) {
-    const successUrl = params.successUrl || `${window.location.origin}/?view=sucesso&paid=1&order=${orderId}`;
-    return { checkoutUrl: successUrl, orderId, provider: "kirvano", plan: params.plan, amount };
+    try {
+      const res = await fetch("/api/checkout/demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guestContact: { email: params.userEmail || "guest@docfacil.com" },
+          autoPay: true,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const successUrl = params.successUrl || `${window.location.origin}/?view=sucesso&order=${data.order.id}`;
+        return {
+          checkoutUrl: successUrl,
+          orderId: data.order.id,
+          provider: "demo" as any,
+          plan: params.plan,
+          amount,
+        };
+      }
+    } catch {
+      // Fallback
+    }
+
+    const orderId = `df-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const successUrl = params.successUrl || `${window.location.origin}/?view=sucesso&order=${orderId}`;
+    return { checkoutUrl: successUrl, orderId, provider: "demo" as any, plan: params.plan, amount };
   }
+
+  const orderId = `df-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const res = await fetch("/api/checkout/create", {
-    method: "POST", headers: { "Content-Type": "application/json" },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...params, provider, orderId }),
   });
   if (!res.ok) throw new Error(`Falha ao criar checkout: ${res.status}`);

@@ -13,6 +13,7 @@ import { useNav } from "../nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { getModel } from "@/lib/services/models-service";
 import { getDocument } from "@/lib/services/documents-service";
+import { getDocumentDownloadUrl } from "@/lib/documents/client";
 import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf/generator";
 import { logger } from "@/lib/logger";
 import { shouldWatermark } from "@/lib/services/plan-service";
@@ -147,9 +148,14 @@ export function SucessoView() {
     if (!modelo || gerandoPdf) return;
     setGerandoPdf(true);
     try {
-      await gerarEBaixarPDF(modelo, respostas, modelo.slug, {
-        watermark: shouldWatermark(user),
-      });
+      if (docId && !docId.startsWith("demo-")) {
+        const { downloadUrl } = await getDocumentDownloadUrl(docId);
+        window.location.href = downloadUrl;
+      } else {
+        await gerarEBaixarPDF(modelo, respostas, modelo.slug, {
+          watermark: shouldWatermark(user),
+        });
+      }
       toast.success(SUCCESS_MESSAGES.PDF_GENERATED, {
         description: `Seu ${modelo.nome} foi baixado.`,
       });

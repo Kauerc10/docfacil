@@ -160,12 +160,13 @@ export async function updateDocument(
 }
 
 export async function deleteDocument(id: string): Promise<void> {
-  if (!IS_FIREBASE_CONFIGURED || !db) {
+  if (id.startsWith("demo-")) {
     const docs = loadDemoDocs().filter((d) => d.id !== id);
     saveDemoDocs(docs);
     return;
   }
-  await deleteDoc(doc(db, "documents", id));
+  const { deleteDocumentApi } = await import("@/lib/documents/client");
+  await deleteDocumentApi(id);
 }
 
 export async function duplicateDocument(id: string): Promise<Documento | null> {

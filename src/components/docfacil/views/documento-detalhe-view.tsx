@@ -13,6 +13,8 @@ import {
   ZoomIn,
   Loader2,
   FileQuestion,
+  Share2,
+  XCircle,
 } from "lucide-react";
 
 import { PageShell } from "@/components/docfacil/views/page-shell";
@@ -96,8 +98,11 @@ function DocumentoDetalheContent() {
   // Quando doc for null, o hook retorna handlers no-op.
   const {
     actionLoading,
+    shareUrl,
     handleEditar,
     handleBaixarPDF,
+    handleCompartilhar,
+    handleRevogarCompartilhamento,
     handleDuplicar,
     handleExcluir,
   } = useDocumentoActions(doc, modelo);
@@ -371,6 +376,41 @@ function DocumentoDetalheContent() {
                 }}
                 disabled={actionLoading !== null}
               />
+              <ActionButton
+                icon={
+                  actionLoading === "share" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Share2 className="w-4 h-4" aria-hidden="true" />
+                  )
+                }
+                label={actionLoading === "share" ? "Gerando link..." : "Compartilhar documento"}
+                onClick={() => {
+                  void handleCompartilhar();
+                }}
+                disabled={actionLoading !== null}
+              />
+
+              {shareUrl && (
+                <div className="p-3 bg-[var(--blue-soft)]/50 border border-[var(--blue-royal)]/30 rounded-xl text-xs space-y-2">
+                  <div className="flex items-center justify-between text-ink/75 font-semibold">
+                    <span>Link ativo de compartilhamento</span>
+                    <button
+                      type="button"
+                      onClick={() => void handleRevogarCompartilhamento()}
+                      disabled={actionLoading === "revoke"}
+                      className="text-[var(--coral)] hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <XCircle className="w-3 h-3" />
+                      Revogar
+                    </button>
+                  </div>
+                  <p className="text-ink/60 truncate font-mono text-[11px]">
+                    {shareUrl}
+                  </p>
+                </div>
+              )}
+
               <ActionButton
                 icon={
                   actionLoading === "duplicate" ? (
