@@ -8,26 +8,21 @@ import {
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-describe("Firestore Security Rules", () => {
-  let testEnv: RulesTestEnvironment | null = null;
+const RUN_FIRESTORE_RULES = process.env.RUN_FIRESTORE_RULES === "true";
+
+describe.skipIf(!RUN_FIRESTORE_RULES)("Firestore Security Rules", () => {
+  let testEnv: RulesTestEnvironment;
   const rules = fs.readFileSync(path.resolve(process.cwd(), "firestore.rules"), "utf8");
 
   beforeAll(async () => {
-    try {
-      testEnv = await initializeTestEnvironment({
-        projectId: "docfacil-rules-test",
-        firestore: {
-          rules,
-          host: "127.0.0.1",
-          port: 8080,
-        },
-      });
-    } catch (e) {
-      if (process.env.FIRESTORE_EMULATOR_HOST || process.env.CI) {
-        throw new Error(`Firestore Emulator não inicializado ou inacessível no ambiente: ${e}`);
-      }
-      testEnv = null;
-    }
+    testEnv = await initializeTestEnvironment({
+      projectId: "demo-docfacil-rules-test",
+      firestore: {
+        rules,
+        host: "127.0.0.1",
+        port: 8080,
+      },
+    });
   });
 
   afterAll(async () => {
@@ -43,16 +38,9 @@ describe("Firestore Security Rules", () => {
   });
 
   it("runs against the Firestore Emulator", async () => {
-    if (process.env.FIRESTORE_EMULATOR_HOST || process.env.CI) {
-      if (!testEnv) {
-        throw new Error("Firestore Emulator não inicializado no ambiente de teste de regras.");
-      }
-      const context = testEnv.unauthenticatedContext();
-      const ref = context.firestore().collection("__health").doc("probe");
-      await expect(ref.get()).resolves.toBeDefined();
-    } else {
-      expect(rules).toContain("rules_version = '2';");
-    }
+    const context = testEnv.unauthenticatedContext();
+    const ref = context.firestore().collection("__health").doc("probe");
+    await expect(ref.get()).resolves.toBeDefined();
   });
 
   describe("rules structure and locks", () => {
@@ -76,7 +64,6 @@ describe("Firestore Security Rules", () => {
 
   describe("users rules", () => {
     it("allows user to create own profile with plano gratis", async () => {
-      if (!testEnv) return;
       const alice = testEnv.authenticatedContext("alice");
       await assertSucceeds(
         alice.firestore().collection("users").doc("alice").set({
@@ -89,7 +76,6 @@ describe("Firestore Security Rules", () => {
     });
 
     it("blocks user from creating profile with plano pro", async () => {
-      if (!testEnv) return;
       const bob = testEnv.authenticatedContext("bob");
       await assertFails(
         bob.firestore().collection("users").doc("bob").set({
@@ -102,7 +88,6 @@ describe("Firestore Security Rules", () => {
     });
 
     it("allows user to update nome, telefone, fotoUrl, atualizadoEm", async () => {
-      if (!testEnv) return;
       await testEnv.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection("users").doc("alice").set({
           uid: "alice",
@@ -122,7 +107,6 @@ describe("Firestore Security Rules", () => {
     });
 
     it("blocks user from mutating plano directly", async () => {
-      if (!testEnv) return;
       await testEnv.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection("users").doc("alice").set({
           uid: "alice",
@@ -139,7 +123,6 @@ describe("Firestore Security Rules", () => {
     });
 
     it("blocks user from mutating uid or email or role or subscription", async () => {
-      if (!testEnv) return;
       await testEnv.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection("users").doc("alice").set({
           uid: "alice",
@@ -174,7 +157,6 @@ describe("Firestore Security Rules", () => {
 
   describe("documents rules", () => {
     it("allows authenticated owner to read own document", async () => {
-      if (!testEnv) return;
       await testEnv.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection("documents").doc("doc_1").set({
           owner: { type: "user", userId: "alice" },
@@ -186,7 +168,6 @@ describe("Firestore Security Rules", () => {
     });
 
     it("blocks other user from reading document", async () => {
-      if (!testEnv) return;
       await testEnv.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection("documents").doc("doc_1").set({
           owner: { type: "user", userId: "alice" },
@@ -198,7 +179,6 @@ describe("Firestore Security Rules", () => {
     });
 
     it("blocks client from creating, updating or deleting documents directly", async () => {
-      if (!testEnv) return;
       const alice = testEnv.authenticatedContext("alice");
       await assertFails(
         alice.firestore().collection("documents").add({
@@ -217,7 +197,6 @@ describe("Firestore Security Rules", () => {
 
   describe("server-only collections", () => {
     it("blocks client access to access_links, generation_requests and orders write", async () => {
-      if (!testEnv) return;
       const alice = testEnv.authenticatedContext("alice");
       await assertFails(alice.firestore().collection("access_links").doc("hash").get());
       await assertFails(

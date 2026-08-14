@@ -41,7 +41,7 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "seed:models": "bun run scripts/seed-models.ts",
-    "test:rules": "firebase emulators:exec --only firestore \"bun test src/test/rules/firestore.rules.test.ts\"",
+    "test:rules": "firebase emulators:exec --only firestore \"RUN_FIRESTORE_RULES=true bun test src/test/rules/firestore.rules.test.ts\"",
     "firestore:rules": "firebase deploy --only firestore:rules"
   },
   "engines": {
