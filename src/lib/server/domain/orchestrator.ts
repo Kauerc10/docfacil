@@ -269,6 +269,7 @@ export async function generateDocumentArtifact(
 
   // 5. Geração de PDF e Persistência Atômica
   let uploadedObjectKey: string | null = null;
+  let firestoreCommitSucceeded = false;
   try {
     const pdfBuffer = await generatePdfServer(modelo, sanitizedAnswers, {
       watermark: entitlementDecision.watermarked,
@@ -286,59 +287,52 @@ export async function generateDocumentArtifact(
     const sourceHash = calculateSourceHash(sanitizedAnswers);
     const modelSnapshotHash = calculateModelSnapshotHash(modelo);
 
-    await repos.documents.saveArtifact(documentId, {
-      version: targetVersion,
-      objectKey: putResult.objectKey,
-      sha256: putResult.sha256,
-      sizeBytes: putResult.sizeBytes,
-      mimeType: "application/pdf",
-      filename,
-      watermarked: entitlementDecision.watermarked,
-      sourceHash,
-      modelSnapshotHash,
-      generatedAt: Date.now(),
-    });
-
-    // 6. Promove currentVersion e atualiza respostas
-    await repos.documents.updateDocumentRespostas(
-      documentId,
-      sanitizedAnswers,
-      targetVersion
-    );
-    await repos.documents.promoteCurrentVersion(documentId, targetVersion);
-
-    // 7. Consome ordem de compra avulsa
-    if (entitlementDecision.entitlement === "single_purchase" && entitlementDecision.orderId) {
-      await repos.orders.consumeReservedOrder({
-        orderId: entitlementDecision.orderId,
-        requestId,
-        documentId,
-      });
-    }
-
-    // 8. Magic link guest automático
     let guestAccessToken: string | undefined;
     let guestAccessPath: string | undefined;
+    let guestAccessTokenHash: string | undefined;
 
     if (principal.type === "guest") {
-      const { token, tokenHash } = generateAccessToken();
-      await repos.access.createAccessLink({
-        tokenHash,
-        kind: "guest",
-        documentId,
-        version: targetVersion,
-        active: true,
-        createdAt: Date.now(),
-      });
-      guestAccessToken = token;
-      guestAccessPath = `/d/${token}`;
+      const generated = generateAccessToken();
+      guestAccessToken = generated.token;
+      guestAccessTokenHash = generated.tokenHash;
+      guestAccessPath = `/d/${generated.token}`;
     }
 
-    await repos.generationRequests.markCompleted(requestId, {
+    const now = Date.now();
+
+    await repos.generationCommit.commitGeneratedArtifact({
+      requestId,
       documentId,
       targetVersion,
+      respostas: sanitizedAnswers,
+      artifact: {
+        version: targetVersion,
+        objectKey: putResult.objectKey,
+        sha256: putResult.sha256,
+        sizeBytes: putResult.sizeBytes,
+        mimeType: "application/pdf",
+        filename,
+        watermarked: entitlementDecision.watermarked,
+        sourceHash,
+        modelSnapshotHash,
+        generatedAt: now,
+      },
+      singlePurchase:
+        entitlementDecision.entitlement === "single_purchase" &&
+        entitlementDecision.orderId
+          ? {
+              orderId: entitlementDecision.orderId,
+              requestId,
+            }
+          : undefined,
+      guestAccess: guestAccessTokenHash
+        ? { tokenHash: guestAccessTokenHash }
+        : undefined,
       guestAccessPath,
+      now,
     });
+
+    firestoreCommitSucceeded = true;
 
     return {
       documentId,
@@ -348,14 +342,14 @@ export async function generateDocumentArtifact(
       guestAccessPath,
     };
   } catch (err: unknown) {
-    if (uploadedObjectKey) {
+    if (uploadedObjectKey && !firestoreCommitSucceeded) {
       try {
         await storage.deleteArtifact(uploadedObjectKey);
       } catch (cleanupErr) {
         logger.error("orchestrator", "falha na compensacao r2 apos erro", cleanupErr);
       }
     }
-    if (entitlementDecision?.entitlement === "single_purchase" && entitlementDecision?.orderId) {
+    if (!firestoreCommitSucceeded && entitlementDecision?.entitlement === "single_purchase" && entitlementDecision?.orderId) {
       await repos.orders.releaseReservedOrder({
         orderId: entitlementDecision.orderId,
         requestId,
@@ -365,8 +359,8 @@ export async function generateDocumentArtifact(
     await repos.documents.setArtifactState(documentId, "failed", {
       code: errCode,
       at: Date.now(),
-    });
-    await repos.generationRequests.markFailed(requestId, errCode);
+    }).catch(() => {});
+    await repos.generationRequests.markFailed(requestId, errCode).catch(() => {});
     throw err;
   }
 }

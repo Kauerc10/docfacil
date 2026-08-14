@@ -10,7 +10,7 @@ import {
 } from "@/lib/server/firestore/in-memory-repositories";
 import { InMemoryArtifactStorage } from "@/lib/server/r2/storage";
 
-describe("Orchestrator Post-Upload R2 Compensation", () => {
+describe("Atomic Generation Commit & Rollback", () => {
   let docsRepo: InMemoryDocumentsRepository;
   let ordersRepo: InMemoryOrdersRepository;
   let accessRepo: InMemoryAccessRepository;
@@ -50,10 +50,8 @@ describe("Orchestrator Post-Upload R2 Compensation", () => {
     cidade_data: "São Paulo, 14 de agosto de 2026",
   };
 
-  it("compensates and deletes uploaded R2 artifact if subsequent Firestore metadata save fails", async () => {
-    commitRepo.failNextCommit(
-      new Error("Firestore connection lost during artifact metadata persistence")
-    );
+  it("compensates R2, releases order and leaves no partial Firestore state when commit fails", async () => {
+    commitRepo.failNextCommit(new Error("transaction aborted by Firestore"));
 
     let deleteArtifactCalledWithKey: string | null = null;
     const originalDeleteArtifact = storage.deleteArtifact.bind(storage);
@@ -101,6 +99,64 @@ describe("Orchestrator Post-Upload R2 Compensation", () => {
 
     expect(thrownError).toBeDefined();
     expect(deleteArtifactCalledWithKey).toBeDefined();
-    expect(deleteArtifactCalledWithKey).toMatch(/^documents\/.+\/v1\/document\.pdf$/);
+
+    // Verify atomic state rollback
+    const updatedOrder = await ordersRepo.getOrder(order.id);
+    expect(updatedOrder?.status).toBe("paid"); // released back to paid
+
+    const genReq = await genRequestsRepo.getRequest(requestId);
+    expect(genReq?.status).toBe("failed");
+
+    expect(accessRepo.size()).toBe(0);
+  });
+
+  it("never deletes R2 artifact after Firestore commit succeeds", async () => {
+    let deleteArtifactCalled = false;
+    storage.deleteArtifact = async (key: string) => {
+      deleteArtifactCalled = true;
+    };
+
+    const order = await ordersRepo.createOrder({
+      provider: "demo",
+      product: "avulso",
+      amountCents: 990,
+      buyer: { type: "guest", email: "maria@example.com" },
+      status: "paid",
+      createdAt: Date.now(),
+    });
+
+    const requestId = crypto.randomUUID();
+
+    const result = await generateDocumentArtifact({
+      requestId,
+      principal: { type: "guest" },
+      modeloSlug: "declaracao-residencia",
+      respostas: validAnswers,
+      clausulasSelecionadas: [],
+      guestContact: { email: "maria@example.com" },
+      orderId: order.id,
+      deps: {
+        repositories: {
+          documents: docsRepo,
+          orders: ordersRepo,
+          access: accessRepo,
+          generationRequests: genRequestsRepo,
+          users: usersRepo,
+          generationCommit: commitRepo,
+        },
+        storage,
+      },
+    });
+
+    expect(result.artifactState).toBe("ready");
+    expect(deleteArtifactCalled).toBe(false);
+
+    const updatedOrder = await ordersRepo.getOrder(order.id);
+    expect(updatedOrder?.status).toBe("consumed");
+
+    const genReq = await genRequestsRepo.getRequest(requestId);
+    expect(genReq?.status).toBe("completed");
+
+    expect(accessRepo.size()).toBe(1);
   });
 });

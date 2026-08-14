@@ -92,3 +92,26 @@ export interface IUsersRepository {
     userId: string
   ): Promise<{ plano?: string; email?: string; nome?: string } | null>;
 }
+
+export interface CommitGeneratedArtifactInput {
+  requestId: string;
+  documentId: string;
+  targetVersion: number;
+  respostas: Record<string, string>;
+  artifact: DocumentArtifactRecord;
+  singlePurchase?: {
+    orderId: string;
+    requestId: string;
+  };
+  guestAccess?: {
+    tokenHash: string;
+  };
+  guestAccessPath?: string;
+  now: number;
+}
+
+export interface IGenerationCommitRepository {
+  commitGeneratedArtifact(
+    input: CommitGeneratedArtifactInput
+  ): Promise<void>;
+}

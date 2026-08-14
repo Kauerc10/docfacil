@@ -8,6 +8,8 @@ import type {
   IOrdersRepository,
   IGenerationRequestsRepository,
   IUsersRepository,
+  IGenerationCommitRepository,
+  CommitGeneratedArtifactInput,
 } from "./interfaces";
 import type {
   DocumentRecord,
@@ -23,6 +25,7 @@ import {
   InMemoryOrdersRepository,
   InMemoryGenerationRequestsRepository,
   InMemoryUsersRepository,
+  InMemoryGenerationCommitRepository,
 } from "./in-memory-repositories";
 
 export class FirestoreDocumentsRepository implements IDocumentsRepository {
@@ -464,12 +467,97 @@ export class FirestoreUsersRepository implements IUsersRepository {
   }
 }
 
+export class FirestoreGenerationCommitRepository implements IGenerationCommitRepository {
+  private readonly db: Firestore;
+
+  constructor(db: Firestore = getAdminFirestore()) {
+    this.db = db;
+  }
+
+  public async commitGeneratedArtifact(input: CommitGeneratedArtifactInput): Promise<void> {
+    await this.db.runTransaction(async (tx) => {
+      const documentRef = this.db.collection("documents").doc(input.documentId);
+      const artifactRef = documentRef.collection("artifacts").doc(String(input.targetVersion));
+      const requestRef = this.db.collection("generation_requests").doc(input.requestId);
+
+      const docSnapshot = await tx.get(documentRef);
+      if (!docSnapshot.exists) {
+        throw new BackendError(
+          "DOCUMENT_NOT_FOUND",
+          404,
+          "Documento não encontrado durante commit da geração."
+        );
+      }
+
+      tx.set(artifactRef, input.artifact);
+
+      tx.update(documentRef, {
+        respostas: input.respostas,
+        currentVersion: input.targetVersion,
+        targetVersion: input.targetVersion,
+        artifactState: "ready",
+        updatedAt: input.now,
+        lastGenerationError: FieldValue.delete(),
+      });
+
+      if (input.singlePurchase) {
+        const orderRef = this.db.collection("orders").doc(input.singlePurchase.orderId);
+        const orderSnapshot = await tx.get(orderRef);
+
+        if (!orderSnapshot.exists) {
+          throw new BackendError(
+            "ORDER_NOT_FOUND",
+            404,
+            "Pedido não encontrado durante commit."
+          );
+        }
+
+        const order = orderSnapshot.data();
+        if (order?.status !== "reserved" || order?.reservedByRequestId !== input.requestId) {
+          throw new BackendError(
+            "ORDER_ALREADY_RESERVED",
+            409,
+            "Pedido não está reservado por esta geração."
+          );
+        }
+
+        tx.update(orderRef, {
+          status: "consumed",
+          documentId: input.documentId,
+          consumedAt: input.now,
+        });
+      }
+
+      if (input.guestAccess) {
+        const accessRef = this.db.collection("access_links").doc(input.guestAccess.tokenHash);
+        tx.create(accessRef, {
+          tokenHash: input.guestAccess.tokenHash,
+          kind: "guest",
+          documentId: input.documentId,
+          version: input.targetVersion,
+          active: true,
+          createdAt: input.now,
+        });
+      }
+
+      tx.update(requestRef, {
+        status: "completed",
+        documentId: input.documentId,
+        targetVersion: input.targetVersion,
+        result: input.guestAccessPath ? { guestAccessPath: input.guestAccessPath } : {},
+        updatedAt: input.now,
+      });
+    });
+  }
+}
+
 export interface BackendRepositories {
   documents: IDocumentsRepository;
   access: IAccessRepository;
   orders: IOrdersRepository;
   generationRequests: IGenerationRequestsRepository;
   users: IUsersRepository;
+  generationCommit: IGenerationCommitRepository;
 }
 
 let repositoriesSingleton: BackendRepositories | null = null;
@@ -480,12 +568,25 @@ export function getRepositories(): BackendRepositories {
   }
 
   if (process.env.NODE_ENV === "test" && !process.env.FIRESTORE_EMULATOR_HOST) {
+    const docs = new InMemoryDocumentsRepository();
+    const access = new InMemoryAccessRepository();
+    const orders = new InMemoryOrdersRepository();
+    const generationRequests = new InMemoryGenerationRequestsRepository();
+    const users = new InMemoryUsersRepository();
+    const generationCommit = new InMemoryGenerationCommitRepository(
+      docs,
+      access,
+      orders,
+      generationRequests
+    );
+
     repositoriesSingleton = {
-      documents: new InMemoryDocumentsRepository(),
-      access: new InMemoryAccessRepository(),
-      orders: new InMemoryOrdersRepository(),
-      generationRequests: new InMemoryGenerationRequestsRepository(),
-      users: new InMemoryUsersRepository(),
+      documents: docs,
+      access,
+      orders,
+      generationRequests,
+      users,
+      generationCommit,
     };
   } else {
     repositoriesSingleton = {
@@ -494,6 +595,7 @@ export function getRepositories(): BackendRepositories {
       orders: new FirestoreOrdersRepository(),
       generationRequests: new FirestoreGenerationRequestsRepository(),
       users: new FirestoreUsersRepository(),
+      generationCommit: new FirestoreGenerationCommitRepository(),
     };
   }
 

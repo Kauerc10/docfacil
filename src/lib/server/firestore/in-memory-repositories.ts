@@ -6,6 +6,8 @@ import type {
   IOrdersRepository,
   IGenerationRequestsRepository,
   IUsersRepository,
+  IGenerationCommitRepository,
+  CommitGeneratedArtifactInput,
 } from "./interfaces";
 import type {
   DocumentRecord,
@@ -196,6 +198,10 @@ export class InMemoryAccessRepository implements IAccessRepository {
       link.accessCount = (link.accessCount || 0) + 1;
       link.lastAccessedAt = Date.now();
     }
+  }
+
+  public size(): number {
+    return this.links.size;
   }
 }
 
@@ -393,5 +399,99 @@ export class InMemoryUsersRepository implements IUsersRepository {
   ): Promise<{ plano?: string; email?: string; nome?: string } | null> {
     const u = this.users.get(userId);
     return u ? JSON.parse(JSON.stringify(u)) : null;
+  }
+}
+
+export class InMemoryGenerationCommitRepository implements IGenerationCommitRepository {
+  private readonly docsRepo: InMemoryDocumentsRepository;
+  private readonly accessRepo: InMemoryAccessRepository;
+  private readonly ordersRepo: InMemoryOrdersRepository;
+  private readonly requestsRepo: InMemoryGenerationRequestsRepository;
+  private failNextError: Error | null = null;
+
+  constructor(
+    docsRepo: InMemoryDocumentsRepository,
+    accessRepo: InMemoryAccessRepository,
+    ordersRepo: InMemoryOrdersRepository,
+    requestsRepo: InMemoryGenerationRequestsRepository
+  ) {
+    this.docsRepo = docsRepo;
+    this.accessRepo = accessRepo;
+    this.ordersRepo = ordersRepo;
+    this.requestsRepo = requestsRepo;
+  }
+
+  public failNextCommit(err: Error): void {
+    this.failNextError = err;
+  }
+
+  public async commitGeneratedArtifact(input: CommitGeneratedArtifactInput): Promise<void> {
+    if (this.failNextError) {
+      const err = this.failNextError;
+      this.failNextError = null;
+      throw err;
+    }
+
+    const doc = await this.docsRepo.getDocument(input.documentId);
+    if (!doc) {
+      throw new BackendError(
+        "DOCUMENT_NOT_FOUND",
+        404,
+        "Documento não encontrado durante commit da geração."
+      );
+    }
+
+    if (input.singlePurchase) {
+      const order = await this.ordersRepo.getOrder(input.singlePurchase.orderId);
+      if (!order) {
+        throw new BackendError(
+          "ORDER_NOT_FOUND",
+          404,
+          "Pedido não encontrado durante commit."
+        );
+      }
+      if (order.status !== "reserved" || order.reservedByRequestId !== input.requestId) {
+        throw new BackendError(
+          "ORDER_ALREADY_RESERVED",
+          409,
+          "Pedido não está reservado por esta geração."
+        );
+      }
+    }
+
+    // Atomic execution
+    await this.docsRepo.saveArtifact(input.documentId, input.artifact);
+    await this.docsRepo.updateDocumentRespostas(
+      input.documentId,
+      input.respostas,
+      input.targetVersion
+    );
+    await this.docsRepo.promoteCurrentVersion(input.documentId, input.targetVersion);
+    await this.docsRepo.setArtifactState(input.documentId, "ready");
+
+    if (input.singlePurchase) {
+      await this.ordersRepo.consumeReservedOrder({
+        orderId: input.singlePurchase.orderId,
+        requestId: input.requestId,
+        documentId: input.documentId,
+      });
+    }
+
+    if (input.guestAccess) {
+      await this.accessRepo.createAccessLink({
+        tokenHash: input.guestAccess.tokenHash,
+        kind: "guest",
+        documentId: input.documentId,
+        version: input.targetVersion,
+        active: true,
+        createdAt: input.now,
+      });
+    }
+
+    await this.requestsRepo.markCompleted(input.requestId, {
+      documentId: input.documentId,
+      targetVersion: input.targetVersion,
+      guestAccessPath: input.guestAccessPath,
+    });
   }
 }

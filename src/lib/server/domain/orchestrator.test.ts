@@ -6,6 +6,7 @@ import {
   InMemoryOrdersRepository,
   InMemoryGenerationRequestsRepository,
   InMemoryUsersRepository,
+  InMemoryGenerationCommitRepository,
 } from "../firestore/in-memory-repositories";
 import { InMemoryArtifactStorage } from "../r2/storage";
 import { BackendError } from "../errors";
@@ -16,6 +17,7 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
   let ordersRepo: InMemoryOrdersRepository;
   let genRequestsRepo: InMemoryGenerationRequestsRepository;
   let usersRepo: InMemoryUsersRepository;
+  let commitRepo: InMemoryGenerationCommitRepository;
   let storage: InMemoryArtifactStorage;
 
   beforeEach(() => {
@@ -24,6 +26,12 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
     ordersRepo = new InMemoryOrdersRepository();
     genRequestsRepo = new InMemoryGenerationRequestsRepository();
     usersRepo = new InMemoryUsersRepository();
+    commitRepo = new InMemoryGenerationCommitRepository(
+      docsRepo,
+      accessRepo,
+      ordersRepo,
+      genRequestsRepo
+    );
     storage = new InMemoryArtifactStorage();
   });
 
@@ -68,6 +76,7 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
           orders: ordersRepo,
           generationRequests: genRequestsRepo,
           users: usersRepo,
+          generationCommit: commitRepo,
         },
         storage,
       },
@@ -124,6 +133,7 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
         orders: ordersRepo,
         generationRequests: genRequestsRepo,
         users: usersRepo,
+        generationCommit: commitRepo,
       },
       storage,
     };
@@ -166,6 +176,7 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
         orders: ordersRepo,
         generationRequests: genRequestsRepo,
         users: usersRepo,
+        generationCommit: commitRepo,
       },
       storage,
     };
@@ -237,6 +248,7 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
         orders: ordersRepo,
         generationRequests: genRequestsRepo,
         users: usersRepo,
+        generationCommit: commitRepo,
       },
       storage: failingStorage,
     };
