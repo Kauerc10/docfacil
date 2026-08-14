@@ -158,7 +158,7 @@ function ConsentForm({
         : ["termos", "privacidade"];
       await recordConsent({
         userId: userId || "guest",
-        userEmail: userEmail || "guest@docfacil.com",
+        userEmail: userEmail || undefined,
         flow,
         documents,
         termsVersion: TERMS_VERSION,
