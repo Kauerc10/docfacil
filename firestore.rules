@@ -7,15 +7,23 @@ service cloud.firestore {
 
     // === Users ===
     // Cada usuário só lê o próprio perfil.
-    // Pode atualizar dados normais, mas NÃO pode alterar seu plano ou permissões no client.
+    // Pode atualizar dados normais via whitelist explícita de campos seguros.
     match /users/{uid} {
+      function onlyEditableProfileFields() {
+        return request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly(['nome', 'telefone', 'fotoUrl', 'atualizadoEm']);
+      }
+
       allow read: if request.auth != null && request.auth.uid == uid;
       allow create: if request.auth != null
         && request.auth.uid == uid
+        && request.resource.data.uid == request.auth.uid
         && (!request.resource.data.keys().hasAny(['plano']) || request.resource.data.plano == 'gratis');
       allow update: if request.auth != null
         && request.auth.uid == uid
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plano', 'role', 'subscription']);
+        && onlyEditableProfileFields();
       allow delete: if false;
     }
 

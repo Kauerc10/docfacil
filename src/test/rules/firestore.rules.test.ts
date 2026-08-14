@@ -54,6 +54,7 @@ describe("Firestore Security Rules", () => {
 
     it("verifies user creation requires plano gratis and restricts updates", () => {
       expect(rules).toContain("request.resource.data.plano == 'gratis'");
+      expect(rules).toContain("hasOnly(['nome', 'telefone', 'fotoUrl', 'atualizadoEm'])");
     });
   });
 
@@ -84,7 +85,7 @@ describe("Firestore Security Rules", () => {
       );
     });
 
-    it("allows user to update name and phone", async () => {
+    it("allows user to update nome, telefone, fotoUrl, atualizadoEm", async () => {
       if (!testEnv) return;
       await testEnv.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection("users").doc("alice").set({
@@ -98,6 +99,8 @@ describe("Firestore Security Rules", () => {
         alice.firestore().collection("users").doc("alice").update({
           nome: "Alice Silva",
           telefone: "(11) 99999-9999",
+          fotoUrl: "https://example.com/photo.jpg",
+          atualizadoEm: Date.now(),
         })
       );
     });
@@ -115,6 +118,34 @@ describe("Firestore Security Rules", () => {
       await assertFails(
         alice.firestore().collection("users").doc("alice").update({
           plano: "pro",
+        })
+      );
+    });
+
+    it("blocks user from mutating uid or email or role or subscription", async () => {
+      if (!testEnv) return;
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection("users").doc("alice").set({
+          uid: "alice",
+          nome: "Alice",
+          email: "alice@example.com",
+          plano: "gratis",
+        });
+      });
+      const alice = testEnv.authenticatedContext("alice");
+      await assertFails(
+        alice.firestore().collection("users").doc("alice").update({
+          email: "alice2@example.com",
+        })
+      );
+      await assertFails(
+        alice.firestore().collection("users").doc("alice").update({
+          role: "admin",
+        })
+      );
+      await assertFails(
+        alice.firestore().collection("users").doc("alice").update({
+          subscription: { active: true },
         })
       );
     });
