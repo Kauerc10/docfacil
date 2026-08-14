@@ -123,7 +123,7 @@ test.describe("Guest Purchase and Download Flow", () => {
 
     // 7. Na página /d/<token> o botão de download deve estar visível
     const downloadButton = page
-      .getByRole("button", { name: /baixar documento|baixar pdf|download/i })
+      .getByRole("button", { name: /^baixar\s/i })
       .first();
     await expect(downloadButton).toBeVisible({ timeout: 15000 });
   });
@@ -251,8 +251,9 @@ test.describe("Guest Purchase and Download Flow", () => {
       waitUntil: "domcontentloaded",
     });
 
+    // Na página /d/<token> o botão tem texto "Baixar {filename}"
     const downloadButton = page
-      .getByRole("button", { name: /baixar documento|baixar pdf|download/i })
+      .getByRole("button", { name: /^baixar\s/i })
       .first();
     await expect(downloadButton).toBeVisible({ timeout: 15000 });
   });
