@@ -37,8 +37,16 @@ export function getFirebaseAdminApp(): App {
   return adminApp;
 }
 
+let testAuth: Auth | null = null;
+let testAppCheck: AppCheck | null = null;
+
 export function getAdminAuth(): Auth {
+  if (testAuth) return testAuth;
   return getAuth(getFirebaseAdminApp());
+}
+
+export function setAdminAuthForTesting(mock: Auth | null): void {
+  testAuth = mock;
 }
 
 export function getAdminFirestore(): Firestore {
@@ -46,5 +54,10 @@ export function getAdminFirestore(): Firestore {
 }
 
 export function getAdminAppCheck(): AppCheck {
+  if (testAppCheck) return testAppCheck;
   return getAppCheck(getFirebaseAdminApp());
+}
+
+export function setAdminAppCheckForTesting(mock: AppCheck | null): void {
+  testAppCheck = mock;
 }
