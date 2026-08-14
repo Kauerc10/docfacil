@@ -32,6 +32,16 @@ export class InMemoryDocumentsRepository implements IDocumentsRepository {
     return doc ? JSON.parse(JSON.stringify(doc)) : null;
   }
 
+  public async listUserDocuments(userId: string): Promise<DocumentRecord[]> {
+    const list: DocumentRecord[] = [];
+    for (const doc of this.docs.values()) {
+      if (doc.owner.type === "user" && doc.owner.userId === userId) {
+        list.push(JSON.parse(JSON.stringify(doc)));
+      }
+    }
+    return list.sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
   public async updateDocumentRespostas(
     documentId: string,
     respostas: Record<string, string>,

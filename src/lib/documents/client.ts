@@ -267,3 +267,60 @@ export async function deleteDocumentApi(documentId: string): Promise<{
 
   return await res.json();
 }
+
+export async function listDocumentsApi(): Promise<import("./dto").DocumentSummaryDto[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch("/api/documents", {
+    method: "GET",
+    headers,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Falha ao listar documentos.");
+  }
+
+  const data = await res.json();
+  return data.documents || [];
+}
+
+export async function getDocumentApi(documentId: string): Promise<import("./dto").DocumentDetailDto | null> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`/api/documents/${documentId}`, {
+    method: "GET",
+    headers,
+  });
+
+  if (res.status === 404) {
+    return null;
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Falha ao carregar documento.");
+  }
+
+  const data = await res.json();
+  return data.document || null;
+}
+
+export async function duplicateDocumentApi(documentId: string): Promise<{
+  duplicateDraft: {
+    modeloSlug: string;
+    respostas: Record<string, string>;
+    clausulasSelecionadas: string[];
+  };
+}> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`/api/documents/${documentId}/duplicate`, {
+    method: "POST",
+    headers,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Falha ao duplicar documento.");
+  }
+
+  return await res.json();
+}

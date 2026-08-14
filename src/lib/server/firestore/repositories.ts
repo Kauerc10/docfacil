@@ -47,6 +47,18 @@ export class FirestoreDocumentsRepository implements IDocumentsRepository {
     return { ...snap.data(), id: snap.id } as DocumentRecord;
   }
 
+  public async listUserDocuments(userId: string): Promise<DocumentRecord[]> {
+    const snap = await this.db
+      .collection("documents")
+      .where("owner.type", "==", "user")
+      .where("owner.userId", "==", userId)
+      .get();
+
+    return snap.docs
+      .map((d) => ({ ...d.data(), id: d.id } as DocumentRecord))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
   public async updateDocumentRespostas(
     documentId: string,
     respostas: Record<string, string>,

@@ -11,6 +11,7 @@ import type {
 export interface IDocumentsRepository {
   createDocument(data: Omit<DocumentRecord, "id">): Promise<DocumentRecord>;
   getDocument(documentId: string): Promise<DocumentRecord | null>;
+  listUserDocuments(userId: string): Promise<DocumentRecord[]>;
   updateDocumentRespostas(
     documentId: string,
     respostas: Record<string, string>,
