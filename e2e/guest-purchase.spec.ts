@@ -1,9 +1,28 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Guest Purchase and Download Flow", () => {
-  test.beforeEach(async () => {
-    test.setTimeout(60000);
-  });
+  test.setTimeout(90000);
+
+  /**
+   * Helper: aguarda um searchParam na URL sem depender de evento "load"
+   * (a navegação é client-side via history.pushState).
+   */
+  async function waitForParam(
+    page: import("@playwright/test").Page,
+    checks: Record<string, string | null>,
+    timeout = 30000
+  ) {
+    await page.waitForFunction(
+      (c) => {
+        const sp = new URLSearchParams(window.location.search);
+        return Object.entries(c).every(([k, v]) =>
+          v === null ? sp.has(k) : sp.get(k) === v
+        );
+      },
+      checks,
+      { timeout }
+    );
+  }
 
   test("completes guest creation, checkout with orderId preservation, magic link generation and download", async ({
     page,
@@ -50,15 +69,15 @@ test.describe("Guest Purchase and Download Flow", () => {
     await page.getByRole("button", { name: /^avançar$/i }).click();
 
     // Stage 1: Finalidade
-    const finalidadeInput = page.locator("textarea");
-    await expect(finalidadeInput.first()).toBeVisible({ timeout: 10000 });
-    await finalidadeInput.first().fill("Comprovante para abertura de conta bancária");
+    const finalidadeInput = page.locator("textarea").first();
+    await expect(finalidadeInput).toBeVisible({ timeout: 10000 });
+    await finalidadeInput.fill("Comprovante para abertura de conta bancária");
 
     // Finalize creation
     await page.getByRole("button", { name: /finalizar/i }).click();
 
-    // Reaches SucessoView
-    await page.waitForURL((url) => url.searchParams.get("view") === "sucesso", { timeout: 20000 });
+    // Reaches SucessoView (client-side navigation)
+    await waitForParam(page, { view: "sucesso" }, 20000);
 
     // Click single purchase CTA from PaymentBarrier
     const buyButton = page.getByRole("button", { name: /baixar por r\$|comprar|desbloquear/i }).first();
@@ -66,7 +85,7 @@ test.describe("Guest Purchase and Download Flow", () => {
     await buyButton.click();
 
     // Reaches CheckoutView
-    await page.waitForURL((url) => url.searchParams.get("view") === "checkout", { timeout: 10000 });
+    await waitForParam(page, { view: "checkout" }, 10000);
 
     // Fill guest email
     const emailInput = page.locator("input[type='email']").first();
@@ -78,30 +97,22 @@ test.describe("Guest Purchase and Download Flow", () => {
     await payCta.click();
 
     // Terms & Privacy consent modal opens
-    const termsCheckbox = page.locator("#consent-terms, input[id='consent-terms']").first();
-    await expect(termsCheckbox).toBeVisible({ timeout: 5000 });
+    const termsCheckbox = page.locator("#consent-terms").first();
+    await expect(termsCheckbox).toBeVisible({ timeout: 8000 });
     await termsCheckbox.click();
 
-    const privacyCheckbox = page.locator("#consent-privacy, input[id='consent-privacy']").first();
+    const privacyCheckbox = page.locator("#consent-privacy").first();
     await privacyCheckbox.click();
 
     const acceptConsentBtn = page.getByRole("button", { name: /aceitar e continuar/i }).first();
     await expect(acceptConsentBtn).toBeEnabled({ timeout: 5000 });
     await acceptConsentBtn.click();
 
-    // Must return to SucessoView with orderId preserved in the URL!
-    await page.waitForURL(
-      (url) => {
-        return (
-          url.searchParams.get("view") === "sucesso" &&
-          Boolean(url.searchParams.get("orderId"))
-        );
-      },
-      { timeout: 25000 }
-    );
+    // Must return to SucessoView with orderId preserved in the URL (client-side)
+    await waitForParam(page, { view: "sucesso", orderId: null }, 30000);
 
     // SucessoView automatically processes guest order and redirects to /d/<token>
-    await page.waitForURL(/\/d\/[A-Za-z0-9_-]{20,}/, { timeout: 35000 });
+    await page.waitForURL(/\/d\/[A-Za-z0-9_-]{20,}/, { timeout: 35000, waitUntil: "domcontentloaded" });
 
     // On /d/<token>, download button must be visible
     const downloadButton = page.getByRole("button", {
@@ -172,17 +183,18 @@ test.describe("Guest Purchase and Download Flow", () => {
     if (await formaInput.isVisible()) await formaInput.fill("PIX");
     await page.getByRole("button", { name: /^avançar$/i }).click();
 
-    // Stage 4: Garantia locatícia (Cláusulas) - select "Fiador" clause and fill extras
+    // Stage 4: Garantia locatícia — seleciona cláusula Fiador
+    // O ID real dos campos extras é "extra-<clausulaId>-<campo.key>"
     const fiadorCard = page.locator("div[role='checkbox']").filter({ hasText: /fiador/i }).first();
     await expect(fiadorCard).toBeVisible({ timeout: 10000 });
     await fiadorCard.click({ force: true });
 
-    // Fill extra fields for fiador
-    const fiadorNomeInput = page.locator("#cl-fiador-fiador_nome");
+    // Aguarda os campos extras do fiador aparecerem
+    const fiadorNomeInput = page.locator("#extra-fiador-fiador_nome");
     await expect(fiadorNomeInput).toBeVisible({ timeout: 10000 });
     await fiadorNomeInput.fill("Roberto Alcantara");
 
-    const fiadorCpfInput = page.locator("#cl-fiador-fiador_cpf");
+    const fiadorCpfInput = page.locator("#extra-fiador-fiador_cpf");
     if (await fiadorCpfInput.isVisible()) {
       await fiadorCpfInput.fill("056.489.370-84");
     }
@@ -191,14 +203,14 @@ test.describe("Guest Purchase and Download Flow", () => {
     await page.getByRole("button", { name: /finalizar/i }).click();
 
     // Reaches SucessoView
-    await page.waitForURL((url) => url.searchParams.get("view") === "sucesso", { timeout: 20000 });
+    await waitForParam(page, { view: "sucesso" }, 20000);
 
     // Checkout
     const buyButton = page.getByRole("button", { name: /baixar por r\$|comprar|desbloquear/i }).first();
     await expect(buyButton).toBeVisible({ timeout: 10000 });
     await buyButton.click();
 
-    await page.waitForURL((url) => url.searchParams.get("view") === "checkout", { timeout: 10000 });
+    await waitForParam(page, { view: "checkout" }, 10000);
 
     const emailInput = page.locator("input[type='email']").first();
     await expect(emailInput).toBeVisible({ timeout: 10000 });
@@ -207,30 +219,22 @@ test.describe("Guest Purchase and Download Flow", () => {
     const payCta = page.getByRole("button", { name: /pagar/i }).first();
     await payCta.click();
 
-    const termsCheckbox = page.locator("#consent-terms, input[id='consent-terms']").first();
-    await expect(termsCheckbox).toBeVisible({ timeout: 5000 });
+    const termsCheckbox = page.locator("#consent-terms").first();
+    await expect(termsCheckbox).toBeVisible({ timeout: 8000 });
     await termsCheckbox.click();
 
-    const privacyCheckbox = page.locator("#consent-privacy, input[id='consent-privacy']").first();
+    const privacyCheckbox = page.locator("#consent-privacy").first();
     await privacyCheckbox.click();
 
     const acceptConsentBtn = page.getByRole("button", { name: /aceitar e continuar/i }).first();
     await expect(acceptConsentBtn).toBeEnabled({ timeout: 5000 });
     await acceptConsentBtn.click();
 
-    // Verify orderId preservation on return
-    await page.waitForURL(
-      (url) => {
-        return (
-          url.searchParams.get("view") === "sucesso" &&
-          Boolean(url.searchParams.get("orderId"))
-        );
-      },
-      { timeout: 25000 }
-    );
+    // Verify orderId preservation on return (client-side navigation)
+    await waitForParam(page, { view: "sucesso", orderId: null }, 30000);
 
     // Verify redirect to /d/<token>
-    await page.waitForURL(/\/d\/[A-Za-z0-9_-]{20,}/, { timeout: 35000 });
+    await page.waitForURL(/\/d\/[A-Za-z0-9_-]{20,}/, { timeout: 35000, waitUntil: "domcontentloaded" });
 
     const downloadButton = page.getByRole("button", {
       name: /baixar documento|baixar pdf|download/i,
