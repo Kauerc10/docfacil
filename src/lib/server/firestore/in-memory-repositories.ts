@@ -36,7 +36,11 @@ export class InMemoryDocumentsRepository implements IDocumentsRepository {
   public async listUserDocuments(userId: string): Promise<DocumentRecord[]> {
     const list: DocumentRecord[] = [];
     for (const doc of this.docs.values()) {
-      if (doc.owner.type === "user" && doc.owner.userId === userId) {
+      if (
+        doc.owner.type === "user" &&
+        doc.owner.userId === userId &&
+        doc.status !== "deleted"
+      ) {
         list.push(JSON.parse(JSON.stringify(doc)));
       }
     }
@@ -109,6 +113,16 @@ export class InMemoryDocumentsRepository implements IDocumentsRepository {
   public async deleteDocumentAndArtifacts(documentId: string): Promise<void> {
     this.docs.delete(documentId);
     this.artifacts.delete(documentId);
+  }
+
+  public async markDocumentDeleted(documentId: string, pendingPurge: boolean): Promise<void> {
+    const doc = this.docs.get(documentId);
+    if (doc) {
+      doc.status = "deleted";
+      doc.deletedAt = Date.now();
+      doc.pendingPurge = pendingPurge;
+      doc.updatedAt = Date.now();
+    }
   }
 
   public async countUserMonthlyDocuments(

@@ -27,6 +27,7 @@ export interface IDocumentsRepository {
   getArtifact(documentId: string, version: number): Promise<DocumentArtifactRecord | null>;
   listArtifacts(documentId: string): Promise<DocumentArtifactRecord[]>;
   deleteDocumentAndArtifacts(documentId: string): Promise<void>;
+  markDocumentDeleted(documentId: string, pendingPurge: boolean): Promise<void>;
   countUserMonthlyDocuments(
     userId: string,
     startOfMonthTimestamp: number

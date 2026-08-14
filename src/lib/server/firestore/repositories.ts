@@ -57,7 +57,17 @@ export class FirestoreDocumentsRepository implements IDocumentsRepository {
 
     return snap.docs
       .map((d) => ({ ...d.data(), id: d.id } as DocumentRecord))
+      .filter((d) => d.status !== "deleted")
       .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  public async markDocumentDeleted(documentId: string, pendingPurge: boolean): Promise<void> {
+    await this.db.collection("documents").doc(documentId).update({
+      status: "deleted",
+      deletedAt: Date.now(),
+      pendingPurge,
+      updatedAt: Date.now(),
+    });
   }
 
   public async updateDocumentRespostas(

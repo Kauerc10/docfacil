@@ -28,6 +28,9 @@ export interface DocumentRecord {
   currentVersion: number | null;
   targetVersion: number | null;
   lastGenerationError?: { code: string; at: number };
+  status?: "active" | "deleted";
+  deletedAt?: number;
+  pendingPurge?: boolean;
   createdAt: number;
   updatedAt: number;
 }

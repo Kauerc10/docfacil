@@ -108,17 +108,24 @@ export async function DELETE(
     // 1. Revoga todos os links de compartilhamento
     await repos.access.revokeDocumentShareLinks(documentId);
 
-    // 2. Remove artefatos do bucket privado R2
-    const storage = getArtifactStorage();
-    await storage.deleteDocumentArtifacts(documentId);
+    // 2. Remove artefatos do bucket privado R2 com fallback de soft-delete
+    let purged = false;
+    try {
+      const storage = getArtifactStorage();
+      await storage.deleteDocumentArtifacts(documentId);
+      purged = true;
+    } catch {
+      purged = false;
+    }
 
-    // 3. Remove metadados do documento e subcoleção de artefatos no Firestore
-    await repos.documents.deleteDocumentAndArtifacts(documentId);
+    // 3. Marca documento como deletado (com flag pendingPurge se o storage falhou)
+    await repos.documents.markDocumentDeleted(documentId, !purged);
 
     return NextResponse.json(
       {
         success: true,
         deletedDocumentId: documentId,
+        purged,
       },
       {
         status: 200,
