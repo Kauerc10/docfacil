@@ -394,3 +394,15 @@ export function getRepositories(): BackendRepositories {
 export function setTestRepositories(repos: BackendRepositories | null): void {
   repositoriesSingleton = repos;
 }
+
+export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | null): void {
+  if (!repos) {
+    repositoriesSingleton = null;
+    return;
+  }
+  const current = getRepositories();
+  repositoriesSingleton = {
+    ...current,
+    ...repos,
+  };
+}

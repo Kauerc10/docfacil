@@ -1,6 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { requireAppCheck, requireUser } from "@/lib/server/security";
+import { requireAppCheck, resolvePrincipal, requireUser } from "@/lib/server/security";
 import { getRepositories } from "@/lib/server/firestore/repositories";
 import { BackendError } from "@/lib/server/errors";
 
@@ -13,7 +13,8 @@ export async function POST(
 ) {
   try {
     await requireAppCheck(req);
-    const user = await requireUser(req);
+    const principal = await resolvePrincipal(req);
+    const user = requireUser(principal);
     const { id } = await params;
 
     const repos = getRepositories();
