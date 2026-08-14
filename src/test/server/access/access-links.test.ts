@@ -89,13 +89,65 @@ describe("Access Links & Magic Link Hardening (POST /api/access/download)", () =
     expect(link?.lastAccessedAt).toBeDefined();
   });
 
-  it("rejects expired link with 410 ACCESS_LINK_INVALID", async () => {
-    const rawToken = "expired_token_1234567890_abcdef";
+  it("allows guest download even after 40 days (permanent guest link)", async () => {
+    const rawToken = "guest_token_permanent_40_days_old";
     const tokenHash = hashToken(rawToken);
+
+    const doc = await docsRepo.createDocument({
+      owner: { type: "guest", contact: { email: "guest@example.com" } },
+      modeloSlug: "declaracao-residencia",
+      modeloNome: "Declaração de Residência",
+      respostas: {},
+      entitlement: { type: "single_purchase", watermarked: false },
+      artifactState: "ready",
+      currentVersion: 1,
+      targetVersion: 1,
+      createdAt: Date.now() - 40 * 24 * 60 * 60 * 1000,
+      updatedAt: Date.now() - 40 * 24 * 60 * 60 * 1000,
+    });
+
+    await docsRepo.saveArtifact(doc.id!, {
+      version: 1,
+      objectKey: `documents/${doc.id}/v1.pdf`,
+      filename: "declaracao.pdf",
+      sizeBytes: 1234,
+      mimeType: "application/pdf",
+      watermarked: false,
+      sha256: "hash123",
+      sourceHash: "src123",
+      modelSnapshotHash: "mod123",
+      generatedAt: Date.now() - 40 * 24 * 60 * 60 * 1000,
+    });
 
     await accessRepo.createAccessLink({
       tokenHash,
       kind: "guest",
+      documentId: doc.id!,
+      version: 1,
+      active: true,
+      createdAt: Date.now() - 40 * 24 * 60 * 60 * 1000,
+      // No expiresAt
+    });
+
+    const req = new Request("http://localhost:3000/api/access/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: rawToken }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.downloadUrl).toBeDefined();
+  });
+
+  it("rejects expired share link with 410 ACCESS_LINK_INVALID", async () => {
+    const rawToken = "expired_share_token_1234567890";
+    const tokenHash = hashToken(rawToken);
+
+    await accessRepo.createAccessLink({
+      tokenHash,
+      kind: "share",
       documentId: "doc_1",
       version: 1,
       active: true,

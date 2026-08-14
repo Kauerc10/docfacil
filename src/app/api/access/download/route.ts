@@ -44,11 +44,11 @@ export async function POST(req: Request) {
       );
     }
 
-    if (link.expiresAt && Date.now() > link.expiresAt) {
+    if (link.kind === "share" && link.expiresAt && Date.now() > link.expiresAt) {
       throw new BackendError(
         "ACCESS_LINK_INVALID",
         410,
-        "Este link de acesso expirou."
+        "Este link de compartilhamento expirou."
       );
     }
 
