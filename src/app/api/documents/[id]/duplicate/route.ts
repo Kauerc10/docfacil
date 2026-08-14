@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { requireAppCheck, resolvePrincipal, requireUser } from "@/lib/server/security";
 import { getRepositories } from "@/lib/server/firestore/repositories";
 import { BackendError } from "@/lib/server/errors";
+import { MODELOS } from "@/lib/modelos";
+import { reconstructDuplicateDraft } from "@/lib/server/domain/documents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,12 +30,20 @@ export async function POST(
       throw new BackendError("DOCUMENT_FORBIDDEN", 403, "Você não tem permissão para duplicar este documento.");
     }
 
+    const modelo = MODELOS.find((m) => m.slug === original.modeloSlug);
+    if (!modelo) {
+      throw new BackendError("INVALID_REQUEST", 400, "Modelo original não está mais disponível.");
+    }
+
+    const duplicateDraft = reconstructDuplicateDraft(modelo, original.respostas);
+
     return NextResponse.json(
       {
         duplicateDraft: {
           modeloSlug: original.modeloSlug,
-          respostas: { ...original.respostas },
-          clausulasSelecionadas: [],
+          respostas: duplicateDraft.respostas,
+          clausulasSelecionadas: duplicateDraft.clausulasSelecionadas,
+          extrasPorClausula: duplicateDraft.extrasPorClausula,
         },
       },
       {

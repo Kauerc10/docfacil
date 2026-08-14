@@ -131,7 +131,7 @@ export function useDocumentoActions(
           answers: draft.respostas,
           stepIndex: 0,
           clausulasSelecionadas: draft.clausulasSelecionadas || [],
-          extrasPorClausula: {},
+          extrasPorClausula: draft.extrasPorClausula || {},
         });
         toast.success("Documento duplicado!", {
           description: "Respostas carregadas no formulário para você revisar e gerar.",

@@ -262,3 +262,57 @@ export function calculateModelSnapshotHash(modelo: Modelo): string {
     .update(JSON.stringify(snapshot))
     .digest("hex");
 }
+
+export interface ReconstructedDuplicateDraft {
+  respostas: Record<string, string>;
+  clausulasSelecionadas: string[];
+  extrasPorClausula: Record<string, Record<string, string>>;
+}
+
+export function reconstructDuplicateDraft(
+  modelo: Modelo,
+  storedRespostas: Record<string, string>
+): ReconstructedDuplicateDraft {
+  const respostas: Record<string, string> = {};
+  const clausulasSelecionadas: string[] = [];
+  const extrasPorClausula: Record<string, Record<string, string>> = {};
+
+  for (const [key, value] of Object.entries(storedRespostas || {})) {
+    if (!key.startsWith("__")) {
+      respostas[key] = value;
+    }
+  }
+
+  for (const etapa of modelo.etapas || []) {
+    if (etapa.tipo !== "clausulas") continue;
+
+    for (const clausula of etapa.clausulas) {
+      const marker = `__clausula_${clausula.id}`;
+
+      if (storedRespostas[marker] === "true") {
+        clausulasSelecionadas.push(clausula.id);
+
+        const extras: Record<string, string> = {};
+
+        for (const campo of clausula.camposExtras || []) {
+          const value = storedRespostas[campo.key];
+
+          if (typeof value === "string") {
+            extras[campo.key] = value;
+            delete respostas[campo.key];
+          }
+        }
+
+        if (Object.keys(extras).length > 0) {
+          extrasPorClausula[clausula.id] = extras;
+        }
+      }
+    }
+  }
+
+  return {
+    respostas,
+    clausulasSelecionadas,
+    extrasPorClausula,
+  };
+}

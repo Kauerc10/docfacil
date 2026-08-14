@@ -144,6 +144,7 @@ export interface DuplicateDraftResult {
   modeloSlug: string;
   respostas: Record<string, string>;
   clausulasSelecionadas: string[];
+  extrasPorClausula: Record<string, Record<string, string>>;
 }
 
 export async function duplicateDocument(id: string): Promise<DuplicateDraftResult | null> {
@@ -154,6 +155,7 @@ export async function duplicateDocument(id: string): Promise<DuplicateDraftResul
       modeloSlug: original.modeloSlug,
       respostas: original.respostas || {},
       clausulasSelecionadas: [],
+      extrasPorClausula: {},
     };
   }
 

@@ -106,4 +106,43 @@ describe("Document Duplication Flow & Draft Restoration", () => {
     const res = await POST(req, { params: Promise.resolve({ id: doc.id! }) });
     expect(res.status).toBe(403);
   });
+
+  it("reconstructs selected clauses and extras without leaking internal __clausula markers to client", async () => {
+    const doc = await docsRepo.createDocument({
+      owner: { type: "user", userId: "alice" },
+      modeloSlug: "contrato-locacao",
+      modeloNome: "Contrato de Locação Residencial",
+      respostas: {
+        locador_nome: "Maria Oliveira",
+        locatario_nome: "João Silva",
+        fiador_nome: "Carlos Santos",
+        fiador_cpf: "123.456.789-00",
+        __clausula_fiador: "true",
+      },
+      entitlement: { type: "free", watermarked: true },
+      artifactState: "ready",
+      currentVersion: 1,
+      targetVersion: 1,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    const req = new Request(`http://localhost:3000/api/documents/${doc.id}/duplicate`, {
+      method: "POST",
+      headers: { Authorization: "Bearer alice-token" },
+    });
+
+    const res = await POST(req, { params: Promise.resolve({ id: doc.id! }) });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    expect(data.duplicateDraft.clausulasSelecionadas).toContain("fiador");
+    expect(data.duplicateDraft.respostas.__clausula_fiador).toBeUndefined();
+    expect(data.duplicateDraft.extrasPorClausula.fiador.fiador_nome).toBe("Carlos Santos");
+    expect(data.duplicateDraft.extrasPorClausula.fiador.fiador_cpf).toBe("123.456.789-00");
+
+    for (const key of Object.keys(data.duplicateDraft.respostas)) {
+      expect(key.startsWith("__")).toBe(false);
+    }
+  });
 });

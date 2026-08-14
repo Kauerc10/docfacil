@@ -311,6 +311,7 @@ export async function duplicateDocumentApi(documentId: string): Promise<{
     modeloSlug: string;
     respostas: Record<string, string>;
     clausulasSelecionadas: string[];
+    extrasPorClausula: Record<string, Record<string, string>>;
   };
 }> {
   const headers = await getAuthHeaders();
