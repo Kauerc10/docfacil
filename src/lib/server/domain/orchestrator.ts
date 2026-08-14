@@ -16,6 +16,7 @@ import type { BackendRepositories } from "../firestore/repositories";
 import { getRepositories } from "../firestore/repositories";
 import type { ArtifactStorage } from "../r2/storage";
 import { getArtifactStorage } from "../r2/storage";
+import { logger } from "../../logger";
 
 export interface GenerateDocumentDependencies {
   repositories?: BackendRepositories;
@@ -267,6 +268,7 @@ export async function generateDocumentArtifact(
   }
 
   // 5. Geração de PDF e Persistência Atômica
+  let uploadedObjectKey: string | null = null;
   try {
     const pdfBuffer = await generatePdfServer(modelo, sanitizedAnswers, {
       watermark: entitlementDecision.watermarked,
@@ -279,6 +281,7 @@ export async function generateDocumentArtifact(
       pdfBuffer,
       filename,
     });
+    uploadedObjectKey = putResult.objectKey;
 
     const sourceHash = calculateSourceHash(sanitizedAnswers);
     const modelSnapshotHash = calculateModelSnapshotHash(modelo);
@@ -346,6 +349,13 @@ export async function generateDocumentArtifact(
       guestAccessPath,
     };
   } catch (err: unknown) {
+    if (uploadedObjectKey) {
+      try {
+        await storage.deleteArtifact(uploadedObjectKey);
+      } catch (cleanupErr) {
+        logger.error("orchestrator", "falha na compensacao r2 apos erro", cleanupErr);
+      }
+    }
     if (entitlementDecision?.entitlement === "single_purchase" && entitlementDecision?.orderId) {
       await repos.orders.releaseReservedOrder({
         orderId: entitlementDecision.orderId,

@@ -134,8 +134,13 @@ export class R2ArtifactStorage implements ArtifactStorage {
         Key: objectKey,
       });
       await this.s3Client.send(command);
-    } catch {
-      // Ignora erro se não existir ou loga
+    } catch (err) {
+      if (err instanceof BackendError) throw err;
+      throw new BackendError(
+        "R2_DELETE_FAILED",
+        500,
+        "Falha ao remover o artefato no armazenamento."
+      );
     }
   }
 
@@ -159,8 +164,13 @@ export class R2ArtifactStorage implements ArtifactStorage {
       });
 
       await this.s3Client.send(deleteCommand);
-    } catch {
-      // Best effort deletion
+    } catch (err) {
+      if (err instanceof BackendError) throw err;
+      throw new BackendError(
+        "R2_DELETE_FAILED",
+        500,
+        "Falha ao purgar artefatos do documento no armazenamento."
+      );
     }
   }
 }
