@@ -19,9 +19,59 @@ import type {
 } from "../domain/documents";
 import { BackendError } from "../errors";
 
+/**
+ * globalThis store — garante que page.tsx (Server Component) e API routes
+ * compartilhem os mesmos Maps no mesmo processo Node.js quando
+ * ALLOW_IN_MEMORY_REPOSITORIES=true. Sem isso, o Next.js App Router pode
+ * instanciar o módulo em contextos isolados e os dados não persistem entre
+ * chamadas.
+ */
+declare global {
+  // eslint-disable-next-line no-var
+  var __inMemoryStore: {
+    docs: Map<string, DocumentRecord>;
+    artifacts: Map<string, Map<number, DocumentArtifactRecord>>;
+    accessLinks: Map<string, AccessLinkRecord>;
+    orders: Map<string, OrderRecord>;
+    generationRequests: Map<string, GenerationRequestRecord>;
+    users: Map<string, { plano?: string; email?: string; nome?: string }>;
+  } | undefined;
+}
+
+function getStore() {
+  if (!globalThis.__inMemoryStore) {
+    globalThis.__inMemoryStore = {
+      docs: new Map(),
+      artifacts: new Map(),
+      accessLinks: new Map(),
+      orders: new Map(),
+      generationRequests: new Map(),
+      users: new Map(),
+    };
+  }
+  return globalThis.__inMemoryStore;
+}
+
+/** Reseta o store global (útil em testes que usam getRepositories diretamente). */
+export function resetInMemoryStore(): void {
+  globalThis.__inMemoryStore = undefined;
+}
+
 export class InMemoryDocumentsRepository implements IDocumentsRepository {
-  private readonly docs = new Map<string, DocumentRecord>();
-  private readonly artifacts = new Map<string, Map<number, DocumentArtifactRecord>>();
+  private readonly _docs: Map<string, DocumentRecord> | null;
+  private readonly _artifacts: Map<string, Map<number, DocumentArtifactRecord>> | null;
+
+  /**
+   * @param isolated Se true (padrão), usa Maps locais isolados (para testes unitários).
+   *                 Se false, usa o globalThis store compartilhado (para E2E via getRepositories).
+   */
+  constructor(isolated = true) {
+    this._docs = isolated ? new Map() : null;
+    this._artifacts = isolated ? new Map() : null;
+  }
+
+  private get docs() { return this._docs ?? getStore().docs; }
+  private get artifacts() { return this._artifacts ?? getStore().artifacts; }
 
   public async createDocument(data: Omit<DocumentRecord, "id">): Promise<DocumentRecord> {
     const id = `doc_${randomUUID().replace(/-/g, "")}`;
@@ -146,7 +196,13 @@ export class InMemoryDocumentsRepository implements IDocumentsRepository {
 }
 
 export class InMemoryAccessRepository implements IAccessRepository {
-  private readonly links = new Map<string, AccessLinkRecord>();
+  private readonly _links: Map<string, AccessLinkRecord> | null;
+
+  constructor(isolated = true) {
+    this._links = isolated ? new Map() : null;
+  }
+
+  private get links() { return this._links ?? getStore().accessLinks; }
 
   public async createAccessLink(link: AccessLinkRecord): Promise<void> {
     this.links.set(link.tokenHash, { ...link });
@@ -206,7 +262,13 @@ export class InMemoryAccessRepository implements IAccessRepository {
 }
 
 export class InMemoryOrdersRepository implements IOrdersRepository {
-  private readonly orders = new Map<string, OrderRecord>();
+  private readonly _orders: Map<string, OrderRecord> | null;
+
+  constructor(isolated = true) {
+    this._orders = isolated ? new Map() : null;
+  }
+
+  private get orders() { return this._orders ?? getStore().orders; }
 
   public async createOrder(order: Omit<OrderRecord, "id">): Promise<OrderRecord> {
     const id = `ord_${randomUUID().replace(/-/g, "")}`;
@@ -311,7 +373,13 @@ export class InMemoryOrdersRepository implements IOrdersRepository {
 export class InMemoryGenerationRequestsRepository
   implements IGenerationRequestsRepository
 {
-  private readonly requests = new Map<string, GenerationRequestRecord>();
+  private readonly _requests: Map<string, GenerationRequestRecord> | null;
+
+  constructor(isolated = true) {
+    this._requests = isolated ? new Map() : null;
+  }
+
+  private get requests() { return this._requests ?? getStore().generationRequests; }
 
   public async getOrCreateRequest(
     requestId: string,
@@ -375,10 +443,13 @@ export class InMemoryGenerationRequestsRepository
 }
 
 export class InMemoryUsersRepository implements IUsersRepository {
-  private readonly users = new Map<
-    string,
-    { plano?: string; email?: string; nome?: string }
-  >();
+  private readonly _users: Map<string, { plano?: string; email?: string; nome?: string }> | null;
+
+  constructor(isolated = true) {
+    this._users = isolated ? new Map() : null;
+  }
+
+  private get users() { return this._users ?? getStore().users; }
 
   public setUser(
     userId: string,

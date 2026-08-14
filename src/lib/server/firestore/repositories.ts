@@ -572,11 +572,13 @@ export function getRepositories(): BackendRepositories {
     (process.env.NODE_ENV === "test" && !process.env.FIRESTORE_EMULATOR_HOST);
 
   if (useInMemory) {
-    const docs = new InMemoryDocumentsRepository();
-    const access = new InMemoryAccessRepository();
-    const orders = new InMemoryOrdersRepository();
-    const generationRequests = new InMemoryGenerationRequestsRepository();
-    const users = new InMemoryUsersRepository();
+    // isolated=false: usa globalThis store compartilhado entre page.tsx e API routes
+    // no mesmo processo Node.js (necessário para E2E sem Firestore Emulator).
+    const docs = new InMemoryDocumentsRepository(false);
+    const access = new InMemoryAccessRepository(false);
+    const orders = new InMemoryOrdersRepository(false);
+    const generationRequests = new InMemoryGenerationRequestsRepository(false);
+    const users = new InMemoryUsersRepository(false);
     const generationCommit = new InMemoryGenerationCommitRepository(
       docs,
       access,
