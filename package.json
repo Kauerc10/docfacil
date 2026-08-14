@@ -42,6 +42,7 @@
     "db:reset": "prisma migrate reset",
     "seed:models": "bun run scripts/seed-models.ts",
     "test:rules": "firebase emulators:exec --only firestore \"RUN_FIRESTORE_RULES=true bun test src/test/rules/firestore.rules.test.ts\"",
+    "test:e2e": "firebase emulators:exec --only firestore \"playwright test\"",
     "firestore:rules": "firebase deploy --only firestore:rules"
   },
   "engines": {
@@ -125,6 +126,7 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/react": "^19",
     "@types/react-dom": "^19",

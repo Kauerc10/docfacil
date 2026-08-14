@@ -43,28 +43,59 @@ type NavState = {
 const NavContext = createContext<NavState | null>(null);
 
 export function NavProvider({ children }: { children: React.ReactNode }) {
-  const [view, setView] = useState<View>("home");
-  const [params, setParams] = useState<NavParams>({});
+  const [view, setView] = useState<View>(() => {
+    if (typeof window !== "undefined") {
+      const search = new URLSearchParams(window.location.search);
+      const v = search.get("view") as View;
+      if (v) return v;
+      const h = window.location.hash.replace("#/", "").replace("#", "") as View;
+      if (h) return h;
+    }
+    return "home";
+  });
+
+  const [params, setParams] = useState<NavParams>(() => {
+    if (typeof window !== "undefined") {
+      const search = new URLSearchParams(window.location.search);
+      const p: NavParams = {};
+      search.forEach((value, key) => {
+        if (key !== "view") p[key] = value;
+      });
+      return p;
+    }
+    return {};
+  });
 
   const navigate = useCallback((next: View, p: NavParams = {}) => {
     setView(next);
     setParams(p);
-    // Jump to top so each "page" starts at the hero/header, not mid-scroll.
     if (typeof window !== "undefined") {
+      const search = new URLSearchParams();
+      search.set("view", next);
+      for (const [k, v] of Object.entries(p)) {
+        if (v) search.set(k, v);
+      }
+      window.history.pushState({}, "", `/?${search.toString()}`);
       window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
     }
   }, []);
 
-  // Keep a hash in the URL so back/forward and refresh feel natural-ish.
+  // Listen to popstate (back/forward)
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const onHash = () => {
-      const h = window.location.hash.replace("#/", "").replace("#", "") as View;
-      if (h && h !== view) setView(h);
+    const onPopState = () => {
+      const search = new URLSearchParams(window.location.search);
+      const v = (search.get("view") as View) || "home";
+      const p: NavParams = {};
+      search.forEach((value, key) => {
+        if (key !== "view") p[key] = value;
+      });
+      setView(v);
+      setParams(p);
     };
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, [view]);
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   return (
     <NavContext.Provider value={{ view, params, navigate }}>
