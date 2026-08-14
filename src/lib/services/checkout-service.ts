@@ -35,6 +35,15 @@ const IS_PRODUCTION_CONFIGURED = Boolean(
   process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER && process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER !== "demo"
 );
 
+export function buildCheckoutReturnUrl(
+  successUrl: string,
+  orderId: string
+): string {
+  const url = new URL(successUrl);
+  url.searchParams.set("orderId", orderId);
+  return url.toString();
+}
+
 export async function createCheckout(params: CheckoutParams): Promise<CheckoutResult> {
   const provider = params.provider || ACTIVE_PROVIDER;
   const amount = PLAN_PRICES[params.plan];
@@ -69,7 +78,10 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
     }
 
     const data = await res.json();
-    const successUrl = params.successUrl || `${window.location.origin}/?view=sucesso&orderId=${data.order.id}`;
+    const baseSuccessUrl =
+      params.successUrl ||
+      `${typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}/?view=sucesso`;
+    const successUrl = buildCheckoutReturnUrl(baseSuccessUrl, data.order.id);
 
     return {
       checkoutUrl: successUrl,
