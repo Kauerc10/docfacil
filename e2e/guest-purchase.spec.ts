@@ -8,50 +8,50 @@ test.describe("Guest Purchase and Download Flow", () => {
     await page.goto("/?view=criar&slug=declaracao-residencia");
 
     // Fill Stage 0 (Declarante + Endereço)
-    const nameInput = page.locator("#g-declarante_nome, #declarante_nome, input[placeholder*='Maria']").first();
+    const nameInput = page.locator("#g-declarante_nome");
     await expect(nameInput).toBeVisible({ timeout: 15000 });
     await nameInput.fill("Maria da Silva");
 
-    const nacSelect = page.locator("#g-declarante_nacionalidade, select[name*='nacionalidade']").first();
-    if (await nacSelect.isVisible()) await nacSelect.selectOption({ label: "Brasileiro(a)" });
+    const nacSelect = page.locator("#g-declarante_nacionalidade");
+    if (await nacSelect.isVisible()) await nacSelect.selectOption("Brasileiro(a)");
 
-    const ecSelect = page.locator("#g-declarante_estado_civil, select[name*='estado_civil']").first();
-    if (await ecSelect.isVisible()) await ecSelect.selectOption({ label: "Solteiro(a)" });
+    const ecSelect = page.locator("#g-declarante_estado_civil");
+    if (await ecSelect.isVisible()) await ecSelect.selectOption("Solteiro(a)");
 
-    const profInput = page.locator("#g-declarante_profissao, #declarante_profissao, input[placeholder*='Comerciante']").first();
+    const profInput = page.locator("#g-declarante_profissao");
     if (await profInput.isVisible()) await profInput.fill("Engenheira");
 
-    const cpfInput = page.locator("#g-declarante_cpf, #declarante_cpf, input[placeholder*='123.456.789-00']").first();
-    if (await cpfInput.isVisible()) await cpfInput.fill("123.456.789-00");
+    const cpfInput = page.locator("#g-declarante_cpf");
+    if (await cpfInput.isVisible()) await cpfInput.fill("111.444.777-35");
 
-    const cepInput = page.locator("#g-declarante_cep, #declarante_cep, input[placeholder*='01234-567']").first();
+    const cepInput = page.locator("#g-declarante_cep");
     if (await cepInput.isVisible()) await cepInput.fill("01310-100");
 
-    const ruaInput = page.locator("#g-declarante_rua, #declarante_rua, input[placeholder*='das Flores']").first();
+    const ruaInput = page.locator("#g-declarante_rua");
     if (await ruaInput.isVisible()) await ruaInput.fill("Av. Paulista");
 
-    const numInput = page.locator("#g-declarante_numero, #declarante_numero, input[placeholder*='123']").first();
+    const numInput = page.locator("#g-declarante_numero");
     if (await numInput.isVisible()) await numInput.fill("1500");
 
-    const bairroInput = page.locator("#g-declarante_bairro, #declarante_bairro, input[placeholder*='Centro']").first();
+    const bairroInput = page.locator("#g-declarante_bairro");
     if (await bairroInput.isVisible()) await bairroInput.fill("Bela Vista");
 
-    const cidadeInput = page.locator("#g-declarante_cidade, #declarante_cidade, input[placeholder*='São Paulo']").first();
+    const cidadeInput = page.locator("#g-declarante_cidade");
     if (await cidadeInput.isVisible()) await cidadeInput.fill("São Paulo");
 
-    const ufInput = page.locator("#g-declarante_uf, #declarante_uf, input[placeholder*='SP']").first();
+    const ufInput = page.locator("#g-declarante_uf");
     if (await ufInput.isVisible()) await ufInput.fill("SP");
 
     // Advance to Stage 1 (Finalidade)
-    await page.getByRole("button", { name: /avançar|continuar/i }).click();
+    await page.getByRole("button", { name: /^avançar$/i }).click();
 
     // Stage 1: Finalidade
-    const finalidadeInput = page.locator("textarea, textarea[name='finalidade'], #finalidade").first();
-    await expect(finalidadeInput).toBeVisible({ timeout: 10000 });
-    await finalidadeInput.fill("Comprovante para abertura de conta bancária");
+    const finalidadeInput = page.locator("textarea");
+    await expect(finalidadeInput.first()).toBeVisible({ timeout: 10000 });
+    await finalidadeInput.first().fill("Comprovante para abertura de conta bancária");
 
     // Finalize creation
-    await page.getByRole("button", { name: /gerar|finalizar|avançar/i }).click();
+    await page.getByRole("button", { name: /finalizar/i }).click();
 
     // Reaches SucessoView
     await page.waitForURL((url) => url.searchParams.get("view") === "sucesso", { timeout: 20000 });
@@ -113,60 +113,60 @@ test.describe("Guest Purchase and Download Flow", () => {
     await page.goto("/?view=criar&slug=contrato-locacao");
 
     // Stage 0: Locador
-    const locadorNome = page.locator("#g-locador_nome, #locador_nome, input[placeholder*='Maria']").first();
+    const locadorNome = page.locator("#g-locador_nome");
     await expect(locadorNome).toBeVisible({ timeout: 15000 });
     await locadorNome.fill("Carlos Santos");
-    const locadorNac = page.locator("#g-locador_nacionalidade, select[name*='nacionalidade']").first();
-    if (await locadorNac.isVisible()) await locadorNac.selectOption({ label: "Brasileiro(a)" });
-    const locadorEc = page.locator("#g-locador_estado_civil, select[name*='estado_civil']").first();
-    if (await locadorEc.isVisible()) await locadorEc.selectOption({ label: "Solteiro(a)" });
-    const locadorCpf = page.locator("#g-locador_cpf, #locador_cpf, input[placeholder*='123.456.789-00']").first();
-    if (await locadorCpf.isVisible()) await locadorCpf.fill("111.222.333-44");
-    const locadorProf = page.locator("#g-locador_profissao, #locador_profissao, input[placeholder*='Comerciante']").first();
+    const locadorNac = page.locator("#g-locador_nacionalidade");
+    if (await locadorNac.isVisible()) await locadorNac.selectOption("Brasileiro(a)");
+    const locadorEc = page.locator("#g-locador_estado_civil");
+    if (await locadorEc.isVisible()) await locadorEc.selectOption("Solteiro(a)");
+    const locadorProf = page.locator("#g-locador_profissao");
     if (await locadorProf.isVisible()) await locadorProf.fill("Empresário");
-    await page.getByRole("button", { name: /avançar|continuar/i }).click();
+    const locadorCpf = page.locator("#g-locador_cpf");
+    if (await locadorCpf.isVisible()) await locadorCpf.fill("111.444.777-35");
+    await page.getByRole("button", { name: /^avançar$/i }).click();
 
     // Stage 1: Locatário
-    const locatarioNome = page.locator("#g-locatario_nome, #locatario_nome, input[placeholder*='Maria']").first();
+    const locatarioNome = page.locator("#g-locatario_nome");
     await expect(locatarioNome).toBeVisible({ timeout: 10000 });
     await locatarioNome.fill("Juliana Lima");
-    const locatarioNac = page.locator("#g-locatario_nacionalidade, select[name*='nacionalidade']").first();
-    if (await locatarioNac.isVisible()) await locatarioNac.selectOption({ label: "Brasileiro(a)" });
-    const locatarioEc = page.locator("#g-locatario_estado_civil, select[name*='estado_civil']").first();
-    if (await locatarioEc.isVisible()) await locatarioEc.selectOption({ label: "Solteiro(a)" });
-    const locatarioCpf = page.locator("#g-locatario_cpf, #locatario_cpf, input[placeholder*='123.456.789-00']").first();
-    if (await locatarioCpf.isVisible()) await locatarioCpf.fill("555.666.777-88");
-    const locatarioProf = page.locator("#g-locatario_profissao, #locatario_profissao, input[placeholder*='Comerciante']").first();
+    const locatarioNac = page.locator("#g-locatario_nacionalidade");
+    if (await locatarioNac.isVisible()) await locatarioNac.selectOption("Brasileiro(a)");
+    const locatarioEc = page.locator("#g-locatario_estado_civil");
+    if (await locatarioEc.isVisible()) await locatarioEc.selectOption("Solteiro(a)");
+    const locatarioProf = page.locator("#g-locatario_profissao");
     if (await locatarioProf.isVisible()) await locatarioProf.fill("Arquiteta");
-    await page.getByRole("button", { name: /avançar|continuar/i }).click();
+    const locatarioCpf = page.locator("#g-locatario_cpf");
+    if (await locatarioCpf.isVisible()) await locatarioCpf.fill("529.982.247-25");
+    await page.getByRole("button", { name: /^avançar$/i }).click();
 
     // Stage 2: Imóvel
-    const imovelRua = page.locator("#g-imovel_rua, #imovel_rua, input[placeholder*='das Flores']").first();
+    const imovelRua = page.locator("#g-imovel_rua");
     await expect(imovelRua).toBeVisible({ timeout: 10000 });
-    const imovelCep = page.locator("#g-imovel_cep, #imovel_cep, input[placeholder*='01234-567']").first();
+    const imovelCep = page.locator("#g-imovel_cep");
     if (await imovelCep.isVisible()) await imovelCep.fill("04538-133");
     await imovelRua.fill("Rua Funchal");
-    const imovelNum = page.locator("#g-imovel_numero, #imovel_numero, input[placeholder*='123']").first();
+    const imovelNum = page.locator("#g-imovel_numero");
     if (await imovelNum.isVisible()) await imovelNum.fill("200");
-    const imovelBairro = page.locator("#g-imovel_bairro, #imovel_bairro, input[placeholder*='Centro']").first();
+    const imovelBairro = page.locator("#g-imovel_bairro");
     if (await imovelBairro.isVisible()) await imovelBairro.fill("Vila Olímpia");
-    const imovelCidade = page.locator("#g-imovel_cidade, #imovel_cidade, input[placeholder*='São Paulo']").first();
+    const imovelCidade = page.locator("#g-imovel_cidade");
     if (await imovelCidade.isVisible()) await imovelCidade.fill("São Paulo");
-    const imovelUf = page.locator("#g-imovel_uf, #imovel_uf, input[placeholder*='SP']").first();
+    const imovelUf = page.locator("#g-imovel_uf");
     if (await imovelUf.isVisible()) await imovelUf.fill("SP");
-    await page.getByRole("button", { name: /avançar|continuar/i }).click();
+    await page.getByRole("button", { name: /^avançar$/i }).click();
 
     // Stage 3: Valores e prazo
-    const valorInput = page.locator("#g-valor, #valor, input[placeholder*='1.450,00']").first();
+    const valorInput = page.locator("#g-valor");
     await expect(valorInput).toBeVisible({ timeout: 10000 });
     await valorInput.fill("3500,00");
-    const prazoInput = page.locator("#g-prazo, #prazo, input[placeholder*='30']").first();
+    const prazoInput = page.locator("#g-prazo");
     if (await prazoInput.isVisible()) await prazoInput.fill("30");
-    const vencInput = page.locator("#g-dia_vencimento, #dia_vencimento, input[placeholder*='5']").first();
+    const vencInput = page.locator("#g-dia_vencimento");
     if (await vencInput.isVisible()) await vencInput.fill("10");
-    const formaInput = page.locator("#g-forma_pagamento, #forma_pagamento, input[placeholder*='PIX']").first();
+    const formaInput = page.locator("#g-forma_pagamento");
     if (await formaInput.isVisible()) await formaInput.fill("PIX");
-    await page.getByRole("button", { name: /avançar|continuar/i }).click();
+    await page.getByRole("button", { name: /^avançar$/i }).click();
 
     // Stage 4: Garantia locatícia (Cláusulas) - select "Fiador" clause and fill extras
     const fiadorCard = page.locator("div[role='checkbox']").filter({ hasText: /fiador/i }).first();
@@ -174,17 +174,17 @@ test.describe("Guest Purchase and Download Flow", () => {
     await fiadorCard.click();
 
     // Fill extra fields for fiador
-    const fiadorNomeInput = page.locator("#cl-fiador-fiador_nome, input[id*='fiador_nome'], input[placeholder*='José Santos']").first();
+    const fiadorNomeInput = page.locator("#cl-fiador-fiador_nome");
     await expect(fiadorNomeInput).toBeVisible({ timeout: 5000 });
     await fiadorNomeInput.fill("Roberto Alcantara");
 
-    const fiadorCpfInput = page.locator("#cl-fiador-fiador_cpf, input[id*='fiador_cpf'], input[placeholder*='123.456.789-00']").first();
+    const fiadorCpfInput = page.locator("#cl-fiador-fiador_cpf");
     if (await fiadorCpfInput.isVisible()) {
-      await fiadorCpfInput.fill("999.888.777-66");
+      await fiadorCpfInput.fill("056.489.370-84");
     }
 
     // Finalize
-    await page.getByRole("button", { name: /finalizar|gerar|avançar/i }).click();
+    await page.getByRole("button", { name: /finalizar/i }).click();
 
     // Reaches SucessoView
     await page.waitForURL((url) => url.searchParams.get("view") === "sucesso", { timeout: 20000 });
