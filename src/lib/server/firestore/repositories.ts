@@ -567,7 +567,11 @@ export function getRepositories(): BackendRepositories {
     return repositoriesSingleton;
   }
 
-  if (process.env.NODE_ENV === "test" && !process.env.FIRESTORE_EMULATOR_HOST) {
+  const useInMemory =
+    process.env.ALLOW_IN_MEMORY_REPOSITORIES === "true" ||
+    (process.env.NODE_ENV === "test" && !process.env.FIRESTORE_EMULATOR_HOST);
+
+  if (useInMemory) {
     const docs = new InMemoryDocumentsRepository();
     const access = new InMemoryAccessRepository();
     const orders = new InMemoryOrdersRepository();

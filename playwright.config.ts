@@ -35,6 +35,9 @@ export default defineConfig({
       FIREBASE_PROJECT_ID: "demo-docfacil-e2e",
       ALLOW_DEMO_BILLING: "true",
       ALLOW_IN_MEMORY_ARTIFACT_STORAGE: "true",
+      // Usa repositories in-memory para não depender do Firestore Emulator
+      // (que requer Java). Necessário em ambientes sem JRE instalado.
+      ALLOW_IN_MEMORY_REPOSITORIES: "true",
       APP_CHECK_ENFORCED: "false",
       NEXT_PUBLIC_CHECKOUT_PROVIDER: "demo",
     },
