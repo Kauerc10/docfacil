@@ -54,6 +54,9 @@ jobs:
       - name: 🛡️ Testes de Firestore Security Rules
         run: bun run test:rules
 
+      - name: 🔥 Integração Firestore — commit atômico
+        run: bun run test:firestore-commit
+
       - name: 🔍 ESLint
         run: bun run lint
         continue-on-error: false
