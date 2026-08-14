@@ -5,14 +5,14 @@
   "description": "Documentos legais prontos como numa conversa. Sem juridiquês, sem fricção. Produto da K-HUB Soluções Digitais.",
   "author": "K-HUB Soluções Digitais <contato@khub.com.br>",
   "license": "UNLICENSED",
-  "homepage": "https://khub.com.br",
+  "homepage": "https://docfacil-indol.vercel.app",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/khub-solucoes/docfacil.git",
+    "url": "git+https://github.com/Kauerc10/docfacil.git",
     "directory": "/"
   },
   "bugs": {
-    "url": "https://github.com/khub-solucoes/docfacil/issues",
+    "url": "https://github.com/Kauerc10/docfacil/issues",
     "email": "contato@khub.com.br"
   },
   "keywords": [
@@ -34,6 +34,8 @@
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
