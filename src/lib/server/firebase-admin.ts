@@ -4,6 +4,7 @@ import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { getAppCheck, type AppCheck } from "firebase-admin/app-check";
 import { getServerEnv } from "./env";
+import { assertProductionServerConfig } from "./config/assert-production-config";
 
 let adminApp: App | null = null;
 
@@ -18,6 +19,7 @@ export function getFirebaseAdminApp(): App {
   }
 
   const env = getServerEnv();
+  assertProductionServerConfig(env);
 
   if (env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) {
     adminApp = initializeApp({
