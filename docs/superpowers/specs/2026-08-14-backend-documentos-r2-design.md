@@ -21,8 +21,8 @@ Este documento consolida a arquitetura técnica, decisões de design (ADRs) e mo
 - `GET /api/documents/:id`: Retorna detalhes e metadados de versões do documento (`DocumentDetailDto`).
 - `DELETE /api/documents/:id`: Revoga links de acesso, purga artefatos do R2 e marca o documento como deletado (com `pendingPurge: true` em caso de instabilidade no storage).
 - `POST /api/documents/:id/duplicate`: Carrega respostas canônicas do documento original para reabertura no formulário sem gravar no Firestore.
-- `POST /api/documents/:id/share`: Cria link de compartilhamento com token seguro de 32 bytes (armazenado em hash SHA-256).
-- `POST /api/access/download`: Valida token de acesso ativo e não expirado, incrementa contador de uso e gera URL assinada temporária (S3 Pre-signed URL) de 5 minutos.
+- `POST /api/documents/:id/share`: Cria link de compartilhamento permanente até revogação explícita/reemissão com token seguro de 32 bytes (armazenado em hash SHA-256), pinned na versão compartilhada. A reemissão revoga automaticamente o link anterior.
+- `POST /api/access/download`: Valida token de acesso ativo (guest ou share), incrementa contador de uso e gera URL assinada temporária (S3 Pre-signed URL) de 300 segundos (5 minutos).
 - `POST /api/checkout/demo`: Cria ou simula pagamento em ambiente de testes/desenvolvimento. Rejeita requisições em produção.
 
 ## 5. Regras de Segurança do Firestore

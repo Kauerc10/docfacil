@@ -207,4 +207,75 @@ describe("Access Links & Magic Link Hardening (POST /api/access/download)", () =
     const data = await res.json();
     expect(data.error.code).toBe("DOCUMENT_NOT_FOUND");
   });
+
+  it("share link without expiresAt stays valid until revoked", async () => {
+    const rawToken = "share_token_no_ttl_1234567890";
+    const tokenHash = hashToken(rawToken);
+
+    const doc = await docsRepo.createDocument({
+      owner: { type: "user", userId: "usr_alice" },
+      modeloSlug: "declaracao-residencia",
+      modeloNome: "Declaração de Residência",
+      respostas: {},
+      entitlement: { type: "free", watermarked: true },
+      artifactState: "ready",
+      currentVersion: 1,
+      targetVersion: 1,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    await docsRepo.saveArtifact(doc.id!, {
+      version: 1,
+      objectKey: `documents/${doc.id}/v1.pdf`,
+      filename: "declaracao.pdf",
+      sizeBytes: 1234,
+      mimeType: "application/pdf",
+      watermarked: true,
+      sha256: "hash123",
+      sourceHash: "src123",
+      modelSnapshotHash: "mod123",
+      generatedAt: Date.now(),
+    });
+
+    await storage.putArtifact({
+      documentId: doc.id!,
+      version: 1,
+      pdfBuffer: Buffer.from("pdf buffer"),
+      filename: "declaracao.pdf",
+    });
+
+    await accessRepo.createAccessLink({
+      tokenHash,
+      kind: "share",
+      documentId: doc.id!,
+      version: 1,
+      active: true,
+      createdByUserId: "usr_alice",
+      createdAt: Date.now(),
+    });
+
+    const req1 = new Request("http://localhost:3000/api/access/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: rawToken }),
+    });
+
+    const res1 = await POST(req1);
+    expect(res1.status).toBe(200);
+    const data1 = await res1.json();
+    expect(data1.downloadUrl).toBeDefined();
+
+    // Now revoke and verify it becomes 404
+    await accessRepo.revokeAccessLink(tokenHash);
+
+    const req2 = new Request("http://localhost:3000/api/access/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: rawToken }),
+    });
+
+    const res2 = await POST(req2);
+    expect(res2.status).toBe(404);
+  });
 });

@@ -101,7 +101,26 @@ sequenceDiagram
 
 ---
 
-## 5. Checklist de Deploy e Produção
+## 5. Semântica de Acesso e Links Revogáveis
+
+1. **Guest Magic Link (`kind: guest`):**
+   - Permanente até revogação explícita ou exclusão do documento.
+   - Concede acesso de download à versão gerada no momento da compra.
+   - Indexação bloqueada via cabeçalhos HTTP (`X-Robots-Tag: noindex, nofollow`).
+
+2. **Authenticated Share Link (`kind: share`):**
+   - Permanente até revogação explícita ou reemissão.
+   - Pinned na versão compartilhada no momento da emissão.
+   - Gerar um novo link de compartilhamento para o mesmo documento revoga automaticamente o anterior.
+   - Links de compartilhamento não possuem TTL automático nesta versão; o campo opcional `expiresAt` permanece no schema apenas para compatibilidade futura.
+
+3. **URL Pré-assinada R2 (S3 Presigned URL):**
+   - Validade efêmera de **300 segundos** (5 minutos).
+   - Gerada sob demanda após validação autoritativa do token de acesso ou ID token autenticado.
+
+---
+
+## 6. Checklist de Deploy e Produção
 
 - [ ] **Service Account Firebase:** Gerar chave JSON no Firebase Console com permissões de Admin para Firestore, Auth e App Check.
 - [ ] **Cloudflare R2 Bucket:** Criar bucket privado sem acesso público e gerar chaves de API com permissão de leitura/escrita.
