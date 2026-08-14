@@ -1,67 +1,217 @@
-YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíÛŽºN‹Z–‹­¦ëeŠw¬Õ¥µÁ½ÉÐì‘•ÍÉ¥‰”°•áÁ•Ð°¥Ð°‰•™½É•±°°…™Ñ•É±°°‰•™½É•… ô™É½´€‰‰Õ¸éÑ•ÍÐˆì)¥µÁ½ÉÐì(€¥¹¥Ñ¥…±¥é•Q•ÍÑ¹Ù¥É½¹µ•¹Ð°(€IÕ±•ÍQ•ÍÑ¹Ù¥É½¹µ•¹Ð°(€…ÍÍ•ÉÑ…¥±Ì°(€…ÍÍ•ÉÑMÕ••‘Ì°)ô™É½´€‰™¥É•‰…Í”½ÉÕ±•ÌµÕ¹¥ÐµÑ•ÍÑ¥¹œˆì)¥µÁ½ÉÐ€¨…Ì™Ì™É½´€‰¹½‘”é™Ìˆì)¥µÁ½ÉÐ€¨…ÌÁ…Ñ ™É½´€‰¹½‘”éÁ…Ñ ˆì()½¹ÍÐIU9}%IMQ=I}IU1L€ôÁÉ½•ÍÌ¹•¹Ø¹IU9}%IMQ=I}IU1L€ôôô€‰ÑÉÕ”ˆì()‘•ÍÉ¥‰”¹Í­¥Á%˜ …IU9}%IMQ=I}IU1L¤ ‰¥É•ÍÑ½É”M•ÕÉ¥ÑäIÕ±•Ìˆ°€ ¤€ôøì(€±•ÐÑ•ÍÑ¹ØèIÕ±•ÍQ•ÍÑ¹Ù¥É½¹µ•¹Ðì(€½¹ÍÐÉÕ±•Ì€ô™Ì¹É•…‘¥±•Må¹Œ¡Á…Ñ ¹É•Í½±Ù”¡ÁÉ½•ÍÌ¹Ý ¤°€‰™¥É•ÍÑ½É”¹ÉÕ±•Ìˆ¤°€‰ÕÑ˜àˆ¤ì((€‰•™½É•±°¡…Íå¹Œ€ ¤€ôøì(€€€Ñ•ÍÑ¹Ø€ô…Ý…¥Ð¥¹¥Ñ¥…±¥é•Q•ÍÑ¹Ù¥É½¹µ•¹Ð¡ì(€€€€€ÁÉ½©•Ñ%è€‰‘•µ¼µ‘½™…¥°µÉÕ±•ÌµÑ•ÍÐˆ°(€€€€€™¥É•ÍÑ½É”èì(€€€€€€€ÉÕ±•Ì°(€€€€€€€¡½ÍÐè€ˆÄÈÜ¸À¸À¸Äˆ°(€€€€€€€Á½ÉÐè€àÀàÀ°(€€€€€ô°(€€€ô¤ì(€ô¤ì((€…™Ñ•É±°¡…Íå¹Œ€ ¤€ôøì(€€€¥˜€¡Ñ•ÍÑ¹Ø¤ì(€€€€€…Ý…¥ÐÑ•ÍÑ¹Ø¹±•…¹ÕÀ ¤ì(€€€ô(€ô¤ì((€‰•™½É•… ¡…Íå¹Œ€ ¤€ôøì(€€€¥˜€¡Ñ•ÍÑ¹Ø¤ì(€€€€€…Ý…¥ÐÑ•ÍÑ¹Ø¹±•…É¥É•ÍÑ½É” ¤ì(€€€ô(€ô¤ì((€¥Ð ‰ÁÉ½Ù•ÌÑ¡”¥É•ÍÑ½É”µÕ±…Ñ½È•¹™½É•ÌÍ•ÉÙ•Èµ½¹±ä…•ÍÌˆ°…Íå¹Œ€ ¤€ôøì(€€€½¹ÍÐ½¹Ñ•áÐ€ôÑ•ÍÑ¹Ø¹Õ¹…ÕÑ¡•¹Ñ¥…Ñ•‘½¹Ñ•áÐ ¤ì(€€€½¹ÍÐÉ•˜€ô½¹Ñ•áÐ¹™¥É•ÍÑ½É” ¤¹½±±•Ñ¥½¸ ‰}}¡•…±Ñ ˆ¤¹‘½Œ ‰ÁÉ½‰”ˆ¤ì(€€€…Ý…¥Ð…ÍÍ•ÉÑ…¥±Ì¡É•˜¹•Ð ¤¤ì(€ô¤ì((€‘•ÍÉ¥‰” ‰ÉÕ±•ÌÍÑÉÕÑÕÉ”…¹±½­Ìˆ°€ ¤€ôøì(€€€¥Ð ‰‘•±…É•ÌÉÕ±•Í}Ù•ÉÍ¥½¸€Èˆ°€ ¤€ôøì(€€€€€•áÁ•Ð¡ÉÕ±•Ì¤¹Ñ½½¹Ñ…¥¸ ‰ÉÕ±•Í}Ù•ÉÍ¥½¸€ô€œÈœìˆ¤ì(€€€ô¤ì((€€€¥Ð ‰±½­ÌÍ•ÉÙ•Èµ½¹±ä½±±•Ñ¥½¹Ì……¥¹ÍÐ±¥•¹ÐÝÉ¥Ñ•Ìˆ°€ ¤€ôøì(€€€€€•áÁ•Ð¡ÉÕ±•Ì¤¹Ñ½½¹Ñ…¥¸ ‰µ…Ñ €½‘½Õµ•¹ÑÌ½í¥‘ôˆ¤ì(€€€€€•áÁ•Ð¡ÉÕ±•Ì¤¹Ñ½½¹Ñ…¥¸ ‰…±±½ÜÝÉ¥Ñ”è¥˜™…±Í”ìˆ¤ì(€€€€€•áÁ•Ð¡ÉÕ±•Ì¤¹Ñ½½¹Ñ…¥¸ ‰µ…Ñ €½…•ÍÍ}±¥¹­Ì½íÑ½­•¹!…Í¡ôˆ¤ì(€€€€€•áÁ•Ð¡ÉÕ±•Ì¤¹Ñ½½¹Ñ…¥¸ ‰µ…Ñ €½•¹•É…Ñ¥½¹}É•ÅÕ•ÍÑÌ½íÉ•ÅÕ•ÍÑ%‘ôˆ¤ì(€€€€€•áÁ•Ð¡ÉÕ±•Ì¤¹Ñ½½¹Ñ…¥¸ ‰µ…Ñ €½½É‘•ÉÌ½í½É‘•É%‘ôˆ¤ì(€€€ô¤ì((€€€¥Ð ‰Ù•É¥™¥•ÌÕÍ•ÈÉ•…Ñ¥½¸É•ÅÕ¥É•ÌÁ±…¹¼É…Ñ¥Ì…¹É•ÍÑÉ¥ÑÌÕÁ‘…Ñ•Ìˆ°€ ¤€ôøì(€€€€€•áÁ•Ð¡ÉÕ±•Ì¤¹Ñ½½¹Ñ…¥¸ ‰É•ÅÕ•ÍÐ¹É•Í½ÕÉ”¹‘…Ñ„¹Á±…¹¼€ôô€É…Ñ¥Ìœˆ¤ì(€€€€€•áÁ•Ð¡ÉÕ±•Ì¤¹Ñ½½¹Ñ…¥¸ ‰¡…Í=¹±ä¡l¹½µ”œ°€Ñ•±•™½¹”œ°€™½Ñ½UÉ°œ°€…ÑÕ…±¥é…‘½´t¤ˆ¤ì(€€€ô¤ì(€ô¤ì((€‘•ÍÉ¥‰” ‰ÕÍ•ÉÌÉÕ±•Ìˆ°€ ¤€ôøì(€€€¥Ð ‰…±±½ÝÌÕÍ•ÈÑ¼É•…Ñ”½Ý¸ÁÉ½™¥±”Ý¥Ñ Á±…¹¼É…Ñ¥Ìˆ°…Íå¹Œ€ ¤€ôøì(€€€€€½¹ÍÐ…±¥”€ôÑ•ÍÑ¹Ø¹…ÕÑ¡•¹Ñ¥…Ñ•‘½¹Ñ•áÐ ‰…±¥”ˆ¤ì(€€€€€…Ý…¥Ð…ÍÍ•ÉÑMÕ••‘Ì (€€€€€€€…±¥”¹™¥É•ÍÑ½É” ¤¹½±±•Ñ¥½¸ ‰ÕÍ•ÉÌˆ¤¹‘½Œ ‰…±¥”ˆ¤¹Í•Ð¡ì(€€€€€€€€€Õ¥è€‰…±¥”ˆ°(€€€€€€€€€¹½µ”è€‰±¥”ˆ°(€€€€€€€€€Á±…¹¼è€‰É…Ñ¥Ìˆ°(€€€€€€€€€É¥…‘½´è…Ñ”¹¹½Ü ¤°(€€€€€€€ô¤(€€€€€€¤ì(€€€ô¤ì((€€€¥Ð ‰‰±½­ÌÕÍ•È™É½´É•…Ñ¥¹œÁÉ½™¥±”Ý¥Ñ Á±…¹¼ÁÉ¼ˆ°…Íå¹Œ€ ¤€ôøì(€€€€€½¹ÍÐ‰½ˆ€ôÑ•ÍÑ¹Ø¹…ÕÑ¡•¹Ñ¥…Ñ•‘½¹Ñ•áÐ ‰‰½ˆˆ¤ì(€€€€€…Ý…¥Ð…ÍÍ•ÉÑ…¥±Ì (€€€€€€€‰½ˆ¹™¥É•ÍÑ½É” ¤¹½±±•Ñ¥½¸ ‰ÕÍ•ÉÌˆ¤¹‘½Œ ‰‰½ˆˆ¤¹Í•Ð¡ì(€€€€€€€€€Õ¥è€‰‰½ˆˆ°(€€€€€€€€€¹½µ”è€‰	½ˆˆ°(€€€€€€€€€Á±…¹¼è€‰ÁÉ¼ˆ°(€€€€€€€€€É¥…‘½´è…Ñ”¹¹½Ü ¤°(€€€€€€€ô¤(€€€€€€¤ì(€€€ô¤ì((€€€¥Ð ‰…±±½ÝÌÕÍ•ÈÑ¼ÕÁ‘…Ñ”¹½µ”°Ñ•±•™½¹”°™½Ñ½UÉ°°…ÑÕ…±¥é…‘½´ˆ°…Íå¹Œ€ ¤€ôøì(€€€€€…Ý…¥ÐÑ•ÍÑ¹Ø¹Ý¥Ñ¡M•ÕÉ¥ÑåIÕ±•Í¥Í…‰±•¡…Íå¹Œ€¡½¹Ñ•áÐ¤€ôøì(€€€€€€€…Ý…¥Ð½¹Ñ•áÐ¹™¥É•ÍÑ½É” ¤¹½±±•Ñ¥½¸ ‰ÕÍ•ÉÌˆ¤¹‘½Œ ‰…±¥”ˆ¤¹Í•Ð¡ì(€€€€€€€€€ƒŽº¶‰žËkºwµçK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ\Ù\œÈŠK™ØÊ˜[XÙHŠK\]JÂˆ[XZ[ˆ˜[XÙL^[\K˜ÛÛH‹ˆJBˆ
-NÂˆ]ØZ]\ÜÙ\˜Z[Êˆ[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ\Ù\œÈŠK™ØÊ˜[XÙHŠK\]JÂˆ›ÛNˆ˜YZ[ˆ‹ˆJBˆ
-NÂˆ]ØZ]\ÜÙ\˜Z[Êˆ[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ\Ù\œÈŠK™ØÊ˜[XÙHŠK\]JÂˆÝXœØÜš\[ÛŽˆÈXÝ]™NˆYHKˆJBˆ
-NÂˆ]ØZ]\ÜÙ\˜Z[Êˆ[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ\Ù\œÈŠK™ØÊ˜[XÙHŠK\]JÂˆZYˆ˜[XÙWÚXÚÙY‹ˆJBˆ
-NÂˆJNÂˆJNÂ‚ˆ\ØÜšX™J™ØÝ[Y[È[\È‹
+import { describe, expect, it, beforeAll, afterAll, beforeEach } from "bun:test";
+import {
+  initializeTestEnvironment,
+  RulesTestEnvironment,
+  assertFails,
+  assertSucceeds,
+} from "@firebase/rules-unit-testing";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-HOˆÂˆ]
-˜[ÝÜÈ]][XØ]YÝÛ™\ˆÈ™XYÝÛˆØÝ[Y[‹\Þ[˜È
+const RUN_FIRESTORE_RULES = process.env.RUN_FIRESTORE_RULES === "true";
 
-HOˆÂˆ]ØZ]\Ý[‹Ú]ÙXÝ\š]T[\Ñ\ØX›Y
-\Þ[˜È
-ÛÛ^
-HOˆÂˆ]ØZ]ÛÛ^™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ™ØÝ[Y[ÈŠK™ØÊ™Ø×ÌHŠKœÙ]
-ÂˆÝÛ™\ŽˆÈ\Nˆ\Ù\ˆ‹\Ù\’Yˆ˜[XÙHˆKˆ[Ù[ÔÛYÎˆ™XÛ\˜XØ[Ë\™\ÚY[˜ÚXH‹ˆJNÂˆJNÂˆÛÛœÝ[XÙHH\Ý[‹˜]][XØ]YÛÛ^
-˜[XÙHŠNÂˆ]ØZ]\ÜÙ\ÝXØÙYYÊ[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ™ØÝ[Y[ÈŠK™ØÊ™Ø×ÌHŠK™Ù]
+describe.skipIf(!RUN_FIRESTORE_RULES)("Firestore Security Rules", () => {
+  let testEnv: RulesTestEnvironment;
+  const rules = fs.readFileSync(path.resolve(process.cwd(), "firestore.rules"), "utf8");
 
-JNÂˆJNÂ‚ˆ]
-˜›ØÚÜÈÝ\ˆ\Ù\ˆœ›ÛH™XY[™ÈØÝ[Y[‹\Þ[˜È
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId: "demo-docfacil-rules-test",
+      firestore: {
+        rules,
+        host: "127.0.0.1",
+        port: 8080,
+      },
+    });
+  });
 
-HOˆÂˆ]ØZ]\Ý[‹Ú]ÙXÝ\š]T[\Ñ\ØX›Y
-\Þ[˜È
-ÛÛ^
-HOˆÂˆ]ØZ]ÛÛ^™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ™ØÝ[Y[ÈŠK™ØÊ™Ø×ÌHŠKœÙ]
-ÂˆÝÛ™\ŽˆÈ\Nˆ\Ù\ˆ‹\Ù\’Yˆ˜[XÙHˆKˆ[Ù[ÔÛYÎˆ™XÛ\˜XØ[Ë\™\ÚY[˜ÚXH‹ˆJNÂˆJNÂˆÛÛœÝ›ØˆH\Ý[‹˜]][XØ]YÛÛ^
-˜›ØˆŠNÂˆ]ØZ]\ÜÙ\˜Z[Ê›Ø‹™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ™ØÝ[Y[ÈŠK™ØÊ™Ø×ÌHŠK™Ù]
+  afterAll(async () => {
+    if (testEnv) {
+      await testEnv.cleanup();
+    }
+  });
 
-JNÂˆJNÂ‚ˆ]
-˜›ØÚÜÈÛY[œ›ÛHÜ™X][™Ë\][™ÈÜˆ[][™ÈØÝ[Y[È\™XÝH‹\Þ[˜È
+  beforeEach(async () => {
+    if (testEnv) {
+      await testEnv.clearFirestore();
+    }
+  });
 
-HOˆÂˆÛÛœÝ[XÙHH\Ý[‹˜]][XØ]YÛÛ^
-˜[XÙHŠNÂˆ]ØZ]\ÜÙ\˜Z[Êˆ[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ™ØÝ[Y[ÈŠK˜Y
-ÂˆÝÛ™\ŽˆÈ\Nˆ\Ù\ˆ‹\Ù\’Yˆ˜[XÙHˆKˆ[Ù[ÔÛYÎˆ™XÛ\˜XØ[Ë\™\ÚY[˜ÚXH‹ˆJBˆ
-NÂˆ]ØZ]\ÜÙ\˜Z[Êˆ[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ™ØÝ[Y[ÈŠK™ØÊ™Ø×ÌHŠK\]JÂˆ[Ù[ÔÛYÎˆšXÚÙY‹ˆJBˆ
-NÂˆ]ØZ]\ÜÙ\˜Z[Ê[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ™ØÝ[Y[ÈŠK™ØÊ™Ø×ÌHŠK™[]J
-JNÂˆJNÂˆJNÂ‚ˆ\ØÜšX™JœÙ\™\‹[Û›HÛÛXÝ[ÛœÈ‹
+  it("proves the Firestore Emulator enforces server-only access", async () => {
+    const context = testEnv.unauthenticatedContext();
+    const ref = context.firestore().collection("__health").doc("probe");
+    await assertFails(ref.get());
+  });
 
-HOˆÂˆ]
-˜›ØÚÜÈÛY[XØÙ\ÜÈÈXØÙ\Ü×Û[šÜËÙ[™\˜][Û—Ü™\]Y\ÝÈ[™Ü™\œÈÜš]H‹\Þ[˜È
+  describe("rules structure and locks", () => {
+    it("declares rules_version 2", () => {
+      expect(rules).toContain("rules_version = '2';");
+    });
 
-HOˆÂˆÛÛœÝ[XÙHH\Ý[‹˜]][XØ]YÛÛ^
-˜[XÙHŠNÂˆ]ØZ]\ÜÙ\˜Z[Ê[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ˜XØÙ\Ü×Û[šÜÈŠK™ØÊš\ÚŠK™Ù]
+    it("locks server-only collections against client writes", () => {
+      expect(rules).toContain("match /documents/{id}");
+      expect(rules).toContain("allow write: if false;");
+      expect(rules).toContain("match /access_links/{tokenHash}");
+      expect(rules).toContain("match /generation_requests/{requestId}");
+      expect(rules).toContain("match /orders/{orderId}");
+    });
 
-JNÂˆ]ØZ]\ÜÙ\˜Z[Êˆ[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ˜XØÙ\Ü×Û[šÜÈŠK™ØÊš\ÚŠKœÙ]
-ÈXÝ]™NˆYHJBˆ
-NÂˆ]ØZ]\ÜÙ\˜Z[Ê[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ™Ù[™\˜][Û—Ü™\]Y\ÝÈŠK™ØÊœ™\HŠK™Ù]
+    it("verifies user creation requires plano gratis and restricts updates", () => {
+      expect(rules).toContain("request.resource.data.plano == 'gratis'");
+      expect(rules).toContain("hasOnly(['nome', 'telefone', 'fotoUrl', 'atualizadoEm'])");
+    });
+  });
 
-JNÂˆ]ØZ]\ÜÙ\˜Z[Êˆ[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ™Ù[™\˜][Û—Ü™\]Y\ÝÈŠK™ØÊœ™\HŠKœÙ]
-ÈÝ]\Îˆ˜ÛÛ\]YˆJBˆ
-NÂˆ]ØZ]\ÜÙ\˜Z[Êˆ[XÙK™š\™\ÝÜ™J
-K˜ÛÛXÝ[ÛŠ›Ü™\œÈŠK˜Y
-Âˆ›ÙXÝˆ˜][ÛÈ‹ˆ[[Ý[Ù[ÎˆNLˆJBˆ
-NÂˆJNÂˆJNÂŸJNÂ
+  describe("users rules", () => {
+    it("allows user to create own profile with plano gratis", async () => {
+      const alice = testEnv.authenticatedContext("alice");
+      await assertSucceeds(
+        alice.firestore().collection("users").doc("alice").set({
+          uid: "alice",
+          nome: "Alice",
+          plano: "gratis",
+          criadoEm: Date.now(),
+        })
+      );
+    });
+
+    it("blocks user from creating profile with plano pro", async () => {
+      const bob = testEnv.authenticatedContext("bob");
+      await assertFails(
+        bob.firestore().collection("users").doc("bob").set({
+          uid: "bob",
+          nome: "Bob",
+          plano: "pro",
+          criadoEm: Date.now(),
+        })
+      );
+    });
+
+    it("allows user to update nome, telefone, fotoUrl, atualizadoEm", async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection("users").doc("alice").set({
+          uid: "alice",
+          nome: "Alice",
+          plano: "gratis",
+        });
+      });
+      const alice = testEnv.authenticatedContext("alice");
+      await assertSucceeds(
+        alice.firestore().collection("users").doc("alice").update({
+          nome: "Alice Silva",
+          telefone: "(11) 99999-9999",
+          fotoUrl: "https://example.com/photo.jpg",
+          atualizadoEm: Date.now(),
+        })
+      );
+    });
+
+    it("blocks user from mutating plano directly", async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection("users").doc("alice").set({
+          uid: "alice",
+          nome: "Alice",
+          plano: "gratis",
+        });
+      });
+      const alice = testEnv.authenticatedContext("alice");
+      await assertFails(
+        alice.firestore().collection("users").doc("alice").update({
+          plano: "pro",
+        })
+      );
+    });
+
+    it("blocks user from mutating uid or email or role or subscription", async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection("users").doc("alice").set({
+          uid: "alice",
+          nome: "Alice",
+          email: "alice@example.com",
+          plano: "gratis",
+        });
+      });
+      const alice = testEnv.authenticatedContext("alice");
+      await assertFails(
+        alice.firestore().collection("users").doc("alice").update({
+          email: "alice2@example.com",
+        })
+      );
+      await assertFails(
+        alice.firestore().collection("users").doc("alice").update({
+          role: "admin",
+        })
+      );
+      await assertFails(
+        alice.firestore().collection("users").doc("alice").update({
+          subscription: { active: true },
+        })
+      );
+      await assertFails(
+        alice.firestore().collection("users").doc("alice").update({
+          uid: "alice_hacked",
+        })
+      );
+    });
+  });
+
+  describe("documents rules", () => {
+    it("allows authenticated owner to read own document", async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection("documents").doc("doc_1").set({
+          owner: { type: "user", userId: "alice" },
+          modeloSlug: "declaracao-residencia",
+        });
+      });
+      const alice = testEnv.authenticatedContext("alice");
+      await assertSucceeds(alice.firestore().collection("documents").doc("doc_1").get());
+    });
+
+    it("blocks other user from reading document", async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection("documents").doc("doc_1").set({
+          owner: { type: "user", userId: "alice" },
+          modeloSlug: "declaracao-residencia",
+        });
+      });
+      const bob = testEnv.authenticatedContext("bob");
+      await assertFails(bob.firestore().collection("documents").doc("doc_1").get());
+    });
+
+    it("blocks client from creating, updating or deleting documents directly", async () => {
+      const alice = testEnv.authenticatedContext("alice");
+      await assertFails(
+        alice.firestore().collection("documents").add({
+          owner: { type: "user", userId: "alice" },
+          modeloSlug: "declaracao-residencia",
+        })
+      );
+      await assertFails(
+        alice.firestore().collection("documents").doc("doc_1").update({
+          modeloSlug: "hacked",
+        })
+      );
+      await assertFails(alice.firestore().collection("documents").doc("doc_1").delete());
+    });
+  });
+
+  describe("server-only collections", () => {
+    it("blocks client access to access_links, generation_requests and orders write", async () => {
+      const alice = testEnv.authenticatedContext("alice");
+      await assertFails(alice.firestore().collection("access_links").doc("hash").get());
+      await assertFails(
+        alice.firestore().collection("access_links").doc("hash").set({ active: true })
+      );
+      await assertFails(alice.firestore().collection("generation_requests").doc("req").get());
+      await assertFails(
+        alice.firestore().collection("generation_requests").doc("req").set({ status: "completed" })
+      );
+      await assertFails(
+        alice.firestore().collection("orders").add({
+          product: "avulso",
+          amountCents: 990,
+        })
+      );
+    });
+  });
+});
