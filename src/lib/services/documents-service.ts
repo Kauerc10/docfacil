@@ -97,22 +97,17 @@ export async function listDocuments(userId: string): Promise<Documento[]> {
     return loadDemoDocs().filter((d) => d.userId === userId || d.userId === "demo");
   }
 
-  try {
-    const dtos = await listDocumentsApi();
-    return dtos.map((dto) => ({
-      id: dto.id,
-      modeloSlug: dto.modeloSlug,
-      modeloNome: dto.modeloNome,
-      respostas: {},
-      status: dto.status,
-      userId: "",
-      criadoEm: dto.criadoEm,
-      atualizadoEm: dto.atualizadoEm,
-    }));
-  } catch {
-    // Fallback demo caso a API não esteja disponível em ambiente local
-    return loadDemoDocs().filter((d) => d.userId === userId || d.userId === "demo");
-  }
+  const dtos = await listDocumentsApi();
+  return dtos.map((dto) => ({
+    id: dto.id,
+    modeloSlug: dto.modeloSlug,
+    modeloNome: dto.modeloNome,
+    respostas: {},
+    status: dto.status,
+    userId,
+    criadoEm: dto.criadoEm,
+    atualizadoEm: dto.atualizadoEm,
+  }));
 }
 
 export async function getDocument(id: string): Promise<Documento | null> {
