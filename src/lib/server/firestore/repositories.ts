@@ -300,14 +300,20 @@ export class FirestoreGenerationRequestsRepository
 
   public async markCompleted(
     requestId: string,
-    result?: { guestAccessPath?: string }
+    data: {
+      documentId: string;
+      targetVersion: number;
+      guestAccessPath?: string;
+    }
   ): Promise<void> {
     const updates: Record<string, unknown> = {
       status: "completed",
+      documentId: data.documentId,
+      targetVersion: data.targetVersion,
       updatedAt: Date.now(),
     };
-    if (result) {
-      updates.result = result;
+    if (data.guestAccessPath) {
+      updates.result = { guestAccessPath: data.guestAccessPath };
     }
     await this.db.collection("generation_requests").doc(requestId).update(updates);
   }

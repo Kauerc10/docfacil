@@ -210,7 +210,11 @@ describe("GenerationRequestsRepository (Idempotency)", () => {
     expect(second.isNew).toBe(false);
     expect(second.request.requestId).toBe("req_uuid_1");
 
-    await repo.markCompleted("req_uuid_1", { guestAccessPath: "/d/token123" });
+    await repo.markCompleted("req_uuid_1", {
+      documentId: "doc_temp_1",
+      targetVersion: 1,
+      guestAccessPath: "/d/token123",
+    });
     const completed = await repo.getRequest("req_uuid_1");
     expect(completed?.status).toBe("completed");
     expect(completed?.result?.guestAccessPath).toBe("/d/token123");

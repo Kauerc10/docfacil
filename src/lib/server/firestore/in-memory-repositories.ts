@@ -239,12 +239,18 @@ export class InMemoryGenerationRequestsRepository
 
   public async markCompleted(
     requestId: string,
-    result?: { guestAccessPath?: string }
+    data: {
+      documentId: string;
+      targetVersion: number;
+      guestAccessPath?: string;
+    }
   ): Promise<void> {
     const req = this.requests.get(requestId);
     if (req) {
       req.status = "completed";
-      req.result = result;
+      req.documentId = data.documentId;
+      req.targetVersion = data.targetVersion;
+      req.result = data.guestAccessPath ? { guestAccessPath: data.guestAccessPath } : undefined;
       req.updatedAt = Date.now();
     }
   }

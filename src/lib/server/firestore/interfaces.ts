@@ -61,7 +61,11 @@ export interface IGenerationRequestsRepository {
   getRequest(requestId: string): Promise<GenerationRequestRecord | null>;
   markCompleted(
     requestId: string,
-    result?: { guestAccessPath?: string }
+    data: {
+      documentId: string;
+      targetVersion: number;
+      guestAccessPath?: string;
+    }
   ): Promise<void>;
   markFailed(requestId: string, errorCode: string): Promise<void>;
 }
