@@ -6,6 +6,7 @@ import { useNav } from "@/components/docfacil/nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { Logo } from "@/components/docfacil/logo";
 import { TermsConsentModal } from "@/components/docfacil/terms-consent-modal";
+import { recordConsent, TERMS_VERSION, type ConsentDocument } from "@/lib/services/consent-service";
 
 /** The standard 4-color Google "G" mark as inline SVG. */
 function GoogleGIcon({ className }: { className?: string }) {
@@ -58,6 +59,7 @@ export function CadastroView() {
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
+  const [createdAccount, setCreatedAccount] = useState<{ uid: string; email: string } | null>(null);
 
   function validate(): string | null {
     if (!nome.trim()) return "Informe seu nome completo.";
@@ -81,13 +83,23 @@ export function CadastroView() {
     setConsentOpen(true);
   }
 
-  // Chamado pelo TermsConsentModal após o registro de consentimento ser
-  // persistido com sucesso (flow="cadastro").
-  async function handleConsentAccepted() {
-    setConsentOpen(false);
+  // No cadastro, a conta precisa existir antes que as regras permitam gravar
+  // o aceite. Se a rede falhar após criar a conta, preservamos a identidade
+  // para que o próximo clique apenas tente registrar o consentimento de novo.
+  async function handleConsentAccepted(documents: ConsentDocument[]) {
     setSubmitting(true);
     try {
-      await signUpWithEmail(nome.trim(), email.trim(), password);
+      const account =
+        createdAccount || (await signUpWithEmail(nome.trim(), email.trim(), password));
+      setCreatedAccount(account);
+      await recordConsent({
+        userId: account.uid,
+        userEmail: account.email,
+        flow: "cadastro",
+        documents,
+        termsVersion: TERMS_VERSION,
+      });
+      setConsentOpen(false);
       navigate("dashboard");
     } catch {
       setSubmitting(false);
@@ -303,9 +315,8 @@ export function CadastroView() {
         </p>
       </div>
 
-      {/* TermsConsentModal — fluxo LGPD de cadastro. Bloqueia backdrop/ESC
-          até o usuário decidir entre aceitar ou cancelar via botão. O
-          registro é persistido pelo consent-service antes de onAccept. */}
+      {/* TermsConsentModal — fluxo LGPD de cadastro. O aceite é registrado
+          com o UID criado pelo callback, nunca como guest anônimo. */}
       <TermsConsentModal
         open={consentOpen}
         onClose={() => setConsentOpen(false)}

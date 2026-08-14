@@ -78,5 +78,24 @@ service cloud.firestore {
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
       allow write: if false;
     }
+
+    // === Consents (aceites de termos e privacidade) ===
+    // O cliente só pode registrar e consultar o próprio aceite depois de
+    // autenticar. O registro é imutável para preservar a evidência original.
+    match /consents/{consentId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll([
+          'userId', 'documents', 'termsVersion', 'flow', 'acceptedAt', 'userAgent', 'termsHash'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'userId', 'userEmail', 'documents', 'termsVersion', 'flow', 'acceptedAt',
+          'ipAddress', 'userAgent', 'termsHash'
+        ])
+        && (!request.resource.data.keys().hasAny(['userEmail'])
+          || request.resource.data.userEmail == request.auth.token.email);
+      allow update, delete: if false;
+    }
   }
 }
