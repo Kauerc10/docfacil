@@ -101,7 +101,7 @@ describe("Atomic Generation Commit & Rollback", () => {
     expect(deleteArtifactCalledWithKey).toBeDefined();
 
     // Verify atomic state rollback
-    const updatedOrder = await ordersRepo.getOrder(order.id);
+    const updatedOrder = await ordersRepo.getOrder(order.id!);
     expect(updatedOrder?.status).toBe("paid"); // released back to paid
 
     const genReq = await genRequestsRepo.getRequest(requestId);
@@ -151,7 +151,7 @@ describe("Atomic Generation Commit & Rollback", () => {
     expect(result.artifactState).toBe("ready");
     expect(deleteArtifactCalled).toBe(false);
 
-    const updatedOrder = await ordersRepo.getOrder(order.id);
+    const updatedOrder = await ordersRepo.getOrder(order.id!);
     expect(updatedOrder?.status).toBe("consumed");
 
     const genReq = await genRequestsRepo.getRequest(requestId);

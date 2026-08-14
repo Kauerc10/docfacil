@@ -19,7 +19,7 @@ import { getArtifactStorage } from "../r2/storage";
 import { logger } from "../../logger";
 
 export interface GenerateDocumentDependencies {
-  repositories?: BackendRepositories;
+  repositories?: Partial<BackendRepositories>;
   storage?: ArtifactStorage;
 }
 
@@ -58,7 +58,32 @@ export async function generateDocumentArtifact(
     deps,
   } = input;
 
-  const repos = deps?.repositories || getRepositories();
+  const defaultRepos = getRepositories();
+  const docs = deps?.repositories?.documents || defaultRepos.documents;
+  const access = deps?.repositories?.access || defaultRepos.access;
+  const orders = deps?.repositories?.orders || defaultRepos.orders;
+  const generationRequests = deps?.repositories?.generationRequests || defaultRepos.generationRequests;
+  const users = deps?.repositories?.users || defaultRepos.users;
+
+  let generationCommit = deps?.repositories?.generationCommit || defaultRepos.generationCommit;
+  if (!deps?.repositories?.generationCommit && deps?.repositories) {
+    const { InMemoryGenerationCommitRepository } = await import("../firestore/in-memory-repositories");
+    generationCommit = new InMemoryGenerationCommitRepository(
+      docs as any,
+      access as any,
+      orders as any,
+      generationRequests as any
+    );
+  }
+
+  const repos: BackendRepositories = {
+    documents: docs,
+    access,
+    orders,
+    generationRequests,
+    users,
+    generationCommit,
+  };
   const storage = deps?.storage || getArtifactStorage();
 
   const principalKey =

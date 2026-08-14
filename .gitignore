@@ -56,3 +56,6 @@ server.log
 # uploaded files (user attachments, not part of the project)
 /upload/
 tool-results/
+test-results/
+playwright-report/
+

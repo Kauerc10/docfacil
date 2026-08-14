@@ -21,6 +21,7 @@ import {
   getDocumentDownloadUrl,
   shareDocument,
 } from "@/lib/documents/client";
+import { buildGuestFinalizationAnswers } from "@/lib/documents/guest-draft";
 import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf/generator";
 import { logger } from "@/lib/logger";
 import { shouldWatermark } from "@/lib/services/plan-service";

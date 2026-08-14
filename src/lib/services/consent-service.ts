@@ -15,9 +15,16 @@ export type ConsentFlow = "cadastro" | "checkout" | "document-generation";
 export type ConsentDocument = "termos" | "privacidade" | "cookies" | "marketing";
 
 export interface ConsentRecord {
-  id?: string; userId: string; userEmail: string; documents: ConsentDocument[];
-  termsVersion: string; flow: ConsentFlow; acceptedAt: number;
-  ipAddress?: string; userAgent: string; termsHash: string;
+  id?: string;
+  userId: string;
+  userEmail?: string;
+  documents: ConsentDocument[];
+  termsVersion: string;
+  flow: ConsentFlow;
+  acceptedAt: number;
+  ipAddress?: string;
+  userAgent: string;
+  termsHash: string;
 }
 
 function loadDemoConsents(): ConsentRecord[] {
@@ -35,12 +42,21 @@ function getUserAgent(): string {
 function hashTerms(version: string): string { return `docfacil-terms-v${version}`; }
 
 export async function recordConsent(params: {
-  userId: string; userEmail: string; documents: ConsentDocument[]; flow: ConsentFlow; termsVersion?: string;
+  userId: string;
+  userEmail?: string;
+  documents: ConsentDocument[];
+  flow: ConsentFlow;
+  termsVersion?: string;
 }): Promise<ConsentRecord> {
   const record: ConsentRecord = {
-    userId: params.userId, userEmail: params.userEmail, documents: params.documents,
-    termsVersion: params.termsVersion || TERMS_VERSION, flow: params.flow,
-    acceptedAt: Date.now(), userAgent: getUserAgent(), termsHash: hashTerms(params.termsVersion || TERMS_VERSION),
+    userId: params.userId,
+    userEmail: params.userEmail,
+    documents: params.documents,
+    termsVersion: params.termsVersion || TERMS_VERSION,
+    flow: params.flow,
+    acceptedAt: Date.now(),
+    userAgent: getUserAgent(),
+    termsHash: hashTerms(params.termsVersion || TERMS_VERSION),
   };
   if (!IS_FIREBASE_CONFIGURED || !db) {
     const list = loadDemoConsents();

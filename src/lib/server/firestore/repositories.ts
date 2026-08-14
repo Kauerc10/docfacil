@@ -612,8 +612,31 @@ export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | 
     return;
   }
   const current = getRepositories();
+  const documents = repos.documents || current.documents;
+  const access = repos.access || current.access;
+  const orders = repos.orders || current.orders;
+  const generationRequests = repos.generationRequests || current.generationRequests;
+  const users = repos.users || current.users;
+  const generationCommit =
+    repos.generationCommit ||
+    (documents instanceof InMemoryDocumentsRepository &&
+    access instanceof InMemoryAccessRepository &&
+    orders instanceof InMemoryOrdersRepository &&
+    generationRequests instanceof InMemoryGenerationRequestsRepository
+      ? new InMemoryGenerationCommitRepository(
+          documents,
+          access,
+          orders,
+          generationRequests
+        )
+      : current.generationCommit);
+
   repositoriesSingleton = {
-    ...current,
-    ...repos,
+    documents,
+    access,
+    orders,
+    generationRequests,
+    users,
+    generationCommit,
   };
 }
