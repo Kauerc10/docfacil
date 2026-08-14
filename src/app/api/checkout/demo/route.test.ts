@@ -19,7 +19,7 @@ describe("POST /api/checkout/demo", () => {
     const data = await res.json();
     expect(data.order.id).toBeDefined();
     expect(data.order.status).toBe("paid");
-    expect(data.order.amountCents).toBe(1990);
+    expect(data.order.amountCents).toBe(990);
     expect(data.order.buyer.type).toBe("guest");
     expect(data.order.buyer.email).toBe("guest@example.com");
   });

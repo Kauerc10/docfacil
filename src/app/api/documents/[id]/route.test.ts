@@ -106,9 +106,10 @@ describe("/api/documents/[id] routes (GET, DELETE)", () => {
     const data = await res.json();
     expect(data.success).toBe(true);
 
-    // Verify document deleted from repository
+    // Verify document marked as deleted in repository
     const checkDoc = await repos.documents.getDocument(doc.id!);
-    expect(checkDoc).toBeNull();
+    expect(checkDoc?.status).toBe("deleted");
+    expect(checkDoc?.pendingPurge).toBe(false);
 
     // Verify share link revoked
     const checkShare = await repos.access.getAccessLink("share_hash_to_delete");
