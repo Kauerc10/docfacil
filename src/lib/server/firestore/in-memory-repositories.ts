@@ -288,6 +288,13 @@ export class InMemoryUsersRepository implements IUsersRepository {
     this.users.set(userId, { ...profile });
   }
 
+  public setUserProfile(
+    userId: string,
+    profile: { plano?: string; email?: string; nome?: string }
+  ): void {
+    this.users.set(userId, { ...profile });
+  }
+
   public async getUserProfile(
     userId: string
   ): Promise<{ plano?: string; email?: string; nome?: string } | null> {

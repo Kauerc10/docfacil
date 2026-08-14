@@ -1,6 +1,10 @@
 import { auth, getClientAppCheckToken } from "../firebase";
+import { getOrCreateFinalizationRequestId, clearFinalizationRequestId } from "./idempotency";
+export { getOrCreateFinalizationRequestId, clearFinalizationRequestId };
 
 export interface GuestDraftData {
+  requestId: string;
+  modeloSlug: string;
   answers: Record<string, string>;
   stepIndex: number;
   clausulasSelecionadas: string[];
@@ -122,7 +126,7 @@ export async function finalizeDocument(input: {
   };
 }> {
   const headers = await getAuthHeaders();
-  const requestId = input.requestId || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "req_" + Date.now());
+  const requestId = input.requestId || getOrCreateFinalizationRequestId(input.modeloSlug);
 
   const res = await fetch("/api/documents/finalize", {
     method: "POST",

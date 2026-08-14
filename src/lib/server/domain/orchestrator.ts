@@ -64,6 +64,14 @@ export async function generateDocumentArtifact(
       ? `guest:${guestContact?.email || guestContact?.phone || "anon"}`
       : `user:${principal.userId}`;
 
+  let expectedTargetVersion = 1;
+  if (existingDocumentId) {
+    const existingDoc = await repos.documents.getDocument(existingDocumentId);
+    if (existingDoc) {
+      expectedTargetVersion = (existingDoc.currentVersion || 0) + 1;
+    }
+  }
+
   // 1. Idempotência / Trava de requisição
   const { request: genReq, isNew } = await repos.generationRequests.getOrCreateRequest(
     requestId,
@@ -71,7 +79,7 @@ export async function generateDocumentArtifact(
       operation: existingDocumentId ? "pro_regeneration" : "initial",
       principalKey,
       documentId: existingDocumentId || "pending",
-      targetVersion: 1,
+      targetVersion: expectedTargetVersion,
     }
   );
 

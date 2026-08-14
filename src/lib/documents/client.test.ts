@@ -14,6 +14,8 @@ describe("documents client draft management", () => {
 
   it("handles guest draft lifecycle", () => {
     saveGuestDraft("test-model", {
+      requestId: "req_test_123",
+      modeloSlug: "test-model",
       answers: { name: "John" },
       stepIndex: 1,
       clausulasSelecionadas: ["c1"],
@@ -21,6 +23,8 @@ describe("documents client draft management", () => {
     });
 
     const loaded = loadGuestDraft("test-model");
+    expect(loaded?.requestId).toBe("req_test_123");
+    expect(loaded?.modeloSlug).toBe("test-model");
     expect(loaded?.answers.name).toBe("John");
     expect(loaded?.stepIndex).toBe(1);
     expect(loaded?.updatedAt).toBeDefined();

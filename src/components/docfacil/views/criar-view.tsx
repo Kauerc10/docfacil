@@ -9,6 +9,8 @@ import {
   saveGuestDraft,
   loadGuestDraft,
   clearGuestDraft,
+  getOrCreateFinalizationRequestId,
+  clearFinalizationRequestId,
 } from "@/lib/documents/client";
 import { normalizarEstado } from "@/lib/normalizers";
 import { aplicarComposicaoModelo, encodeClausulasSelecionadas } from "@/lib/document-engine";
@@ -295,15 +297,21 @@ export function CriarView() {
 
     try {
       if (user) {
+        const requestId = getOrCreateFinalizationRequestId(modelo.slug);
         const result = await finalizeDocument({
+          requestId,
           modeloSlug: modelo.slug,
           respostas: respostasFinais,
           clausulasSelecionadas,
         });
+        clearFinalizationRequestId(modelo.slug);
         clearGuestDraft(slug);
         navigate("sucesso", { slug, id: result.document.id });
       } else {
+        const requestId = getOrCreateFinalizationRequestId(modelo.slug);
         saveGuestDraft(slug, {
+          requestId,
+          modeloSlug: slug,
           answers,
           stepIndex,
           clausulasSelecionadas,
