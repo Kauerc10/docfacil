@@ -19,6 +19,7 @@ import {
   clearGuestDraft,
   clearFinalizationRequestId,
   getDocumentDownloadUrl,
+  shareDocument,
 } from "@/lib/documents/client";
 import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf/generator";
 import { logger } from "@/lib/logger";
@@ -213,16 +214,48 @@ export function SucessoView() {
     }
   };
 
+  const ensureShareUrl = async (): Promise<string | null> => {
+    if (!docId || docId.startsWith("demo-")) {
+      return window.location.href;
+    }
+    try {
+      const res = await shareDocument(docId);
+      return `${window.location.origin}${res.shareUrl}`;
+    } catch (e) {
+      logger.error("SucessoView", "falha ao criar share link seguro", e, { docId });
+      toast.error("Não foi possível gerar o link seguro.");
+      return null;
+    }
+  };
+
   const handleCopyLink = async () => {
+    const url = await ensureShareUrl();
+    if (!url) return;
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard) {
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(url);
       }
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
+      toast.success("Link seguro copiado!");
     } catch {
-      /* clipboard may be blocked — silent */
+      toast.error("Não foi possível copiar o link.");
     }
+  };
+
+  const handleShareWhatsApp = async () => {
+    const url = await ensureShareUrl();
+    if (!url) return;
+    const text = encodeURIComponent(`Acesse o documento compartilhado no DocFácil: ${url}`);
+    window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+  };
+
+  const handleShareEmail = async () => {
+    const url = await ensureShareUrl();
+    if (!url) return;
+    const subject = encodeURIComponent(`Documento: ${modelo?.nome || "DocFácil"}`);
+    const body = encodeURIComponent(`Olá,\n\nVocê pode acessar o documento pelo link seguro:\n${url}\n\nDocFácil`);
+    window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
   };
 
   // --- Loading skeleton ---
@@ -398,6 +431,7 @@ export function SucessoView() {
               <button
                 data-suc="secondary"
                 type="button"
+                onClick={handleShareWhatsApp}
                 aria-label="Compartilhar no WhatsApp"
                 className="grid place-items-center w-11 h-11 rounded-full border border-[var(--border)] text-ink/70 hover:bg-[var(--blue-soft)] hover:text-[var(--blue-royal)] transition-colors"
               >
@@ -406,6 +440,7 @@ export function SucessoView() {
               <button
                 data-suc="secondary"
                 type="button"
+                onClick={handleShareEmail}
                 aria-label="Enviar por e-mail"
                 className="grid place-items-center w-11 h-11 rounded-full border border-[var(--border)] text-ink/70 hover:bg-[var(--blue-soft)] hover:text-[var(--blue-royal)] transition-colors"
               >
