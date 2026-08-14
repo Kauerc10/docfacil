@@ -195,6 +195,61 @@ describe.skipIf(!RUN_FIRESTORE_RULES)("Firestore Security Rules", () => {
     });
   });
 
+  describe("consents rules", () => {
+    it("allows an authenticated user to record and read only their own consent", async () => {
+      const alice = testEnv.authenticatedContext("alice");
+      const bob = testEnv.authenticatedContext("bob");
+
+      await assertSucceeds(
+        alice.firestore().collection("consents").doc("alice-terms-v1").set({
+          userId: "alice",
+          userEmail: "alice@example.com",
+          documents: ["termos", "privacidade"],
+          termsVersion: "1.0",
+          flow: "cadastro",
+          acceptedAt: 1,
+          userAgent: "test-agent",
+          termsHash: "docfacil-terms-v1.0",
+        })
+      );
+
+      await assertSucceeds(
+        alice.firestore().collection("consents").doc("alice-terms-v1").get()
+      );
+      await assertFails(
+        bob.firestore().collection("consents").doc("alice-terms-v1").get()
+      );
+      await assertFails(
+        bob.firestore().collection("consents").doc("forged").set({
+          userId: "alice",
+          userEmail: "alice@example.com",
+          documents: ["termos", "privacidade"],
+          termsVersion: "1.0",
+          flow: "cadastro",
+          acceptedAt: 1,
+          userAgent: "test-agent",
+          termsHash: "docfacil-terms-v1.0",
+        })
+      );
+    });
+
+    it("blocks anonymous consent records", async () => {
+      const anonymous = testEnv.unauthenticatedContext();
+
+      await assertFails(
+        anonymous.firestore().collection("consents").doc("anonymous").set({
+          userId: "guest",
+          documents: ["termos", "privacidade"],
+          termsVersion: "1.0",
+          flow: "cadastro",
+          acceptedAt: 1,
+          userAgent: "test-agent",
+          termsHash: "docfacil-terms-v1.0",
+        })
+      );
+    });
+  });
+
   describe("server-only collections", () => {
     it("blocks client access to access_links, generation_requests and orders write", async () => {
       const alice = testEnv.authenticatedContext("alice");
