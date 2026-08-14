@@ -49,6 +49,20 @@ export interface IOrdersRepository {
   getOrder(orderId: string): Promise<OrderRecord | null>;
   markOrderPaid(orderId: string): Promise<OrderRecord>;
   consumeOrder(orderId: string, documentId: string): Promise<void>;
+  reservePaidOrder(params: {
+    orderId: string;
+    requestId: string;
+    principalKey: string;
+  }): Promise<OrderRecord>;
+  consumeReservedOrder(params: {
+    orderId: string;
+    requestId: string;
+    documentId: string;
+  }): Promise<void>;
+  releaseReservedOrder(params: {
+    orderId: string;
+    requestId: string;
+  }): Promise<void>;
 }
 
 export interface IGenerationRequestsRepository {

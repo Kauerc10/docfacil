@@ -43,7 +43,7 @@ export function resolveEntitlement(params: ResolveEntitlementParams): Entitlemen
       );
     }
 
-    if (order.status !== "paid") {
+    if (order.status !== "paid" && order.status !== "reserved") {
       throw new BackendError(
         "ORDER_NOT_PAID",
         402,

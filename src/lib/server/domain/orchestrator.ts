@@ -10,6 +10,7 @@ import {
 import { BackendError } from "../errors";
 import { MODELOS } from "../../modelos";
 import { resolveEntitlement } from "../billing/entitlement";
+import { createBuyerFingerprint } from "../billing/order-identity";
 import { generatePdfServer } from "../../pdf/server/generator";
 import type { BackendRepositories } from "../firestore/repositories";
 import { getRepositories } from "../firestore/repositories";
@@ -61,7 +62,7 @@ export async function generateDocumentArtifact(
 
   const principalKey =
     principal.type === "guest"
-      ? `guest:${guestContact?.email || guestContact?.phone || "anon"}`
+      ? `guest:${createBuyerFingerprint(guestContact || {})}`
       : `user:${principal.userId}`;
 
   let expectedTargetVersion = 1;
@@ -118,15 +119,15 @@ export async function generateDocumentArtifact(
     throw new BackendError("INVALID_REQUEST", 400, `Modelo '${modeloSlug}' não encontrado.`);
   }
 
-  let documentId: string;
-  let targetVersion: number;
+  // 3. Resolução de Entitlement e Trava de Documento
   let entitlementDecision: {
     entitlement: "free" | "single_purchase" | "pro";
     watermarked: boolean;
     orderId?: string;
   };
+  let documentId: string;
+  let targetVersion: number;
 
-  // 3. Verifica fluxo: Pro Regeneration vs Novo Documento
   if (existingDocumentId) {
     const existingDoc = await repos.documents.getDocument(existingDocumentId);
     if (!existingDoc) {
@@ -173,7 +174,11 @@ export async function generateDocumentArtifact(
           "Pagamento avulso necessário para guests."
         );
       }
-      const order = await repos.orders.getOrder(orderId);
+      const order = await repos.orders.reservePaidOrder({
+        orderId,
+        requestId,
+        principalKey,
+      });
       entitlementDecision = resolveEntitlement({ principal, orderId, order });
     } else {
       const profile = await repos.users.getUserProfile(principal.userId);
@@ -186,7 +191,13 @@ export async function generateDocumentArtifact(
         principal.userId,
         startOfMonth
       );
-      const order = orderId ? await repos.orders.getOrder(orderId) : undefined;
+      const order = orderId
+        ? await repos.orders.reservePaidOrder({
+            orderId,
+            requestId,
+            principalKey,
+          })
+        : undefined;
       entitlementDecision = resolveEntitlement({
         principal,
         orderId,
@@ -233,6 +244,12 @@ export async function generateDocumentArtifact(
       clausulasSelecionadas
     );
   } catch (err: unknown) {
+    if (entitlementDecision?.entitlement === "single_purchase" && entitlementDecision?.orderId) {
+      await repos.orders.releaseReservedOrder({
+        orderId: entitlementDecision.orderId,
+        requestId,
+      }).catch(() => {});
+    }
     await repos.documents.setArtifactState(documentId, "failed", {
       code: "INVALID_REQUEST",
       at: Date.now(),
@@ -281,7 +298,11 @@ export async function generateDocumentArtifact(
 
     // 7. Consome ordem de compra avulsa
     if (entitlementDecision.entitlement === "single_purchase" && entitlementDecision.orderId) {
-      await repos.orders.consumeOrder(entitlementDecision.orderId, documentId);
+      await repos.orders.consumeReservedOrder({
+        orderId: entitlementDecision.orderId,
+        requestId,
+        documentId,
+      });
     }
 
     // 8. Magic link guest automático
@@ -316,6 +337,12 @@ export async function generateDocumentArtifact(
       guestAccessPath,
     };
   } catch (err: unknown) {
+    if (entitlementDecision?.entitlement === "single_purchase" && entitlementDecision?.orderId) {
+      await repos.orders.releaseReservedOrder({
+        orderId: entitlementDecision.orderId,
+        requestId,
+      }).catch(() => {});
+    }
     const errCode = err instanceof BackendError ? err.code : "GENERATION_FAILED";
     await repos.documents.setArtifactState(documentId, "failed", {
       code: errCode,

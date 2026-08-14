@@ -1,6 +1,7 @@
 import "server-only";
-import type { Firestore } from "firebase-admin/firestore";
+import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { getAdminFirestore } from "../firebase-admin";
+import { BackendError } from "../errors";
 import type {
   IDocumentsRepository,
   IAccessRepository,
@@ -259,6 +260,97 @@ export class FirestoreOrdersRepository implements IOrdersRepository {
       status: "consumed",
       documentId,
       consumedAt: Date.now(),
+    });
+  }
+
+  public async reservePaidOrder(params: {
+    orderId: string;
+    requestId: string;
+    principalKey: string;
+  }): Promise<OrderRecord> {
+    const docRef = this.db.collection("orders").doc(params.orderId);
+
+    return await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      if (!snap.exists) {
+        throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido de compra não encontrado.");
+      }
+
+      const order = { ...snap.data(), id: snap.id } as OrderRecord;
+
+      if (order.status === "reserved" && order.reservedByRequestId === params.requestId) {
+        return order;
+      }
+
+      if (order.status === "reserved") {
+        throw new BackendError(
+          "ORDER_ALREADY_RESERVED",
+          409,
+          "Este pagamento já está sendo processado por outra solicitação."
+        );
+      }
+
+      if (order.status === "consumed") {
+        throw new BackendError(
+          "ORDER_ALREADY_CONSUMED",
+          409,
+          "Este pagamento já foi utilizado para gerar outro documento."
+        );
+      }
+
+      if (order.status !== "paid") {
+        throw new BackendError(
+          "ORDER_NOT_PAID",
+          402,
+          "O pagamento informado ainda não foi confirmado."
+        );
+      }
+
+      tx.update(docRef, {
+        status: "reserved",
+        reservedByRequestId: params.requestId,
+        reservedAt: Date.now(),
+      });
+
+      return {
+        ...order,
+        status: "reserved",
+        reservedByRequestId: params.requestId,
+        reservedAt: Date.now(),
+      };
+    });
+  }
+
+  public async consumeReservedOrder(params: {
+    orderId: string;
+    requestId: string;
+    documentId: string;
+  }): Promise<void> {
+    const docRef = this.db.collection("orders").doc(params.orderId);
+    await docRef.update({
+      status: "consumed",
+      documentId: params.documentId,
+      consumedAt: Date.now(),
+    });
+  }
+
+  public async releaseReservedOrder(params: {
+    orderId: string;
+    requestId: string;
+  }): Promise<void> {
+    const docRef = this.db.collection("orders").doc(params.orderId);
+    await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      if (snap.exists) {
+        const order = snap.data() as OrderRecord;
+        if (order.status === "reserved" && order.reservedByRequestId === params.requestId) {
+          tx.update(docRef, {
+            status: "paid",
+            reservedByRequestId: FieldValue.delete(),
+            reservedAt: FieldValue.delete(),
+          });
+        }
+      }
     });
   }
 }

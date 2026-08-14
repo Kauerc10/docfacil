@@ -15,6 +15,7 @@ import type {
   OrderRecord,
   ArtifactState,
 } from "../domain/documents";
+import { BackendError } from "../errors";
 
 export class InMemoryDocumentsRepository implements IDocumentsRepository {
   private readonly docs = new Map<string, DocumentRecord>();
@@ -205,6 +206,76 @@ export class InMemoryOrdersRepository implements IOrdersRepository {
       order.status = "consumed";
       order.documentId = documentId;
       order.consumedAt = Date.now();
+    }
+  }
+
+  public async reservePaidOrder(params: {
+    orderId: string;
+    requestId: string;
+    principalKey: string;
+  }): Promise<OrderRecord> {
+    const order = this.orders.get(params.orderId);
+    if (!order) {
+      throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido de compra não encontrado.");
+    }
+
+    if (order.status === "reserved" && order.reservedByRequestId === params.requestId) {
+      return JSON.parse(JSON.stringify(order));
+    }
+
+    if (order.status === "reserved") {
+      throw new BackendError(
+        "ORDER_ALREADY_RESERVED",
+        409,
+        "Este pagamento já está sendo processado por outra solicitação."
+      );
+    }
+
+    if (order.status === "consumed") {
+      throw new BackendError(
+        "ORDER_ALREADY_CONSUMED",
+        409,
+        "Este pagamento já foi utilizado para gerar outro documento."
+      );
+    }
+
+    if (order.status !== "paid") {
+      throw new BackendError(
+        "ORDER_NOT_PAID",
+        402,
+        "O pagamento informado ainda não foi confirmado."
+      );
+    }
+
+    order.status = "reserved";
+    order.reservedByRequestId = params.requestId;
+    order.reservedAt = Date.now();
+
+    return JSON.parse(JSON.stringify(order));
+  }
+
+  public async consumeReservedOrder(params: {
+    orderId: string;
+    requestId: string;
+    documentId: string;
+  }): Promise<void> {
+    const order = this.orders.get(params.orderId);
+    if (order && (order.status === "reserved" || order.status === "paid")) {
+      order.status = "consumed";
+      order.documentId = params.documentId;
+      order.consumedAt = Date.now();
+    }
+  }
+
+  public async releaseReservedOrder(params: {
+    orderId: string;
+    requestId: string;
+  }): Promise<void> {
+    const order = this.orders.get(params.orderId);
+    if (order && order.status === "reserved" && order.reservedByRequestId === params.requestId) {
+      order.status = "paid";
+      delete order.reservedByRequestId;
+      delete order.reservedAt;
     }
   }
 }

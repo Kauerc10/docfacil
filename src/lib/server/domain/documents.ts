@@ -70,6 +70,14 @@ export interface GenerationRequestRecord {
   expiresAt: number;
 }
 
+export type OrderStatus =
+  | "pending"
+  | "paid"
+  | "reserved"
+  | "consumed"
+  | "failed"
+  | "refunded";
+
 export interface OrderRecord {
   id?: string;
   provider: "demo";
@@ -78,8 +86,10 @@ export interface OrderRecord {
   buyer:
     | { type: "guest"; email?: string; phone?: string }
     | { type: "user"; userId: string; email?: string };
-  status: "pending" | "paid" | "consumed" | "failed" | "refunded";
+  status: OrderStatus;
   documentId?: string;
+  reservedByRequestId?: string;
+  reservedAt?: number;
   createdAt: number;
   paidAt?: number;
   consumedAt?: number;
