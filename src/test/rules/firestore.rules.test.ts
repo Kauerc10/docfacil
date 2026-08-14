@@ -22,7 +22,10 @@ describe("Firestore Security Rules", () => {
           port: 8080,
         },
       });
-    } catch {
+    } catch (e) {
+      if (process.env.FIRESTORE_EMULATOR_HOST || process.env.CI) {
+        throw new Error(`Firestore Emulator não inicializado ou inacessível no ambiente: ${e}`);
+      }
       testEnv = null;
     }
   });
@@ -36,6 +39,19 @@ describe("Firestore Security Rules", () => {
   beforeEach(async () => {
     if (testEnv) {
       await testEnv.clearFirestore();
+    }
+  });
+
+  it("runs against the Firestore Emulator", async () => {
+    if (process.env.FIRESTORE_EMULATOR_HOST || process.env.CI) {
+      if (!testEnv) {
+        throw new Error("Firestore Emulator não inicializado no ambiente de teste de regras.");
+      }
+      const context = testEnv.unauthenticatedContext();
+      const ref = context.firestore().collection("__health").doc("probe");
+      await expect(ref.get()).resolves.toBeDefined();
+    } else {
+      expect(rules).toContain("rules_version = '2';");
     }
   });
 
@@ -148,6 +164,11 @@ describe("Firestore Security Rules", () => {
           subscription: { active: true },
         })
       );
+      await assertFails(
+        alice.firestore().collection("users").doc("alice").update({
+          uid: "alice_hacked",
+        })
+      );
     });
   });
 
@@ -164,6 +185,18 @@ describe("Firestore Security Rules", () => {
       await assertSucceeds(alice.firestore().collection("documents").doc("doc_1").get());
     });
 
+    it("blocks other user from reading document", async () => {
+      if (!testEnv) return;
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection("documents").doc("doc_1").set({
+          owner: { type: "user", userId: "alice" },
+          modeloSlug: "declaracao-residencia",
+        });
+      });
+      const bob = testEnv.authenticatedContext("bob");
+      await assertFails(bob.firestore().collection("documents").doc("doc_1").get());
+    });
+
     it("blocks client from creating, updating or deleting documents directly", async () => {
       if (!testEnv) return;
       const alice = testEnv.authenticatedContext("alice");
@@ -173,6 +206,12 @@ describe("Firestore Security Rules", () => {
           modeloSlug: "declaracao-residencia",
         })
       );
+      await assertFails(
+        alice.firestore().collection("documents").doc("doc_1").update({
+          modeloSlug: "hacked",
+        })
+      );
+      await assertFails(alice.firestore().collection("documents").doc("doc_1").delete());
     });
   });
 
@@ -181,7 +220,13 @@ describe("Firestore Security Rules", () => {
       if (!testEnv) return;
       const alice = testEnv.authenticatedContext("alice");
       await assertFails(alice.firestore().collection("access_links").doc("hash").get());
+      await assertFails(
+        alice.firestore().collection("access_links").doc("hash").set({ active: true })
+      );
       await assertFails(alice.firestore().collection("generation_requests").doc("req").get());
+      await assertFails(
+        alice.firestore().collection("generation_requests").doc("req").set({ status: "completed" })
+      );
       await assertFails(
         alice.firestore().collection("orders").add({
           product: "avulso",
