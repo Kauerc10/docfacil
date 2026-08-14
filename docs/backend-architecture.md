@@ -40,13 +40,8 @@ sequenceDiagram
     Orch->>PDF: generatePdfServer(modeloConfiavel, respostasSanitizadas, watermark)
     PDF-->>Orch: Buffer (%PDF)
     Orch->>R2: putArtifact(documentId, v1, Buffer)
-    Orch->>DB: saveArtifact(documentId, v1, metadata, sha256)
-    Orch->>DB: promoteCurrentVersion(documentId, 1)
-    alt Guest com Compra Avulsa
-        Orch->>DB: consumeOrder(orderId, documentId)
-        Orch->>DB: createAccessLink(tokenHash, kind: 'guest', v1)
-    end
-    Orch->>DB: markCompleted(requestId)
+    Orch->>DB: commitGeneratedArtifact (Transação atômica única: saveArtifact, promoteVersion, consumeOrder, createAccessLink, markCompleted)
+    Note over Orch,DB: Se a transação falhar, o artefato no R2 é compensado e deletado imediatamente.
     Orch-->>API: { documentId, version: 1, guestAccessPath? }
     API-->>User: 200 OK
 ```
