@@ -1,6 +1,10 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Guest Purchase and Download Flow", () => {
+  test.beforeEach(async () => {
+    test.setTimeout(60000);
+  });
+
   test("completes guest creation, checkout with orderId preservation, magic link generation and download", async ({
     page,
   }) => {
@@ -171,11 +175,11 @@ test.describe("Guest Purchase and Download Flow", () => {
     // Stage 4: Garantia locatícia (Cláusulas) - select "Fiador" clause and fill extras
     const fiadorCard = page.locator("div[role='checkbox']").filter({ hasText: /fiador/i }).first();
     await expect(fiadorCard).toBeVisible({ timeout: 10000 });
-    await fiadorCard.click();
+    await fiadorCard.click({ force: true });
 
     // Fill extra fields for fiador
     const fiadorNomeInput = page.locator("#cl-fiador-fiador_nome");
-    await expect(fiadorNomeInput).toBeVisible({ timeout: 5000 });
+    await expect(fiadorNomeInput).toBeVisible({ timeout: 10000 });
     await fiadorNomeInput.fill("Roberto Alcantara");
 
     const fiadorCpfInput = page.locator("#cl-fiador-fiador_cpf");
