@@ -147,23 +147,32 @@ export class R2ArtifactStorage implements ArtifactStorage {
   public async deleteDocumentArtifacts(documentId: string): Promise<void> {
     const prefix = `documents/${documentId}/`;
     try {
-      const listCommand = new ListObjectsV2Command({
-        Bucket: this.bucketName,
-        Prefix: prefix,
-      });
+      let continuationToken: string | undefined;
+      do {
+        const listed = await this.s3Client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucketName,
+            Prefix: prefix,
+            ContinuationToken: continuationToken,
+          })
+        );
+        const objectsToDelete = (listed.Contents || [])
+          .filter((obj) => obj.Key)
+          .map((obj) => ({ Key: obj.Key }));
 
-      const listed = await this.s3Client.send(listCommand);
-      if (!listed.Contents || listed.Contents.length === 0) {
-        return;
-      }
+        if (objectsToDelete.length > 0) {
+          await this.s3Client.send(
+            new DeleteObjectsCommand({
+              Bucket: this.bucketName,
+              Delete: { Objects: objectsToDelete },
+            })
+          );
+        }
 
-      const objectsToDelete = listed.Contents.map((obj) => ({ Key: obj.Key }));
-      const deleteCommand = new DeleteObjectsCommand({
-        Bucket: this.bucketName,
-        Delete: { Objects: objectsToDelete },
-      });
-
-      await this.s3Client.send(deleteCommand);
+        continuationToken = listed.IsTruncated
+          ? listed.NextContinuationToken
+          : undefined;
+      } while (continuationToken);
     } catch (err) {
       if (err instanceof BackendError) throw err;
       throw new BackendError(

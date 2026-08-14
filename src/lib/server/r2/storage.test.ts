@@ -6,6 +6,7 @@ import {
 } from "./storage";
 import { BackendError } from "../errors";
 import { createHash } from "crypto";
+import { DeleteObjectsCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
 describe("buildArtifactObjectKey", () => {
   it("formats object key consistently with versioning", () => {
@@ -114,5 +115,48 @@ describe("R2ArtifactStorage mock S3Client", () => {
       expect(err.code).toBe("R2_UPLOAD_FAILED");
       expect(err.status).toBe(500);
     }
+  });
+
+  it("deletes every artifact page returned by R2", async () => {
+    const continuationTokens: Array<string | undefined> = [];
+    const deletedKeys: string[][] = [];
+    const mockS3 = {
+      send: async (command: unknown) => {
+        if (command instanceof ListObjectsV2Command) {
+          const token = command.input.ContinuationToken;
+          continuationTokens.push(token);
+          if (!token) {
+            return {
+              Contents: [
+                { Key: "documents/doc_paged/v1/document.pdf" },
+                { Key: "documents/doc_paged/v2/document.pdf" },
+              ],
+              IsTruncated: true,
+              NextContinuationToken: "page-2",
+            };
+          }
+          return {
+            Contents: [{ Key: "documents/doc_paged/v1001/document.pdf" }],
+            IsTruncated: false,
+          };
+        }
+        if (command instanceof DeleteObjectsCommand) {
+          deletedKeys.push(
+            command.input.Delete?.Objects?.map((object) => object.Key!).filter(Boolean) || []
+          );
+          return {};
+        }
+        throw new Error("Unexpected R2 command");
+      },
+    };
+    const storage = new R2ArtifactStorage(mockS3 as any, "docfacil-pdfs");
+
+    await storage.deleteDocumentArtifacts("doc_paged");
+
+    expect(continuationTokens).toEqual([undefined, "page-2"]);
+    expect(deletedKeys).toEqual([
+      ["documents/doc_paged/v1/document.pdf", "documents/doc_paged/v2/document.pdf"],
+      ["documents/doc_paged/v1001/document.pdf"],
+    ]);
   });
 });
