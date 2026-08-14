@@ -1,4 +1,564 @@
-YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíëùN‹Z–‹­¦ëeŠw¬Õ¥µÁ½ÉĞ€‰Í•ÉÙ•Èµ½¹±äˆì)¥µÁ½ÉĞì¥•±‘Y…±Õ”°ÑåÁ”¥É•ÍÑ½É”ô™É½´€‰™¥É•‰…Í”µ…‘µ¥¸½™¥É•ÍÑ½É”ˆì)¥µÁ½ÉĞì•Ñ‘µ¥¹¥É•ÍÑ½É”ô™É½´€ˆ¸¸½™¥É•‰…Í”µ…‘µ¥¸ˆì)¥µÁ½ÉĞì	…­•¹‘ÉÉ½Èô™É½´€ˆ¸¸½•ÉÉ½ÉÌˆì)¥µÁ½ÉĞÑåÁ”ì(€%½Õµ•¹ÑÍI•Á½Í¥Ñ½Éä°(€%•ÍÍI•Á½Í¥Ñ½Éä°(€%=É‘•ÉÍI•Á½Í¥Ñ½Éä°(€%•¹•É…Ñ¥½¹I•ÅÕ•ÍÑÍI•Á½Í¥Ñ½Éä°(€%UÍ•ÉÍI•Á½Í¥Ñ½Éä°(€%•¹•É…Ñ¥½¹½µµ¥ÑI•Á½Í¥Ñ½Éä°(€½µµ¥Ñ•¹•É…Ñ•‘ÉÑ¥™…Ñ%¹ÁÕĞ°)ô™É½´€ˆ¸½¥¹Ñ•É™…•Ìˆì)¥µÁ½ÉĞÑåÁ”ì(€½Õµ•¹ÑI•½É°(€½Õµ•¹ÑÉÑ¥™…ÑI•½É°(€•ÍÍ1¥¹­I•½É°(€•¹•É…Ñ¥½¹I•ÅÕ•ÍÑI•½É°(€=É‘•ÉI•½É°(€ÉÑ¥™…ÑMÑ…Ñ”°)ô™É½´€ˆ¸¸½‘½µ…¥¸½‘½Õµ•¹ÑÌˆì)¥µÁ½ÉĞì(€%¹5•µ½Éå½Õµ•¹ÑÍI•Á½Í¥Ñ½Éä°(€%¹5•µ½Éå•ÍÍI•Á½Í¥Ñ½Éä°(€%¹5•µ½Éå=É‘•ÉÍI•Á½Í¥Ñ½Éä°(€%¹5•µ½Éå•¹•É…Ñ¥½¹I•ÅÕ•ÍÑÍI•Á½Í¥Ñ½Éä°(€%¹5•µ½ÉåUÍ•ÉÍI•Á½Í¥Ñ½Éä°(€%¹5•µ½Éå•¹•É…Ñ¥½¹½µµ¥ÑI•Á½Í¥Ñ½Éä°)ô™É½´€ˆ¸½¥¸µµ•µ½ÉäµÉ•Á½Í¥Ñ½É¥•Ìˆì()•áÁ½ÉĞ±…ÍÌ¥É•ÍÑ½É•½Õµ•¹ÑÍI•Á½Í¥Ñ½Éä¥µÁ±•µ•¹ÑÌ%½Õµ•¹ÑÍI•Á½Í¥Ñ½Éäì(€ÁÉ¥Ù…Ñ”É•…‘½¹±ä‘ˆè¥É•ÍÑ½É”ì((€½¹ÍÑÉÕÑ½È¡‘ˆè¥É•ÍÑ½É”€ô•Ñ‘µ¥¹¥É•ÍÑ½É” ¤¤ì(€€€Ñ¡¥Ì¹‘ˆ€ô‘ˆì(€ô((€ÁÕ‰±¥Œ…Íå¹ŒÉ•…Ñ•½Õµ•¹Ğ¡‘…Ñ„è=µ¥Ğñ½Õµ•¹ÑI•½É°€‰¥ˆø¤èAÉ½µ¥Í”ñ½Õµ•¹ÑI•½Éøì(€€€½¹ÍĞ‘½I•˜€ôÑ¡¥Ì¹‘ˆ¹½±±•Ñ¥½¸ ‰‘½Õµ•¹ÑÌˆ¤¹‘½Œ ¤ì(€€€½¹ÍĞÉ•½Éè½Õµ•¹ÑI•½É€ôì(€€€€€€¸¸¹‘…Ñ„°(€€€€€¥è‘½I•˜¹¥°(€€€ôì(€€€…İ…¥Ğ‘½I•˜¹Í•Ğ¡É•½É¤ì(€€€É•ÑÕÉ¸É•½Éì(€ô((€ÁÕ‰±¥Œ…Íå¹Œ•Ñ½Õµ•¹Ğ¡‘½Õµ•¹Ñ%èÍÑÉ¥¹œ¤èAÉ½µ¥Í”ñ½Õµ•¹ÑI•½Éğ¹Õ±°øì(€€€½¹ÍĞÍ¹…À€ô…İ…¥ĞÑ¡¥Ì¹‘ˆ¹½±±•Ñ¥½¸ ‰‘½Õµ•¹ÑÌˆ¤¹‘½Œ¡‘½Õµ•¹Ñ%¤¹•Ğ ¤ì(€€€¥˜€ …Í¹…À¹•á¥ÍÑÌ¤É•ÑÕÉ¸¹Õ±°ì(€€€É•ÑÕÉ¸ì€¸¸¹Í¹…À¹‘…Ñ„ ¤°¥èÍ¹…À¹¥ô…Ì½Õµ•¹ÑI•½Éì(€ô((€ÁÕ‰±¥Œ…Íå¹Œ±¥ÍÑUÍ•É½Õµ•¹ÑÌ¡ÕÍ•É%èÍÑÉ¥¹œ¤èAÉ½µ¥Í”ñ½Õµ•¹ÑI•½É‘mtøì(€€€½¹ÍĞÍ¹…À€ô…İ…¥ĞÑ¡¥Ì¹‘ˆ(€€€€€€¹½±±•Ñ¥½¸ ‰‘½Õµ•¹ÑÌˆ¤(€€€€€€¹İ¡•É” ‰½İ¹•È¹ÑåÁ”ˆ°€ˆôôˆ°€‰ÕÍ•Èˆ¤(€€€€€€¹İ¡•É” ‰½İ¹•È¹ÕÍ•É%ˆ°€ˆôôˆ°ÕÍ•É%¤(€€€€€€¹•Ğ ¤ì((€€€É•ÑÕÉ¸Í¹…À¹‘½Ì(€€€€€€¹µ…À ¡¤€ôø€¡ì€¸¸¹¹‘…Ñ„ ¤°¥è¹¥ô…Ì½Õµ•¹ÑI•½É¤¤(€€€€€€¹™¥±Ñ•È ¡¤€ôø¹ÍÑ…ÑÕÌ€„ôô€‰‘•±•Ñ•ˆ¤(€€€€€€¹Í½ÉĞ ¡„°ˆ¤€ôøˆ¹ÕÁ‘…Ñ•‘Ğ€´„¹ÕÁ‘…Ñ•‘Ğ¤ì(€ô((€ÁÕ‰±¥Œ…Íå¹Œµ…É­½Õµ•¹Ñ•±•Ñ•¡‘½Õµ•¹Ñ%èÍÑÉ¥¹œ°Á•¹‘¥¹AÕÉ”è‰½½±•…¸¤èAÉ½µ¥Í”ñÙ½¥øì(€€€…İ…¥ĞÑ¡¥Ì¹‘ˆ¹½±±•Ñ¥½¸ ‰‘½Õµ•¹ÑÌˆ¤¹‘½Œ¡‘½Õµ•¹Ñ%¤¹ÕÁ‘…Ñ”¡ì(€€€€€ÍÑ…ÑÕÌè€‰‘•±•Ñ•ˆ°(€€€€€‘•±•Ñ•‘Ğè…Ñ”¹¹½Ü ¤°(€€€€€Á•¹‘¥¹AÕÉ”°(€€€€€ÕÁ‘…Ñ•‘Ğè…Ñ”¹¹½Ü ¤°(€€€ô¤ì(€ô((€ÁÕ‰±¥Œ…Íå¹ŒÕÁ‘…Ñ•½Õµ•¹ÑI•ÍÁ½ÍÑ…Ì (€€€‘½Õµ•¹Ñ%èÍÑÉ¥¹œ°(€€€É•ÍÁ½ÍÑ…ÌèI•½ÉñÍÑÉ¥¹œ°ÍÑÉ¥¹œø°(€€€Ñ…É•ÑY•ÉÍ¥½¸è¹Õµ‰•È(€€¤èAÉ½µ¥Í”ñÙ½¥øì(€€€…İ…¥ĞÑ¡¥Ì¹‘ˆ¹½±±•Ñ¥½¸ ‰‘½Õµ•¹ÑÌˆ¤¹‘½Œ¡‘½Õµ•¹Ñ%¤¹ÕÁ‘…Ñ”¡ì(€€€€€É•ÍÁ½ÍÑ…Ì°(€€€€€Ñ…É•ÑY•ÉÍ¥½¸°(€€€€€ÕÁ‘…Ñ•‘Ğè…Ñ”¹¹½Ü ¤°(€€€ô¤ì(€ô((€ÁÕ‰±¥Œ…Íå¹ŒÍ•ÑÉÑ¥™…ÑMÑ…Ñ” (€€€‘½Õµ•¹Ñ%èÍÑÉ¥¹œ°(€€€ÍÑ…Ñ”èÉÑ¥™…ÑMÑ…Ñ”°(€€€•ÉÉ½Èüèì½‘”èÍÑÉ¥¹œì…Ğè¹Õµ‰•Èô(€€¤èAÉ½µ¥Í”ñÙ½¥øì(€€€½¹ÍĞÕÁ‘…Ñ•ÌèI•½ÉñÍÑÉ¥¹œ°Õ¹­¹½İ¸ø€ôì(€€€€€…ÉÑ¥™…ÑMÑ…Ñ”èÍÑ…Ñ”°(€€€€€ÕÁ‘…Ñ•‘Ğè…Ñ”¹¹½Ü ¤°(€€€ôì(€€€¥˜€¡•ÉÉ½È¤ì(€€€€€ÕÁ‘…Ñ•Ì¹±…ÍÑ•¹•É…Ñ¥½¹ÉÉ½È€ô•ÉÉ½Èì(€€€ô(€€€…İ…¥ĞÑ¡¥Ì¹‘ˆ¹½±±•Ñ¥½¸ ‰‘½Õµ•¹ÑÌˆ¤¹‘½Œ¡‘½Õµ•¹Ñ%¤¹ÕÁ‘…Ñ”¡ÕÁ‘…Ñ•Ì¤ì(€ô((€ÁÕ‰±¥Œ…Íå¹ŒÁÉ½µ½Ñ•ÕÉÉ•¹ÑY•ÉÍ¥½¸¡‘½Õµ•¹Ñ%èÍÑÉ¥»7æÚ$z{-®éÜj×ace BackendRepositories {
+import "server-only";
+import { FieldValue, type Firestore } from "firebase-admin/firestore";
+import { getAdminFirestore } from "../firebase-admin";
+import { BackendError } from "../errors";
+import type {
+  IDocumentsRepository,
+  IAccessRepository,
+  IOrdersRepository,
+  IGenerationRequestsRepository,
+  IUsersRepository,
+  IGenerationCommitRepository,
+  CommitGeneratedArtifactInput,
+} from "./interfaces";
+import type {
+  DocumentRecord,
+  DocumentArtifactRecord,
+  AccessLinkRecord,
+  GenerationRequestRecord,
+  OrderRecord,
+  ArtifactState,
+} from "../domain/documents";
+import {
+  InMemoryDocumentsRepository,
+  InMemoryAccessRepository,
+  InMemoryOrdersRepository,
+  InMemoryGenerationRequestsRepository,
+  InMemoryUsersRepository,
+  InMemoryGenerationCommitRepository,
+} from "./in-memory-repositories";
+
+export class FirestoreDocumentsRepository implements IDocumentsRepository {
+  private readonly db: Firestore;
+
+  constructor(db: Firestore = getAdminFirestore()) {
+    this.db = db;
+  }
+
+  public async createDocument(data: Omit<DocumentRecord, "id">): Promise<DocumentRecord> {
+    const docRef = this.db.collection("documents").doc();
+    const record: DocumentRecord = {
+      ...data,
+      id: docRef.id,
+    };
+    await docRef.set(record);
+    return record;
+  }
+
+  public async getDocument(documentId: string): Promise<DocumentRecord | null> {
+    const snap = await this.db.collection("documents").doc(documentId).get();
+    if (!snap.exists) return null;
+    return { ...snap.data(), id: snap.id } as DocumentRecord;
+  }
+
+  public async listUserDocuments(userId: string): Promise<DocumentRecord[]> {
+    const snap = await this.db
+      .collection("documents")
+      .where("owner.type", "==", "user")
+      .where("owner.userId", "==", userId)
+      .get();
+
+    return snap.docs
+      .map((d) => ({ ...d.data(), id: d.id } as DocumentRecord))
+      .filter((d) => d.status !== "deleted")
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  public async markDocumentDeleted(documentId: string, pendingPurge: boolean): Promise<void> {
+    await this.db.collection("documents").doc(documentId).update({
+      status: "deleted",
+      deletedAt: Date.now(),
+      pendingPurge,
+      updatedAt: Date.now(),
+    });
+  }
+
+  public async updateDocumentRespostas(
+    documentId: string,
+    respostas: Record<string, string>,
+    targetVersion: number
+  ): Promise<void> {
+    await this.db.collection("documents").doc(documentId).update({
+      respostas,
+      targetVersion,
+      updatedAt: Date.now(),
+    });
+  }
+
+  public async setArtifactState(
+    documentId: string,
+    state: ArtifactState,
+    error?: { code: string; at: number }
+  ): Promise<void> {
+    const updates: Record<string, unknown> = {
+      artifactState: state,
+      updatedAt: Date.now(),
+    };
+    if (error) {
+      updates.lastGenerationError = error;
+    }
+    await this.db.collection("documents").doc(documentId).update(updates);
+  }
+
+  public async promoteCurrentVersion(documentId: string, version: number): Promise<void> {
+    await this.db.collection("documents").doc(documentId).update({
+      currentVersion: version,
+      artifactState: "ready",
+      updatedAt: Date.now(),
+    });
+  }
+
+  public async saveArtifact(
+    documentId: string,
+    artifact: DocumentArtifactRecord
+  ): Promise<void> {
+    await this.db
+      .collection("documents")
+      .doc(documentId)
+      .collection("artifacts")
+      .doc(String(artifact.version))
+      .set(artifact);
+  }
+
+  public async getArtifact(
+    documentId: string,
+    version: number
+  ): Promise<DocumentArtifactRecord | null> {
+    const snap = await this.db
+      .collection("documents")
+      .doc(documentId)
+      .collection("artifacts")
+      .doc(String(version))
+      .get();
+
+    if (!snap.exists) return null;
+    return snap.data() as DocumentArtifactRecord;
+  }
+
+  public async listArtifacts(documentId: string): Promise<DocumentArtifactRecord[]> {
+    const snaps = await this.db
+      .collection("documents")
+      .doc(documentId)
+      .collection("artifacts")
+      .orderBy("version", "asc")
+      .get();
+
+    return snaps.docs.map((d) => d.data() as DocumentArtifactRecord);
+  }
+
+  public async deleteDocumentAndArtifacts(documentId: string): Promise<void> {
+    const docRef = this.db.collection("documents").doc(documentId);
+    const artifactsSnap = await docRef.collection("artifacts").get();
+
+    const batch = this.db.batch();
+    for (const art of artifactsSnap.docs) {
+      batch.delete(art.ref);
+    }
+    batch.delete(docRef);
+    await batch.commit();
+  }
+
+  public async countUserMonthlyDocuments(
+    userId: string,
+    startOfMonthTimestamp: number
+  ): Promise<number> {
+    const snaps = await this.db
+      .collection("documents")
+      .where("owner.type", "==", "user")
+      .where("owner.userId", "==", userId)
+      .where("createdAt", ">=", startOfMonthTimestamp)
+      .count()
+      .get();
+
+    return snaps.data().count;
+  }
+}
+
+export class FirestoreAccessRepository implements IAccessRepository {
+  private readonly db: Firestore;
+
+  constructor(db: Firestore = getAdminFirestore()) {
+    this.db = db;
+  }
+
+  public async createAccessLink(link: AccessLinkRecord): Promise<void> {
+    await this.db.collection("access_links").doc(link.tokenHash).set(link);
+  }
+
+  public async getAccessLink(tokenHash: string): Promise<AccessLinkRecord | null> {
+    const snap = await this.db.collection("access_links").doc(tokenHash).get();
+    if (!snap.exists) return null;
+    return snap.data() as AccessLinkRecord;
+  }
+
+  public async findActiveShareLink(
+    documentId: string,
+    userId: string
+  ): Promise<AccessLinkRecord | null> {
+    const snaps = await this.db
+      .collection("access_links")
+      .where("documentId", "==", documentId)
+      .where("kind", "==", "share")
+      .where("active", "==", true)
+      .where("createdByUserId", "==", userId)
+      .limit(1)
+      .get();
+
+    if (snaps.empty) return null;
+    return snaps.docs[0].data() as AccessLinkRecord;
+  }
+
+  public async revokeAccessLink(tokenHash: string): Promise<void> {
+    await this.db.collection("access_links").doc(tokenHash).update({
+      active: false,
+      revokedAt: Date.now(),
+    });
+  }
+
+  public async revokeDocumentShareLinks(documentId: string): Promise<void> {
+    const snaps = await this.db
+      .collection("access_links")
+      .where("documentId", "==", documentId)
+      .where("kind", "==", "share")
+      .where("active", "==", true)
+      .get();
+
+    if (snaps.empty) return;
+
+    const batch = this.db.batch();
+    const now = Date.now();
+    for (const doc of snaps.docs) {
+      batch.update(doc.ref, { active: false, revokedAt: now });
+    }
+    await batch.commit();
+  }
+
+  public async recordAccess(tokenHash: string): Promise<void> {
+    await this.db.collection("access_links").doc(tokenHash).update({
+      accessCount: FieldValue.increment(1),
+      lastAccessedAt: Date.now(),
+    });
+  }
+}
+
+export class FirestoreOrdersRepository implements IOrdersRepository {
+  private readonly db: Firestore;
+
+  constructor(db: Firestore = getAdminFirestore()) {
+    this.db = db;
+  }
+
+  public async createOrder(order: Omit<OrderRecord, "id">): Promise<OrderRecord> {
+    const docRef = this.db.collection("orders").doc();
+    const record: OrderRecord = {
+      ...order,
+      id: docRef.id,
+    };
+    await docRef.set(record);
+    return record;
+  }
+
+  public async getOrder(orderId: string): Promise<OrderRecord | null> {
+    const snap = await this.db.collection("orders").doc(orderId).get();
+    if (!snap.exists) return null;
+    return { ...snap.data(), id: snap.id } as OrderRecord;
+  }
+
+  public async markOrderPaid(orderId: string): Promise<OrderRecord> {
+    const docRef = this.db.collection("orders").doc(orderId);
+    const paidAt = Date.now();
+    await docRef.update({
+      status: "paid",
+      paidAt,
+    });
+    const snap = await docRef.get();
+    return { ...snap.data(), id: snap.id } as OrderRecord;
+  }
+
+  public async consumeOrder(orderId: string, documentId: string): Promise<void> {
+    await this.db.collection("orders").doc(orderId).update({
+      status: "consumed",
+      documentId,
+      consumedAt: Date.now(),
+    });
+  }
+
+  public async reservePaidOrder(params: {
+    orderId: string;
+    requestId: string;
+    principalKey: string;
+  }): Promise<OrderRecord> {
+    const docRef = this.db.collection("orders").doc(params.orderId);
+
+    return await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      if (!snap.exists) {
+        throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido de compra nÃ£o encontrado.");
+      }
+
+      const order = { ...snap.data(), id: snap.id } as OrderRecord;
+
+      if (order.status === "reserved" && order.reservedByRequestId === params.requestId) {
+        return order;
+      }
+
+      if (order.status === "reserved") {
+        throw new BackendError(
+          "ORDER_ALREADY_RESERVED",
+          409,
+          "Este pagamento jÃ¡ estÃ¡ sendo processado por outra solicitaÃ§Ã£o."
+        );
+      }
+
+      if (order.status === "consumed") {
+        throw new BackendError(
+          "ORDER_ALREADY_CONSUMED",
+          409,
+          "Este pagamento jÃ¡ foi utilizado para gerar outro documento."
+        );
+      }
+
+      if (order.status !== "paid") {
+        throw new BackendError(
+          "ORDER_NOT_PAID",
+          402,
+          "O pagamento informado ainda nÃ£o foi confirmado."
+        );
+      }
+
+      tx.update(docRef, {
+        status: "reserved",
+        reservedByRequestId: params.requestId,
+        reservedAt: Date.now(),
+      });
+
+      return {
+        ...order,
+        status: "reserved",
+        reservedByRequestId: params.requestId,
+        reservedAt: Date.now(),
+      };
+    });
+  }
+
+  public async consumeReservedOrder(params: {
+    orderId: string;
+    requestId: string;
+    documentId: string;
+  }): Promise<void> {
+    const docRef = this.db.collection("orders").doc(params.orderId);
+    await docRef.update({
+      status: "consumed",
+      documentId: params.documentId,
+      consumedAt: Date.now(),
+    });
+  }
+
+  public async releaseReservedOrder(params: {
+    orderId: string;
+    requestId: string;
+  }): Promise<void> {
+    const docRef = this.db.collection("orders").doc(params.orderId);
+    await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      if (snap.exists) {
+        const order = snap.data() as OrderRecord;
+        if (order.status === "reserved" && order.reservedByRequestId === params.requestId) {
+          tx.update(docRef, {
+            status: "paid",
+            reservedByRequestId: FieldValue.delete(),
+            reservedAt: FieldValue.delete(),
+          });
+        }
+      }
+    });
+  }
+}
+
+export class FirestoreGenerationRequestsRepository
+  implements IGenerationRequestsRepository
+{
+  private readonly db: Firestore;
+
+  constructor(db: Firestore = getAdminFirestore()) {
+    this.db = db;
+  }
+
+  public async getOrCreateRequest(
+    requestId: string,
+    initData: Omit<
+      GenerationRequestRecord,
+      "requestId" | "status" | "createdAt" | "updatedAt" | "expiresAt"
+    >
+  ): Promise<{ request: GenerationRequestRecord; isNew: boolean }> {
+    const docRef = this.db.collection("generation_requests").doc(requestId);
+
+    return await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      if (snap.exists) {
+        return { request: snap.data() as GenerationRequestRecord, isNew: false };
+      }
+
+      const now = Date.now();
+      const newRecord: GenerationRequestRecord = {
+        ...initData,
+        requestId,
+        status: "processing",
+        createdAt: now,
+        updatedAt: now,
+        expiresAt: now + 24 * 60 * 60 * 1000,
+      };
+
+      tx.set(docRef, newRecord);
+      return { request: newRecord, isNew: true };
+    });
+  }
+
+  public async getRequest(
+    requestId: string
+  ): Promise<GenerationRequestRecord | null> {
+    const snap = await this.db.collection("generation_requests").doc(requestId).get();
+    if (!snap.exists) return null;
+    return snap.data() as GenerationRequestRecord;
+  }
+
+  public async markCompleted(
+    requestId: string,
+    data: {
+      documentId: string;
+      targetVersion: number;
+      guestAccessPath?: string;
+    }
+  ): Promise<void> {
+    const updates: Record<string, unknown> = {
+      status: "completed",
+      documentId: data.documentId,
+      targetVersion: data.targetVersion,
+      updatedAt: Date.now(),
+    };
+    if (data.guestAccessPath) {
+      updates.result = { guestAccessPath: data.guestAccessPath };
+    }
+    await this.db.collection("generation_requests").doc(requestId).update(updates);
+  }
+
+  public async markFailed(requestId: string, errorCode: string): Promise<void> {
+    await this.db.collection("generation_requests").doc(requestId).update({
+      status: "failed",
+      errorCode,
+      updatedAt: Date.now(),
+    });
+  }
+}
+
+export class FirestoreUsersRepository implements IUsersRepository {
+  private readonly db: Firestore;
+
+  constructor(db: Firestore = getAdminFirestore()) {
+    this.db = db;
+  }
+
+  public async getUserProfile(
+    userId: string
+  ): Promise<{ plano?: string; email?: string; nome?: string } | null> {
+    const snap = await this.db.collection("users").doc(userId).get();
+    if (!snap.exists) return null;
+    return snap.data() as { plano?: string; email?: string; nome?: string };
+  }
+}
+
+export class FirestoreGenerationCommitRepository implements IGenerationCommitRepository {
+  private readonly db: Firestore;
+
+  constructor(db: Firestore = getAdminFirestore()) {
+    this.db = db;
+  }
+
+  public async commitGeneratedArtifact(input: CommitGeneratedArtifactInput): Promise<void> {
+    await this.db.runTransaction(async (tx) => {
+      const documentRef = this.db.collection("documents").doc(input.documentId);
+      const artifactRef = documentRef.collection("artifacts").doc(String(input.targetVersion));
+      const requestRef = this.db.collection("generation_requests").doc(input.requestId);
+      const orderRef = input.singlePurchase
+        ? this.db.collection("orders").doc(input.singlePurchase.orderId)
+        : null;
+      const accessRef = input.guestAccess
+        ? this.db.collection("access_links").doc(input.guestAccess.tokenHash)
+        : null;
+
+      const documentSnapshot = await tx.get(documentRef);
+      const orderSnapshot = orderRef ? await tx.get(orderRef) : null;
+
+      if (!documentSnapshot.exists) {
+        throw new BackendError(
+          "DOCUMENT_NOT_FOUND",
+          404,
+          "Documento nÃ£o encontrado durante commit da geraÃ§Ã£o."
+        );
+      }
+
+      if (input.singlePurchase) {
+        if (!orderSnapshot?.exists) {
+          throw new BackendError(
+            "ORDER_NOT_FOUND",
+            404,
+            "Pedido nÃ£o encontrado durante commit."
+          );
+        }
+
+        const order = orderSnapshot.data();
+        if (order?.status !== "reserved" || order?.reservedByRequestId !== input.requestId) {
+          throw new BackendError(
+            "ORDER_ALREADY_RESERVED",
+            409,
+            "Pedido nÃ£o estÃ¡ reservado por esta geraÃ§Ã£o."
+          );
+        }
+
+      }
+
+      tx.set(artifactRef, input.artifact);
+
+      tx.update(documentRef, {
+        respostas: input.respostas,
+        currentVersion: input.targetVersion,
+        targetVersion: input.targetVersion,
+        artifactState: "ready",
+        updatedAt: input.now,
+        lastGenerationError: FieldValue.delete(),
+      });
+
+      if (input.singlePurchase && orderRef) {
+        tx.update(orderRef, {
+          status: "consumed",
+          documentId: input.documentId,
+          consumedAt: input.now,
+        });
+      }
+
+      if (input.guestAccess && accessRef) {
+        tx.create(accessRef, {
+          tokenHash: input.guestAccess.tokenHash,
+          kind: "guest",
+          documentId: input.documentId,
+          version: input.targetVersion,
+          active: true,
+          createdAt: input.now,
+        });
+      }
+
+      tx.update(requestRef, {
+        status: "completed",
+        documentId: input.documentId,
+        targetVersion: input.targetVersion,
+        result: input.guestAccessPath ? { guestAccessPath: input.guestAccessPath } : {},
+        updatedAt: input.now,
+      });
+    });
+  }
+}
+
+export interface BackendRepositories {
   documents: IDocumentsRepository;
   access: IAccessRepository;
   orders: IOrdersRepository;
