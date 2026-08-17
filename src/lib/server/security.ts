@@ -40,30 +40,6 @@ export async function resolvePrincipal(
       email: decoded.email,
     };
   } catch {
-    // Fallback gracioso em ambientes de preview/staging onde a chave privada do Firebase Admin não foi configurada
-    const env = getServerEnv();
-    if (
-      !env.FIREBASE_PRIVATE_KEY &&
-      (env.ALLOW_DEMO_BILLING || env.ALLOW_IN_MEMORY_ARTIFACT_STORAGE || env.NODE_ENV !== "production")
-    ) {
-      try {
-        const payloadBase64 = token.split(".")[1];
-        if (payloadBase64) {
-          const payloadJson = Buffer.from(payloadBase64, "base64url").toString("utf-8");
-          const payload = JSON.parse(payloadJson);
-          if (payload.user_id || payload.sub) {
-            return {
-              type: "user",
-              userId: payload.user_id || payload.sub,
-              email: payload.email,
-            };
-          }
-        }
-      } catch {
-        // Ignora e segue para o throw de INVALID_AUTH_TOKEN
-      }
-    }
-
     throw new BackendError(
       "INVALID_AUTH_TOKEN",
       401,
