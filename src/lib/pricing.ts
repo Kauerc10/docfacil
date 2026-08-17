@@ -13,18 +13,32 @@
  *  - termos-view.tsx (preço citado nos Termos)
  */
 
-/** Planos possíveis para um usuário. */
+/** Planos de conta de usuário autoritativos no sistema. */
+export type AccountPlan = "gratis" | "pro";
+
+/** Produtos de compra disponíveis. */
+export type PurchaseProduct = "avulso" | "pro";
+
+/** Planos possíveis para um usuário (inclui legado para UI). */
 export type Plan = "gratis" | "avulso" | "pro";
 
 /** Planos pagos (subset usado pelo checkout). */
 export type PaidPlan = Exclude<Plan, "gratis">;
 
 /** Preço numérico (BRL) de cada plano. Grátis = 0. */
-export const PLAN_PRICES: Record<Plan, number> = {
+export const PLAN_PRICES = {
   gratis: 0,
   avulso: 9.9,
   pro: 24.9,
-};
+} as const;
+
+/**
+ * Converte o preço do plano/produto para valor inteiro em centavos.
+ * Ex: avulso (R$ 9,90) -> 990 centavos.
+ */
+export function planPriceToCents(plan: keyof typeof PLAN_PRICES): number {
+  return Math.round(PLAN_PRICES[plan] * 100);
+}
 
 /** Rótulo curto de exibição. */
 export const PLAN_LABELS: Record<Plan, string> = {

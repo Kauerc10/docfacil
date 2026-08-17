@@ -34,7 +34,7 @@ type AuthState = {
   error: string | null;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (nome: string, email: string, password: string) => Promise<void>;
+  signUpWithEmail: (nome: string, email: string, password: string) => Promise<Pick<AppUser, "uid" | "email">>;
   signOut: () => Promise<void>;
   updateProfileData: (data: Partial<Pick<PerfilUsuario, "nome" | "telefone">>) => Promise<void>;
 };
@@ -174,12 +174,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       saveDemoUser(demo);
       setUser(demo);
-      return;
+      return { uid: demo.uid, email: demo.email };
     }
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: nome });
       // Profile doc created by onAuthStateChanged bootstrap
+      return { uid: cred.user.uid, email: cred.user.email || email };
     } catch (e) {
       setError(translateAuthError(e));
       throw e;

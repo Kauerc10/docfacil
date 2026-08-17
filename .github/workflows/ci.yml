@@ -29,6 +29,12 @@ jobs:
         with:
           bun-version: 1.3.14
 
+      - name: ☕ Setup Java (para Firestore Emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
       # Cache da pasta .bun para installs subsequentes voarem.
       - name: 💾 Cache bun
         uses: actions/cache@v4
@@ -42,25 +48,54 @@ jobs:
       - name: 📦 Install dependências
         run: bun install --frozen-lockfile
 
-      - name: 🧪 Testes unitários
+      - name: 🧪 Testes unitários do Backend e Domínio
         run: bun run test
+
+      - name: 🛡️ Testes de Firestore Security Rules
+        run: bun run test:rules
+
+      - name: 🔥 Integração Firestore — commit atômico
+        run: bun run test:firestore-commit
 
       - name: 🔍 ESLint
         run: bun run lint
-        # Warnings não quebram o CI — só erros.
         continue-on-error: false
 
-      # Typecheck separado do build pra mensagem de erro mais clara.
       - name: 🔬 TypeScript (typecheck)
-        run: bunx tsc --noEmit
+        run: bun run typecheck
 
       - name: 🏗️ Next.js Build
         run: bun run build:ci
         env:
-          # Variáveis mínimas pra o build não explodir (Firebase em modo demo).
           NEXT_PUBLIC_FIREBASE_API_KEY: ""
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ""
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ""
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "docfacil-ci"
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ""
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ""
           NEXT_PUBLIC_FIREBASE_APP_ID: ""
+          FIREBASE_PROJECT_ID: "docfacil-ci"
+          R2_BUCKET_NAME: "docfacil-pdfs"
+
+  e2e:
+    name: Guest E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: quality
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - run: bun install --frozen-lockfile
+
+      - run: bunx playwright install --with-deps chromium
+
+      - run: bun run test:e2e

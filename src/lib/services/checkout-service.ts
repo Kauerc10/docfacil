@@ -1,23 +1,31 @@
 /**
  * Checkout service — integração com gateways de pagamento brasileiros.
- * Suporta kirvano, perfectpay, stripe. Demo mode simula.
+ * Suporta kirvano, perfectpay, stripe. Demo mode simula via /api/checkout/demo.
  * Preços e rótulos vêm de `@/lib/pricing` (fonte única de verdade).
  */
 import { PLAN_PRICES, PLAN_LABELS, type PaidPlan } from "@/lib/pricing";
+import { getClientAppCheckToken } from "@/lib/firebase";
 
 export type CheckoutProvider = "kirvano" | "perfectpay" | "stripe";
 export type CheckoutPlan = PaidPlan;
 
 export interface CheckoutParams {
-  provider?: CheckoutProvider; plan: CheckoutPlan; userId?: string; userEmail?: string;
-  documentId?: string; successUrl?: string;
-}
-export interface CheckoutResult {
-  checkoutUrl: string; orderId: string; provider: CheckoutProvider; plan: CheckoutPlan; amount: number;
+  provider?: CheckoutProvider;
+  plan: CheckoutPlan;
+  userId?: string;
+  userEmail?: string;
+  documentId?: string;
+  successUrl?: string;
 }
 
-// Re-exporta para compatibilidade — consumidores existentes continuam funcionando.
-// Prefira importar diretamente de `@/lib/pricing` em código novo.
+export interface CheckoutResult {
+  checkoutUrl: string;
+  orderId: string;
+  provider: CheckoutProvider;
+  plan: CheckoutPlan;
+  amount: number;
+}
+
 export { PLAN_PRICES, PLAN_LABELS } from "@/lib/pricing";
 
 export const ACTIVE_PROVIDER: CheckoutProvider | "demo" =
@@ -27,43 +35,80 @@ const IS_PRODUCTION_CONFIGURED = Boolean(
   process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER && process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER !== "demo"
 );
 
+export function buildCheckoutReturnUrl(
+  successUrl: string,
+  orderId: string
+): string {
+  const url = new URL(successUrl);
+  url.searchParams.set("orderId", orderId);
+  return url.toString();
+}
+
 export async function createCheckout(params: CheckoutParams): Promise<CheckoutResult> {
   const provider = params.provider || ACTIVE_PROVIDER;
   const amount = PLAN_PRICES[params.plan];
-  const orderId = `df-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   if (provider === "demo" || !IS_PRODUCTION_CONFIGURED) {
-    const successUrl = params.successUrl || `${window.location.origin}/?view=sucesso&paid=1&order=${orderId}`;
-    return { checkoutUrl: successUrl, orderId, provider: "kirvano", plan: params.plan, amount };
-  }
-  const res = await fetch("/api/checkout/create", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...params, provider, orderId }),
-  });
-  if (!res.ok) throw new Error(`Falha ao criar checkout: ${res.status}`);
-  const data = (await res.json()) as { checkoutUrl: string };
-  return { checkoutUrl: data.checkoutUrl, orderId, provider, plan: params.plan, amount };
-}
-
-export async function checkPaymentStatus(orderId: string): Promise<{ paid: boolean; status: "pending" | "paid" | "failed" | "refunded"; }> {
-  if (typeof window !== "undefined") {
-    const url = new URL(window.location.href);
-    const paid = url.searchParams.get("paid") === "1";
-    return { paid, status: paid ? "paid" : "pending" };
-  }
-  return { paid: false, status: "pending" };
-}
-
-export async function createOrder(params: {
-  orderId: string; userId: string; userEmail?: string; plan: CheckoutPlan; amount: number;
-  provider: CheckoutProvider; documentId?: string;
-}): Promise<void> {
-  const order = { ...params, status: "pending" as const, createdAt: Date.now(), paidAt: null };
-  if (!IS_PRODUCTION_CONFIGURED) {
-    if (typeof window !== "undefined") {
-      const orders = JSON.parse(localStorage.getItem("docfacil:orders") || "[]");
-      orders.push(order); localStorage.setItem("docfacil:orders", JSON.stringify(orders));
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    try {
+      const appCheckToken = await getClientAppCheckToken();
+      if (appCheckToken) {
+        headers["X-Firebase-AppCheck"] = appCheckToken;
+      }
+    } catch {
+      // continue
     }
-    return;
+
+    if (!params.userEmail) {
+      throw new Error("Informe seu e-mail para prosseguir com o pagamento.");
+    }
+
+    const res = await fetch("/api/checkout/demo", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        guestContact: { email: params.userEmail },
+        autoPay: true,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || "Não foi possível criar o pedido de checkout.");
+    }
+
+    const data = await res.json();
+    const baseSuccessUrl =
+      params.successUrl ||
+      `${typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}/?view=sucesso`;
+    const successUrl = buildCheckoutReturnUrl(baseSuccessUrl, data.order.id);
+
+    return {
+      checkoutUrl: successUrl,
+      orderId: data.order.id,
+      provider: "demo" as any,
+      plan: params.plan,
+      amount,
+    };
   }
-  await fetch("/api/orders/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(order) });
+
+  // Gateway real em produção
+  const res = await fetch("/api/checkout/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Falha ao criar checkout: ${res.status}`);
+  }
+
+  const data = (await res.json()) as { checkoutUrl: string; orderId: string };
+  return {
+    checkoutUrl: data.checkoutUrl,
+    orderId: data.orderId,
+    provider,
+    plan: params.plan,
+    amount,
+  };
 }

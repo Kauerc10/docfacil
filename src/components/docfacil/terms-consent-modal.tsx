@@ -27,7 +27,7 @@ import { COMPANY } from "@/lib/company";
  *
  * Props:
  * - open / onClose        — controle de visibilidade
- * - onAccept: () => void  — chamado APÓS o consentimento ser persistido
+ * - onAccept: recebe os documentos aceitos e prossegue o fluxo.
  * - flow                  — "cadastro" | "checkout" | "document-generation"
  * - userEmail? / userId?  — identificação do titular (para o registro)
  *
@@ -51,7 +51,7 @@ import { COMPANY } from "@/lib/company";
 export interface TermsConsentModalProps {
   open: boolean;
   onClose: () => void;
-  onAccept: () => void;
+  onAccept: (documents: ConsentDocument[]) => Promise<void> | void;
   flow: ConsentFlow;
   userEmail?: string;
   userId?: string;
@@ -139,7 +139,7 @@ function ConsentForm({
   userEmail?: string;
   lockClose: boolean;
   onClose: () => void;
-  onAccept: () => void;
+  onAccept: (documents: ConsentDocument[]) => Promise<void> | void;
 }) {
   const { navigate } = useNav();
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -156,15 +156,24 @@ function ConsentForm({
       const documents: ConsentDocument[] = acceptedMarketing
         ? ["termos", "privacidade", "marketing"]
         : ["termos", "privacidade"];
-      await recordConsent({
-        userId: userId || "guest",
-        userEmail: userEmail || "guest@docfacil.com",
-        flow,
-        documents,
-        termsVersion: TERMS_VERSION,
-      });
+      if (flow === "cadastro") {
+        // No cadastro ainda não existe auth.uid. O callback cria a conta e
+        // persiste o aceite com a identidade real recém-autenticada.
+        await onAccept(documents);
+      } else {
+        if (!userId) {
+          throw new Error("Usuário autenticado obrigatório para registrar o aceite.");
+        }
+        await recordConsent({
+          userId,
+          userEmail: userEmail || undefined,
+          flow,
+          documents,
+          termsVersion: TERMS_VERSION,
+        });
+        await onAccept(documents);
+      }
       toast.success(SUCCESS_MESSAGES.CONSENT_RECORDED);
-      onAccept();
     } catch (e) {
       console.error("[TermsConsentModal] falha ao registrar consent:", e);
       toast.error("Não foi possível registrar seu aceite. Tente novamente.");

@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNav } from "../nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { getModel } from "@/lib/services/models-service";
-import { createDocument } from "@/lib/services/documents-service";
+import {
+  finalizeDocument,
+  saveGuestDraft,
+  loadGuestDraft,
+  clearGuestDraft,
+  getOrCreateFinalizationRequestId,
+  clearFinalizationRequestId,
+} from "@/lib/documents/client";
 import { normalizarEstado } from "@/lib/normalizers";
 import { aplicarComposicaoModelo, encodeClausulasSelecionadas } from "@/lib/document-engine";
 import { logger } from "@/lib/logger";
@@ -80,6 +87,23 @@ export function CriarView() {
     try {
       const m = await getModel(slug);
       setModelo(m);
+      if (slug) {
+        const draft = loadGuestDraft(slug);
+        if (draft) {
+          if (draft.answers && Object.keys(draft.answers).length > 0) {
+            setAnswers(draft.answers);
+          }
+          if (draft.clausulasSelecionadas && draft.clausulasSelecionadas.length > 0) {
+            setClausulasSelecionadas(draft.clausulasSelecionadas);
+          }
+          if (draft.extrasPorClausula) {
+            setExtrasPorClausula(draft.extrasPorClausula);
+          }
+          if (typeof draft.stepIndex === "number" && draft.stepIndex >= 0) {
+            setStepIndex(draft.stepIndex);
+          }
+        }
+      }
     } catch (e) {
       logger.error("CriarView", "falha ao carregar modelo", e, { slug });
       setModelo(null);
@@ -237,16 +261,16 @@ export function CriarView() {
     }
   };
 
-  // Validação: pergunta → obrigatório se campo.obrigatorio !== false
+  // Validação: campo obrigatório vazio bloqueia o avanço.
   const validarEtapaAtual = (): string | null => {
     if (!etapaAtual) return null;
     if (etapaAtual.tipo === "campo") {
-      const c = etapaAtual.campo;
-      const v = (answers[c.key] ?? "").trim();
-      if (c.obrigatorio !== false && !v) {
-        return "Preencha este campo para avançar.";
+      const v = (answers[etapaAtual.campo.key] ?? "").trim();
+      if (etapaAtual.campo.obrigatorio !== false && !v) {
+        return `Preencha: ${etapaAtual.campo.pergunta}`;
       }
-    } else if (etapaAtual.tipo === "campo_grupo") {
+    }
+    if (etapaAtual.tipo === "campo_grupo") {
       for (const c of etapaAtual.campos) {
         const v = (answers[c.key] ?? "").trim();
         if (c.obrigatorio !== false && !v) {
@@ -254,7 +278,6 @@ export function CriarView() {
         }
       }
     }
-    // clausulas: sempre pode avançar (seleção opcional)
     return null;
   };
 
@@ -288,22 +311,33 @@ export function CriarView() {
     setSubmitting(true);
     setMostrandoLoading(true);
     setPetMood("pensando");
-    // Sem latência artificial: chama createDocument imediatamente.
-    // LoadingDocumento aparece apenas durante a operação real de persistência.
+
     try {
-      const userId = user?.uid || "demo";
-      const doc = await createDocument({
-        modeloSlug: modelo.slug,
-        modeloNome: modelo.nome,
-        respostas: respostasFinais,
-        status: "concluido",
-        userId,
-      });
-      navigate("sucesso", { slug, id: doc.id });
+      if (user) {
+        const requestId = getOrCreateFinalizationRequestId(modelo.slug);
+        const result = await finalizeDocument({
+          requestId,
+          modeloSlug: modelo.slug,
+          respostas: respostasFinais,
+          clausulasSelecionadas,
+        });
+        clearFinalizationRequestId(modelo.slug);
+        clearGuestDraft(slug);
+        navigate("sucesso", { slug, id: result.document.id });
+      } else {
+        const requestId = getOrCreateFinalizationRequestId(modelo.slug);
+        saveGuestDraft(slug, {
+          requestId,
+          modeloSlug: slug,
+          answers,
+          stepIndex,
+          clausulasSelecionadas,
+          extrasPorClausula,
+        });
+        navigate("sucesso", { slug });
+      }
     } catch (e) {
-      logger.error("CriarView", "falha ao salvar documento", e, { slug });
-      // Não bloqueamos o usuário — navegamos mesmo assim pra que ele não
-      // perca o preenchimento. SucessoView lida com fallback.
+      logger.error("CriarView", "falha ao finalizar documento", e, { slug });
       setSubmitting(false);
       setMostrandoLoading(false);
       navigate("sucesso", { slug });
