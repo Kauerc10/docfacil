@@ -340,7 +340,9 @@ export function CriarView() {
       logger.error("CriarView", "falha ao finalizar documento", e, { slug });
       setSubmitting(false);
       setMostrandoLoading(false);
-      navigate("sucesso", { slug });
+      setFieldError("Não foi possível salvar e gerar o documento. Seus dados continuam aqui; tente novamente em instantes.");
+      setPetMood("atencao");
+      setPetOverride("Não consegui concluir o salvamento com segurança. Tente novamente e eu continuo daqui.");
     }
   };
 
