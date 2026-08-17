@@ -37,6 +37,7 @@ type AuthState = {
   signUpWithEmail: (nome: string, email: string, password: string) => Promise<Pick<AppUser, "uid" | "email">>;
   signOut: () => Promise<void>;
   updateProfileData: (data: Partial<Pick<PerfilUsuario, "nome" | "telefone">>) => Promise<void>;
+  clearError: () => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -208,9 +209,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, error, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, updateProfileData }}
+      value={{
+        user,
+        loading,
+        error,
+        signInWithGoogle,
+        signInWithEmail,
+        signUpWithEmail,
+        signOut,
+        updateProfileData,
+        clearError,
+      }}
     >
       {children}
     </AuthContext.Provider>
@@ -223,22 +238,30 @@ export function useAuth() {
   return ctx;
 }
 
-/** Traduz mensagens de erro do Firebase Auth para PT-BR amigável. */
-function translateAuthError(e: unknown): string {
+/** Traduz mensagens de erro do Firebase Auth para PT-BR claro e orientador. */
+export function translateAuthError(e: unknown): string {
   const code = (e as { code?: string })?.code || "";
   const map: Record<string, string> = {
-    "auth/invalid-email": "E-mail inválido.",
-    "auth/user-disabled": "Conta desativada.",
-    "auth/user-not-found": "E-mail ou senha incorretos.",
-    "auth/wrong-password": "E-mail ou senha incorretos.",
-    "auth/email-already-in-use": "Este e-mail já está cadastrado.",
-    "auth/weak-password": "Senha muito fraca. Use pelo menos 6 caracteres.",
-    "auth/popup-closed-by-user": "Janela de login fechada antes de concluir.",
-    "auth/cancelled-popup-request": "Login cancelado.",
-    "auth/network-request-failed": "Sem conexão. Verifique sua internet.",
-    "auth/too-many-requests": "Muitas tentativas. Tente novamente em alguns minutos.",
+    "auth/invalid-credential": "E-mail ou senha incorretos. Verifique a digitação ou entre com o Google.",
+    "auth/invalid-email": "E-mail com formato inválido. Verifique se digitou corretamente.",
+    "auth/user-not-found": "Nenhuma conta cadastrada com este e-mail.",
+    "auth/wrong-password": "Senha incorreta. Verifique se digitou corretamente ou clique em 'Esqueci minha senha'.",
+    "auth/missing-password": "Por favor, digite sua senha.",
+    "auth/missing-email": "Por favor, informe seu e-mail.",
+    "auth/email-already-in-use": "Este e-mail já está cadastrado. Tente entrar em vez de criar uma nova conta.",
+    "auth/weak-password": "Senha muito curta. Escolha uma senha com pelo menos 6 caracteres.",
+    "auth/account-exists-with-different-credential": "Esta conta foi cadastrada com outro método (ex: Google). Use o botão correspondente.",
+    "auth/credential-already-in-use": "Esta credencial já está associada a outra conta.",
+    "auth/user-disabled": "Esta conta foi temporariamente desativada pelo suporte.",
+    "auth/too-many-requests": "Muitas tentativas sem sucesso. Por segurança, aguarde alguns instantes antes de tentar novamente.",
+    "auth/popup-closed-by-user": "Login com o Google cancelado (a janela foi fechada antes de concluir).",
+    "auth/popup-blocked": "A janela de login com o Google foi bloqueada pelo navegador. Permita pop-ups para continuar.",
+    "auth/cancelled-popup-request": "Operação de login cancelada.",
+    "auth/network-request-failed": "Sem conexão com a internet. Verifique sua rede e tente novamente.",
+    "auth/operation-not-allowed": "Este método de login não está ativado no momento.",
+    "auth/internal-error": "Ocorreu uma instabilidade no serviço de autenticação. Tente novamente em instantes.",
   };
-  return map[code] || "Algo deu errado. Tente novamente.";
+  return map[code] || "Não foi possível concluir o login. Verifique seus dados e tente novamente.";
 }
 
 /** Re-exporta os modelos locais para uso no demo mode (não remover). */

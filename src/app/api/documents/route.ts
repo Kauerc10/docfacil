@@ -42,6 +42,7 @@ export async function GET(req: Request) {
     if (err instanceof BackendError) {
       return err.toResponse();
     }
+    console.error("[API Documents GET Error]:", err);
     return BackendError.fromUnknown(err).toResponse();
   }
 }

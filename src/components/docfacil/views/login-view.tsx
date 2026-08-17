@@ -36,7 +36,7 @@ function GoogleGIcon({ className }: { className?: string }) {
  */
 export function LoginView() {
   const { navigate } = useNav();
-  const { signInWithEmail, signInWithGoogle, error } = useAuth();
+  const { signInWithEmail, signInWithGoogle, error, clearError } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,6 +49,18 @@ export function LoginView() {
     if (!email.includes("@")) return "E-mail inválido.";
     if (!password) return "Informe sua senha.";
     return null;
+  }
+
+  function handleEmailChange(v: string) {
+    setEmail(v);
+    if (validationError) setValidationError(null);
+    if (error) clearError();
+  }
+
+  function handlePasswordChange(v: string) {
+    setPassword(v);
+    if (validationError) setValidationError(null);
+    if (error) clearError();
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -118,7 +130,7 @@ export function LoginView() {
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => handleEmailChange(e.target.value)}
                   placeholder="voce@email.com"
                   className="w-full h-12 pl-11 pr-4 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
                 />
@@ -143,7 +155,7 @@ export function LoginView() {
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => handlePasswordChange(e.target.value)}
                   placeholder="••••••••"
                   className="w-full h-12 pl-11 pr-12 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
                 />

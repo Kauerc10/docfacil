@@ -87,28 +87,22 @@ export function buildDocDefinition(
             {
               columns: [
                 {
-                  // Identidade de marca: símbolo "D" + título na continuação
                   text: [
-                    { text: "D", color: "#14315c", bold: true },
-                    { text: " · ", color: "#5a6b82" },
-                    { text: modelo.template.titulo, color: "#5a6b82" },
+                    { text: "DocFacil", color: "#14315c", bold: true },
+                    { text: " · ", color: "#64748b" },
+                    { text: modelo.template.titulo, color: "#64748b" },
                   ],
                   style: "headerContinuation",
                   width: "*",
                 },
-                { text: `pág. ${currentPage}`, style: "headerContinuation", width: "auto", alignment: "right" as const },
+                { text: `Página ${currentPage}`, style: "headerContinuation", width: "auto", alignment: "right" as const },
               ],
             },
-            // Double rule: linha principal + linha fina (efeito documento formal)
             {
               canvas: [
                 {
                   type: "line" as const, x1: 0, y1: 4, x2: CONTENT_WIDTH, y2: 4,
-                  lineWidth: 1, lineColor: "#14315c",
-                },
-                {
-                  type: "line" as const, x1: 0, y1: 6.5, x2: CONTENT_WIDTH, y2: 6.5,
-                  lineWidth: 0.4, lineColor: "#14315c",
+                  lineWidth: 0.8, lineColor: "#cbd5e1",
                 },
               ],
               margin: [0, 2, 0, 0] as [number, number, number, number],
@@ -125,16 +119,11 @@ export function buildDocDefinition(
         alignment: "center" as const,
         margin: [0, 0, 0, 4] as [number, number, number, number],
       },
-      // Double rule sob o título (efeito premium)
       {
         canvas: [
           {
             type: "line" as const, x1: 0, y1: 0, x2: CONTENT_WIDTH, y2: 0,
-            lineWidth: 1.5, lineColor: "#14315c",
-          },
-          {
-            type: "line" as const, x1: 0, y1: 3, x2: CONTENT_WIDTH, y2: 3,
-            lineWidth: 0.5, lineColor: "#14315c",
+            lineWidth: 1.2, lineColor: "#14315c",
           },
         ],
         margin: [0, 0, 0, 20] as [number, number, number, number],
@@ -147,13 +136,13 @@ export function buildDocDefinition(
         {
           canvas: [{
             type: "line" as const, x1: 0, y1: 0, x2: CONTENT_WIDTH, y2: 0,
-            lineWidth: 0.8, lineColor: "#14315c",
+            lineWidth: 0.6, lineColor: "#cbd5e1",
           }],
         },
         {
           columns: [
             { text: "Gerado por DocFacil · K-HUB", style: "footerText" },
-            { text: `${dataHoje} — pág. ${currentPage}/${pageCount}`, style: "footerText", alignment: "right" as const },
+            { text: `Página ${currentPage} de ${pageCount}`, style: "footerText", alignment: "right" as const },
           ],
           margin: [0, 4, 0, 0] as [number, number, number, number],
         },

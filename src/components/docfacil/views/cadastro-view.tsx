@@ -49,7 +49,7 @@ function GoogleGIcon({ className }: { className?: string }) {
  */
 export function CadastroView() {
   const { navigate } = useNav();
-  const { signUpWithEmail, signInWithGoogle, error } = useAuth();
+  const { signUpWithEmail, signInWithGoogle, error, clearError } = useAuth();
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -60,6 +60,11 @@ export function CadastroView() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
   const [createdAccount, setCreatedAccount] = useState<{ uid: string; email: string } | null>(null);
+
+  function clearErrors() {
+    if (validationError) setValidationError(null);
+    if (error) clearError();
+  }
 
   function validate(): string | null {
     if (!nome.trim()) return "Informe seu nome completo.";
@@ -156,7 +161,10 @@ export function CadastroView() {
                   type="text"
                   autoComplete="name"
                   value={nome}
-                  onChange={(e) => setNome(e.target.value)}
+                  onChange={(e) => {
+                    setNome(e.target.value);
+                    clearErrors();
+                  }}
                   placeholder="Seu nome"
                   className="w-full h-12 pl-11 pr-4 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
                 />
@@ -181,7 +189,10 @@ export function CadastroView() {
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    clearErrors();
+                  }}
                   placeholder="voce@email.com"
                   className="w-full h-12 pl-11 pr-4 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
                 />
@@ -206,7 +217,10 @@ export function CadastroView() {
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    clearErrors();
+                  }}
                   minLength={8}
                   placeholder="••••••••"
                   className="w-full h-12 pl-11 pr-12 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
