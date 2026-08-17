@@ -15,6 +15,8 @@
  * (decorrentes de cláusulas não selecionadas que deixam buracos).
  */
 import type { ClausulaDinamica, EtapaModelo } from "../types";
+import { type RenderContext, createRenderContext } from "./types";
+import { converterValorMoedaParaExtenso } from "./money";
 
 /** Marcador de espaço reservado quando um campo obrigatório não foi preenchido. */
 const PLACEHOLDER = "______________________";
@@ -27,32 +29,40 @@ const PLACEHOLDER = "______________________";
  * @param clausulaPorId Mapa de cláusulas (id → objeto ClausulaDinamica)
  * @param clausulasSelecionadas IDs das cláusulas marcadas pelo usuário
  * @param camposOpcionais Chaves dos campos opcionais (vazios viram "" em vez de PLACEHOLDER)
+ * @param context Contexto de renderização determinístico (datas, locale, timezone)
  */
 export function fillTemplate(
   template: string,
   respostas: Record<string, string>,
   clausulaPorId: Record<string, ClausulaDinamica>,
   clausulasSelecionadas: string[],
-  camposOpcionais: string[] = []
+  camposOpcionais: string[] = [],
+  context?: RenderContext
 ): string {
-  // === PASSO 1: injeta cláusulas selecionadas ============================
-  // `{{clausula:id}}` → corpo da cláusula (quando selecionada) ou "".
-  // O corpo pode conter `{{key}}` que será resolvido no passo 2.
-  let result = template.replace(/\{\{\s*clausula:([^}]+?)\s*\}\}/g, (_match, id: string) => {
-    const cid = id.trim();
-    if (!clausulasSelecionadas.includes(cid)) return "";
-    const cl = clausulaPorId[cid];
-    return cl?.corpo ?? "";
+  const ctx = context ?? createRenderContext();
+  let result = template;
+
+  // === PASSO 1: substitui `{{clausula:id}}` ================================
+  result = result.replace(/\{\{\s*clausula:([a-zA-Z0-9_-]+)\s*\}\}/g, (_match, id: string) => {
+    if (!clausulasSelecionadas.includes(id)) return "";
+    const cl = clausulaPorId[id];
+    return cl ? cl.corpo : "";
   });
 
-  // Trata {{sem_garantia}} caso nenhuma garantia locatícia tenha sido selecionada
-  const temGarantia = clausulasSelecionadas.some((id) =>
-    ["caucao", "fiador", "seguro_fianca"].includes(id)
-  );
-  result = result.replace(/\{\{\s*sem_garantia\s*\}\}/g, () => {
-    if (temGarantia) return "";
-    return "As partes declaram expressamente que o presente contrato é celebrado SEM QUALQUER MODALIDADE DE GARANTIA LOCATÍCIA, inexistindo caução, fiança, seguro-fiança ou cessão fiduciária, nos termos do art. 37 da Lei nº 8.245/1991. Em razão da ausência de garantia, fica ressalvada a faculdade prevista no art. 42 da mesma lei.";
-  });
+  // Tratamento da tag {{sem_garantia}} para contrato de locação
+  if (result.includes("{{sem_garantia}}")) {
+    const temGarantiaSelecionada = clausulasSelecionadas.some((id) =>
+      ["caucao", "fiador", "seguro_fianca"].includes(id)
+    );
+    if (!temGarantiaSelecionada) {
+      result = result.replace(
+        "{{sem_garantia}}",
+        "As partes pactuam a presente locação SEM QUALQUER MODALIDADE DE GARANTIA LOCATÍCIA, nos termos do art. 42 da Lei nº 8.245/1991, ficando o LOCADOR autorizado a exigir o pagamento do aluguel e encargos até o sexto dia útil do mês vincendo."
+      );
+    } else {
+      result = result.replace("{{sem_garantia}}", "");
+    }
+  }
 
   // === PASSO 2: substitui `{{key}}` por valores ==========================
   result = result.replace(/\{\{\s*([^}:][^}]*?)\s*\}\}/g, (_match, key: string) => {
@@ -81,11 +91,12 @@ export function fillTemplate(
     return PLACEHOLDER;
   });
 
-  // === PASSO 3: substitui [data de assinatura] por data atual ============
-  const dataHoje = new Date().toLocaleDateString("pt-BR", {
+  // === PASSO 3: substitui [data de assinatura] por data do documento =====
+  const dataHoje = ctx.documentDate.toLocaleDateString(ctx.locale, {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: ctx.timeZone,
   });
   result = result.replace(/\[data de assinatura\]/g, dataHoje);
 
@@ -112,9 +123,10 @@ export function fillTemplateOrNull(
   respostas: Record<string, string>,
   clausulaPorId: Record<string, ClausulaDinamica>,
   clausulasSelecionadas: string[],
-  camposOpcionais: string[] = []
+  camposOpcionais: string[] = [],
+  context?: RenderContext
 ): string | null {
-  const filled = fillTemplate(template, respostas, clausulaPorId, clausulasSelecionadas, camposOpcionais);
+  const filled = fillTemplate(template, respostas, clausulaPorId, clausulasSelecionadas, camposOpcionais, context);
   return filled.trim() ? filled : null;
 }
 
@@ -137,101 +149,12 @@ export function buildClausulaMap(
   return map;
 }
 
-/**
- * Converte um valor numérico ou formatado (ex: "1.000,00" ou "1000.00" ou "1450") em texto por extenso (PT-BR).
- */
-export function converterValorMoedaParaExtenso(valorStr: string): string {
-  const nums = valorStr.replace(/\D/g, "");
-  if (!nums) return "";
+export {
+  parseMoneyToCents,
+  formatMoneyFromCents,
+  numberToWords,
+  moneyToWords,
+  converterValorMoedaParaExtenso,
+  numberToWords as formatarNumeroExtenso,
+} from "./money";
 
-  // Se o usuário digitou sem centavos (ex: "1500") ou com centavos (ex: "150000" para 1.500,00)
-  let num: number;
-  if (valorStr.includes(",") || valorStr.includes(".")) {
-    num = parseInt(nums, 10) / 100;
-  } else {
-    num = parseInt(nums, 10);
-  }
-
-  if (isNaN(num) || num <= 0) return "";
-
-  const inteiros = Math.floor(num);
-  const centavos = Math.round((num - inteiros) * 100);
-
-  const extensoInt = formatarNumeroExtenso(inteiros);
-  const moeda = inteiros === 1 ? "real" : "reais";
-
-  if (centavos > 0) {
-    const extensoCent = formatarNumeroExtenso(centavos);
-    const centmoeda = centavos === 1 ? "centavo" : "centavos";
-    return `${extensoInt} ${moeda} e ${extensoCent} ${centmoeda}`;
-  }
-
-  return `${extensoInt} ${moeda}`;
-}
-
-export function formatarNumeroExtenso(n: number): string {
-  if (n === 0) return "zero";
-  const unidades = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
-  const dezenasTeens = [
-    "dez",
-    "onze",
-    "doze",
-    "treze",
-    "quatorze",
-    "quinze",
-    "dezesseis",
-    "dezessete",
-    "dezoito",
-    "dezenove",
-  ];
-  const dezenas = [
-    "",
-    "",
-    "vinte",
-    "trinta",
-    "quarenta",
-    "cinquenta",
-    "sessenta",
-    "setenta",
-    "oitenta",
-    "noventa",
-  ];
-  const centenas = [
-    "",
-    "cento",
-    "duzentos",
-    "trezentos",
-    "quatrocentos",
-    "quinhentos",
-    "seiscentos",
-    "setecentos",
-    "oitocentos",
-    "novecentos",
-  ];
-
-  if (n === 100) return "cem";
-  if (n < 10) return unidades[n];
-  if (n < 20) return dezenasTeens[n - 10];
-  if (n < 100) {
-    const d = Math.floor(n / 10);
-    const u = n % 10;
-    return u > 0 ? `${dezenas[d]} e ${unidades[u]}` : dezenas[d];
-  }
-  if (n < 1000) {
-    const c = Math.floor(n / 100);
-    const resto = n % 100;
-    return resto > 0 ? `${centenas[c]} e ${formatarNumeroExtenso(resto)}` : centenas[c];
-  }
-  if (n < 1000000) {
-    const mil = Math.floor(n / 1000);
-    const resto = n % 1000;
-    const prefixo = mil === 1 ? "um mil" : `${formatarNumeroExtenso(mil)} mil`;
-    if (resto === 0) return prefixo;
-    // Em PT-BR: usa "e" após milhar apenas se o resto for centena redonda (ex: 100, 200, 500) ou menor que 100 (ex: 1 a 99)
-    if (resto % 100 === 0 || resto < 100) {
-      return `${prefixo} e ${formatarNumeroExtenso(resto)}`;
-    }
-    return `${prefixo} ${formatarNumeroExtenso(resto)}`;
-  }
-  return n.toLocaleString("pt-BR");
-}
