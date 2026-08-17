@@ -4,6 +4,8 @@
  * Modo Real (Firebase/API):
  *   - Toda operação real é intermediada pelas rotas server-side (/api/documents)
  *   - Zero mutações client-side no Firestore.
+ *   - Falhas da API são propagadas. Nunca usamos fixtures/cache demo como
+ *     fallback de produção, pois isso mascara indisponibilidade e mistura dados.
  *
  * Modo Demo (sem Firebase / IDs demo-*):
  *   - Armazenamento em localStorage para preview e desenvolvimento local.
@@ -97,25 +99,17 @@ export async function listDocuments(userId: string): Promise<Documento[]> {
     return loadDemoDocs().filter((d) => d.userId === userId || d.userId === "demo");
   }
 
-  try {
-    const dtos = await listDocumentsApi();
-    const serverDocs: Documento[] = dtos.map((dto) => ({
-      id: dto.id,
-      modeloSlug: dto.modeloSlug,
-      modeloNome: dto.modeloNome,
-      respostas: {},
-      status: dto.status,
-      userId,
-      criadoEm: dto.criadoEm,
-      atualizadoEm: dto.atualizadoEm,
-    }));
-    const localDocs = loadDemoDocs().filter((d) => d.userId === userId || d.userId === "demo");
-    const existingIds = new Set(serverDocs.map((d) => d.id));
-    return [...serverDocs, ...localDocs.filter((d) => !existingIds.has(d.id))];
-  } catch (err) {
-    console.warn("[DocumentsService] Não foi possível consultar a API de documentos, usando cache local:", err);
-    return loadDemoDocs().filter((d) => d.userId === userId || d.userId === "demo");
-  }
+  const dtos = await listDocumentsApi();
+  return dtos.map((dto) => ({
+    id: dto.id,
+    modeloSlug: dto.modeloSlug,
+    modeloNome: dto.modeloNome,
+    respostas: {},
+    status: dto.status,
+    userId,
+    criadoEm: dto.criadoEm,
+    atualizadoEm: dto.atualizadoEm,
+  }));
 }
 
 export async function getDocument(id: string): Promise<Documento | null> {
