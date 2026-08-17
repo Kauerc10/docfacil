@@ -1,6 +1,7 @@
 import "server-only";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { getAdminFirestore } from "../firebase-admin";
+import { getServerEnv } from "../env";
 import { BackendError } from "../errors";
 import { createOrderBuyerPrincipalKey } from "../billing/order-identity";
 import type {
@@ -679,9 +680,13 @@ export function getRepositories(): BackendRepositories {
     return repositoriesSingleton;
   }
 
+  const env = getServerEnv();
   const useInMemory =
     process.env.ALLOW_IN_MEMORY_REPOSITORIES === "true" ||
-    (process.env.NODE_ENV === "test" && !process.env.FIRESTORE_EMULATOR_HOST);
+    env.ALLOW_IN_MEMORY_ARTIFACT_STORAGE ||
+    env.ALLOW_DEMO_BILLING ||
+    !env.FIREBASE_PRIVATE_KEY ||
+    (env.NODE_ENV === "test" && !process.env.FIRESTORE_EMULATOR_HOST);
 
   if (useInMemory) {
     // isolated=false: usa globalThis store compartilhado entre page.tsx e API routes

@@ -97,17 +97,25 @@ export async function listDocuments(userId: string): Promise<Documento[]> {
     return loadDemoDocs().filter((d) => d.userId === userId || d.userId === "demo");
   }
 
-  const dtos = await listDocumentsApi();
-  return dtos.map((dto) => ({
-    id: dto.id,
-    modeloSlug: dto.modeloSlug,
-    modeloNome: dto.modeloNome,
-    respostas: {},
-    status: dto.status,
-    userId,
-    criadoEm: dto.criadoEm,
-    atualizadoEm: dto.atualizadoEm,
-  }));
+  try {
+    const dtos = await listDocumentsApi();
+    const serverDocs: Documento[] = dtos.map((dto) => ({
+      id: dto.id,
+      modeloSlug: dto.modeloSlug,
+      modeloNome: dto.modeloNome,
+      respostas: {},
+      status: dto.status,
+      userId,
+      criadoEm: dto.criadoEm,
+      atualizadoEm: dto.atualizadoEm,
+    }));
+    const localDocs = loadDemoDocs().filter((d) => d.userId === userId || d.userId === "demo");
+    const existingIds = new Set(serverDocs.map((d) => d.id));
+    return [...serverDocs, ...localDocs.filter((d) => !existingIds.has(d.id))];
+  } catch (err) {
+    console.warn("[DocumentsService] Não foi possível consultar a API de documentos, usando cache local:", err);
+    return loadDemoDocs().filter((d) => d.userId === userId || d.userId === "demo");
+  }
 }
 
 export async function getDocument(id: string): Promise<Documento | null> {

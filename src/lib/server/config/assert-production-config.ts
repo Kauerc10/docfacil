@@ -3,6 +3,7 @@ import type { ServerEnv } from "../env";
 
 export function assertProductionServerConfig(env: ServerEnv): void {
   if (env.NODE_ENV !== "production") return;
+  if (process.env.VERCEL_ENV === "preview" || process.env.ENABLE_PREVIEW_MODE === "true") return;
 
   const missing = [
     ["FIREBASE_PROJECT_ID", env.FIREBASE_PROJECT_ID],
