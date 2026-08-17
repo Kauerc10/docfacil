@@ -42,7 +42,7 @@ if (IS_FIREBASE_CONFIGURED && typeof window !== "undefined") {
   const debugToken = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_DEBUG_TOKEN;
 
   if (debugToken) {
-    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
+    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken === "true" ? true : debugToken;
   }
 
   if (siteKey) {

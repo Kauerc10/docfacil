@@ -86,22 +86,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Load (or create) the user profile from Firestore
       let perfil: PerfilUsuario | null = null;
       if (db) {
-        const ref = doc(db, "users", fbUser.uid);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          perfil = snap.data() as PerfilUsuario;
-        } else {
-          // First login → create profile
-          perfil = {
-            uid: fbUser.uid,
-            nome: fbUser.displayName || "Usuário",
-            email: fbUser.email || "",
-            fotoUrl: fbUser.photoURL || undefined,
-            plano: "gratis",
-            criadoEm: Date.now(),
-            atualizadoEm: Date.now(),
-          };
-          await setDoc(ref, perfil);
+        try {
+          const ref = doc(db, "users", fbUser.uid);
+          const snap = await getDoc(ref);
+          if (snap.exists()) {
+            perfil = snap.data() as PerfilUsuario;
+          } else {
+            // First login → create profile (never pass undefined to Firestore)
+            const novoPerfil: PerfilUsuario = {
+              uid: fbUser.uid,
+              nome: fbUser.displayName || "Usuário",
+              email: fbUser.email || "",
+              plano: "gratis",
+              criadoEm: Date.now(),
+              atualizadoEm: Date.now(),
+            };
+            if (fbUser.photoURL) {
+              novoPerfil.fotoUrl = fbUser.photoURL;
+            }
+            await setDoc(ref, novoPerfil);
+            perfil = novoPerfil;
+          }
+        } catch (err) {
+          console.warn("[AuthContext] Não foi possível sincronizar perfil do Firestore:", err);
         }
       }
       if (cancelled) return;
