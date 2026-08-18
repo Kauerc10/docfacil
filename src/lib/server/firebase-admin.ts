@@ -52,11 +52,15 @@ export function setAdminAuthForTesting(mock: Auth | null): void {
   testAuth = mock;
 }
 
+export function configureAdminFirestore(db: Firestore): Firestore {
+  db.settings({ ignoreUndefinedProperties: true });
+  return db;
+}
+
 export function getAdminFirestore(): Firestore {
   if (adminFirestore) return adminFirestore;
 
-  adminFirestore = getFirestore(getFirebaseAdminApp());
-  adminFirestore.settings({ ignoreUndefinedProperties: true });
+  adminFirestore = configureAdminFirestore(getFirestore(getFirebaseAdminApp()));
   return adminFirestore;
 }
 
