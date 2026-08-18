@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     const documents = Array.from(new Set(parsed.data.documents));
     if (!documents.includes("termos") || !documents.includes("privacidade")) {
       throw new BackendError(
-        "CONSENT_REQUIRED",
+        "INVALID_REQUEST",
         400,
         "Termos de Uso e Política de Privacidade são obrigatórios."
       );
