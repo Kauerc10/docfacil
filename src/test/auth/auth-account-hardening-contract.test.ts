@@ -24,16 +24,13 @@ describe("hardening da conta Firebase", () => {
     expect(text).toContain("ensureAuthPersistence");
   });
 
-  it("expõe reset de senha real e o login deixa de mandar para ajuda", () => {
-    const authContext = source("src/lib/auth-context.tsx");
+  it("esqueci minha senha abre a rota dedicada", () => {
     const login = source("src/components/docfacil/views/login-view.tsx");
 
-    expect(authContext).toContain("sendPasswordResetEmail");
-    expect(authContext).toContain("requestPasswordReset");
-    expect(authContext).toContain('languageCode = "pt-BR"');
-    expect(login).toContain("requestPasswordReset");
+    expect(login).toContain('href="/esqueci-senha"');
+    expect(login).not.toContain("requestPasswordReset");
+    expect(login).not.toContain("resetFeedback");
     expect(login).not.toContain('navigate("ajuda")');
-    expect(login).toContain("Se existir uma conta com esse e-mail");
   });
 
   it("consulta a política de senha do Firebase antes do cadastro", () => {
