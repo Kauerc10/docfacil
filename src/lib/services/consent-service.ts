@@ -129,7 +129,6 @@ export async function recordConsent(params: {
   userEmail?: string;
   documents: ConsentDocument[];
   flow: ConsentFlow;
-  termsVersion?: string;
 }): Promise<ConsentRecord> {
   if (!IS_FIREBASE_CONFIGURED || !db) {
     const record = await createDemoConsentRecord(params);
