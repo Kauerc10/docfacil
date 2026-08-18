@@ -6,13 +6,20 @@
  * - If NEXT_PUBLIC_FIREBASE_* env vars are present → real Firebase (Auth + Firestore)
  * - If absent → IS_FIREBASE_CONFIGURED = false, services fall back to local data
  *
- * This lets the app ship & demo TODAY, and flip to production the moment
- * credentials are added to .env — without touching any view code.
+ * App Check is intentionally lazy. Initializing reCAPTCHA while this module is
+ * evaluated can run before React finishes hydration and before the document is
+ * stable. We only need an App Check token for calls to our protected backend,
+ * so initialization happens on the first getClientAppCheckToken() call.
  */
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
-import { initializeAppCheck, ReCaptchaV3Provider, type AppCheck, getToken } from "firebase/app-check";
+import {
+  initializeAppCheck,
+  ReCaptchaV3Provider,
+  type AppCheck,
+  getToken,
+} from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -31,38 +38,76 @@ let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 let appCheck: AppCheck | null = null;
+let appCheckInitializationAttempted = false;
 
 if (IS_FIREBASE_CONFIGURED && typeof window !== "undefined") {
   // Client-side only — Firebase Auth needs window.
   app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+}
+
+function isDisposableVercelPreview(): boolean {
+  if (typeof window === "undefined") return false;
+
+  const hostname = window.location.hostname;
+  if (!hostname.endsWith(".vercel.app")) return false;
+
+  // Branch aliases usam "-git-" e deployments imutáveis da Vercel terminam
+  // com o slug do time/projeto. Esses hosts mudam a cada preview e não devem
+  // depender de um domínio reCAPTCHA registrado. O domínio oficial de produção
+  // (ex.: docfacil-indol.vercel.app ou domínio próprio) não cai nesta regra.
+  return hostname.includes("-git-") || hostname.endsWith("-projects.vercel.app");
+}
+
+function ensureClientAppCheck(): AppCheck | null {
+  if (appCheck) return appCheck;
+  if (appCheckInitializationAttempted) return null;
+  if (!app || typeof window === "undefined") return null;
+
+  appCheckInitializationAttempted = true;
 
   const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   const debugToken = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_DEBUG_TOKEN;
 
-  if (debugToken) {
-    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
+  if (!siteKey) return null;
+
+  // O backend já não aplica App Check em Vercel Preview. Evita pedir um token
+  // reCAPTCHA para um hostname descartável que não está registrado no provider.
+  // Se um debug token foi configurado explicitamente, ainda permitimos App Check.
+  if (isDisposableVercelPreview() && !debugToken) {
+    return null;
   }
 
-  if (siteKey) {
-    try {
-      appCheck = initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider(siteKey),
-        isTokenAutoRefreshEnabled: true,
-      });
-    } catch {
-      // Silencioso em ambientes onde AppCheck já foi inicializado ou indisponível
-    }
+  if (debugToken) {
+    (self as typeof self & { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean | string })
+      .FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken === "true" ? true : debugToken;
+  }
+
+  try {
+    appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(siteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+    return appCheck;
+  } catch (error) {
+    // Keep authentication usable even if App Check cannot initialize. Protected
+    // backend calls will fail closed when APP_CHECK_ENFORCED=true rather than
+    // poisoning unrelated screens such as login/cadastro.
+    console.warn("[Firebase] Não foi possível inicializar o App Check:", error);
+    return null;
   }
 }
 
 export async function getClientAppCheckToken(): Promise<string | null> {
-  if (!appCheck) return null;
+  const instance = ensureClientAppCheck();
+  if (!instance) return null;
+
   try {
-    const result = await getToken(appCheck, false);
+    const result = await getToken(instance, false);
     return result.token;
-  } catch {
+  } catch (error) {
+    console.warn("[Firebase] Não foi possível obter token do App Check:", error);
     return null;
   }
 }

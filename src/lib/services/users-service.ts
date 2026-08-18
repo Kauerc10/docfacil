@@ -26,7 +26,13 @@ export async function getPerfil(uid: string): Promise<PerfilUsuario | null> {
 
 export async function savePerfil(uid: string, data: Partial<PerfilUsuario>): Promise<void> {
   if (!IS_FIREBASE_CONFIGURED || !db) return;
-  await setDoc(doc(db, "users", uid), { ...data, atualizadoEm: Date.now() }, { merge: true });
+  const cleanData: Record<string, unknown> = { atualizadoEm: Date.now() };
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      cleanData[key] = value;
+    }
+  }
+  await setDoc(doc(db, "users", uid), cleanData, { merge: true });
 }
 
 export async function listPagamentos(uid: string): Promise<Pagamento[]> {

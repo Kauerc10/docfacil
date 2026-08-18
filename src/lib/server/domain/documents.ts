@@ -248,19 +248,36 @@ export function calculateSourceHash(respostas: Record<string, string>): string {
     .digest("hex");
 }
 
+export function canonicalizeJson(value: unknown): unknown {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(canonicalizeJson);
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  return Object.fromEntries(
+    entries.map(([k, v]) => [k, canonicalizeJson(v)])
+  );
+}
+
 export function calculateModelSnapshotHash(modelo: Modelo): string {
   const snapshot = {
     slug: modelo.slug,
     nome: modelo.nome,
     template: modelo.template,
+    etapas: modelo.etapas ?? [],
     campos: (modelo.campos || []).map((c) => ({
       key: c.key,
       pergunta: c.pergunta,
       tipo: c.tipo,
+      obrigatorio: c.obrigatorio,
     })),
   };
+  const canonical = canonicalizeJson(snapshot);
   return createHash("sha256")
-    .update(JSON.stringify(snapshot))
+    .update(JSON.stringify(canonical))
     .digest("hex");
 }
 

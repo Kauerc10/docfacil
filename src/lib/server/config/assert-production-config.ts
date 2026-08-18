@@ -2,7 +2,10 @@ import "server-only";
 import type { ServerEnv } from "../env";
 
 export function assertProductionServerConfig(env: ServerEnv): void {
-  if (env.NODE_ENV !== "production") return;
+  const isFinalProduction =
+    env.NODE_ENV === "production" && env.VERCEL_ENV !== "preview";
+
+  if (!isFinalProduction) return;
 
   const missing = [
     ["FIREBASE_PROJECT_ID", env.FIREBASE_PROJECT_ID],
@@ -18,6 +21,15 @@ export function assertProductionServerConfig(env: ServerEnv): void {
     const missingKeys = missing.map(([k]) => k).join(", ");
     throw new Error(
       `DocFacil production backend configuration incomplete. Missing required environment variables: ${missingKeys}`
+    );
+  }
+
+  if (
+    env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
+    env.NEXT_PUBLIC_FIREBASE_PROJECT_ID !== env.FIREBASE_PROJECT_ID
+  ) {
+    throw new Error(
+      "FIREBASE_PROJECT_ID must match NEXT_PUBLIC_FIREBASE_PROJECT_ID in production."
     );
   }
 

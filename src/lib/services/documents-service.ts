@@ -4,6 +4,8 @@
  * Modo Real (Firebase/API):
  *   - Toda operação real é intermediada pelas rotas server-side (/api/documents)
  *   - Zero mutações client-side no Firestore.
+ *   - Falhas da API são propagadas. Nunca usamos fixtures/cache demo como
+ *     fallback de produção, pois isso mascara indisponibilidade e mistura dados.
  *
  * Modo Demo (sem Firebase / IDs demo-*):
  *   - Armazenamento em localStorage para preview e desenvolvimento local.

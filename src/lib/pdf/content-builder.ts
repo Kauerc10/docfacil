@@ -44,11 +44,20 @@ export const CONTENT_WIDTH = cm(21) - 2 * cm(3.15);
  * travessões → hífen, colapsa espaços duplos.
  */
 export function normalizePdfText(value: string): string {
-  return String(value || "")
-    .replace(/\u00a0/g, " ")
+  return value
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
     .replace(/[""]/g, '"')
     .replace(/['']/g, "'")
     .replace(/[–—]/g, "-")
+    // Limpeza de resquícios de LaTeX / símbolos matemáticos
+    .replace(/\\?R\\\$/g, "R$")
+    .replace(/\$S1^{\\circ}\$|\\S1°|\$1\^\{\\circ\}\$/g, "§ 1º")
+    .replace(/§\s*1[º°o]/gi, "§ 1º")
+    .replace(/n\^\{\\circ\}/g, "nº")
+    .replace(/\$(\d+)\^\{\\circ\}\$/g, "$1º")
+    .replace(/\$([a-zA-Z()]+)\$/g, "$1")
+    .replace(/\\/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -421,6 +430,7 @@ export function buildSignatureColumns(blocks: SignatureBlock[]): unknown {
         })),
       ],
       alignment: "center" as const,
+      unbreakable: true,
       margin: [0, 12, 0, 12],
     };
   }
@@ -441,6 +451,7 @@ export function buildSignatureColumns(blocks: SignatureBlock[]): unknown {
               })),
             ],
             alignment: "center" as const,
+            unbreakable: true,
             width: "*" as const,
           },
           {
@@ -453,10 +464,12 @@ export function buildSignatureColumns(blocks: SignatureBlock[]): unknown {
               })),
             ],
             alignment: "center" as const,
+            unbreakable: true,
             width: "*" as const,
           },
         ],
         columnGap: 24,
+        unbreakable: true,
         margin: [0, 12, 0, 12],
       });
     } else {
@@ -473,10 +486,12 @@ export function buildSignatureColumns(blocks: SignatureBlock[]): unknown {
               })),
             ],
             alignment: "center" as const,
+            unbreakable: true,
             width: "auto" as const,
           },
           { text: "", width: "*" as const },
         ],
+        unbreakable: true,
         margin: [0, 12, 0, 12],
       });
     }

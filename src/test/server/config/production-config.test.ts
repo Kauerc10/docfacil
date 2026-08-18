@@ -5,6 +5,7 @@ import type { ServerEnv } from "@/lib/server/env";
 describe("Production Server Configuration Assertions (Fail-Closed)", () => {
   const validProductionEnv: ServerEnv = {
     NODE_ENV: "production",
+    VERCEL_ENV: "production",
     FIREBASE_PROJECT_ID: "docfacil-prod",
     FIREBASE_CLIENT_EMAIL: "admin@docfacil-prod.iam.gserviceaccount.com",
     FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----",
@@ -51,9 +52,23 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
     expect(() => assertProductionServerConfig(invalid)).toThrow(/In-memory artifact storage/i);
   });
 
+  it("does not treat Vercel preview as the final production deployment", () => {
+    const previewEnv: ServerEnv = {
+      ...validProductionEnv,
+      VERCEL_ENV: "preview",
+      APP_CHECK_ENFORCED: false,
+      R2_ACCOUNT_ID: undefined,
+      R2_ACCESS_KEY_ID: undefined,
+      R2_SECRET_ACCESS_KEY: undefined,
+    };
+
+    expect(() => assertProductionServerConfig(previewEnv)).not.toThrow();
+  });
+
   it("allows partial credentials in development environment", () => {
     const devEnv: ServerEnv = {
       NODE_ENV: "development",
+      VERCEL_ENV: undefined,
       FIREBASE_PROJECT_ID: "dev-proj",
       FIREBASE_CLIENT_EMAIL: undefined,
       FIREBASE_PRIVATE_KEY: undefined,

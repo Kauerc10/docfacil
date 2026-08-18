@@ -203,15 +203,20 @@ export class FirestoreDocumentsRepository implements IDocumentsRepository {
     userId: string,
     startOfMonthTimestamp: number
   ): Promise<number> {
+    // V1: evita depender de um índice composto só para calcular a cota mensal.
+    // A trava final da cota continua atômica em free_generation_quotas durante
+    // o commit do artefato. Aqui buscamos apenas os documentos do usuário e
+    // filtramos o mês no servidor, o que é simples e suficiente no volume atual.
     const snaps = await this.db
       .collection("documents")
-      .where("owner.type", "==", "user")
       .where("owner.userId", "==", userId)
-      .where("createdAt", ">=", startOfMonthTimestamp)
-      .count()
       .get();
 
-    return snaps.data().count;
+    return snaps.docs.reduce((count, snap) => {
+      const document = snap.data() as DocumentRecord;
+      if (document.status === "deleted") return count;
+      return document.createdAt >= startOfMonthTimestamp ? count + 1 : count;
+    }, 0);
   }
 }
 
@@ -589,7 +594,6 @@ export class FirestoreGenerationCommitRepository implements IGenerationCommitRep
             "Pedido não está reservado por esta geração."
           );
         }
-
       }
 
       let nextFreeQuotaCount: number | undefined;
@@ -684,8 +688,6 @@ export function getRepositories(): BackendRepositories {
     (process.env.NODE_ENV === "test" && !process.env.FIRESTORE_EMULATOR_HOST);
 
   if (useInMemory) {
-    // isolated=false: usa globalThis store compartilhado entre page.tsx e API routes
-    // no mesmo processo Node.js (necessário para E2E sem Firestore Emulator).
     const docs = new InMemoryDocumentsRepository(false);
     const access = new InMemoryAccessRepository(false);
     const orders = new InMemoryOrdersRepository(false);

@@ -7,6 +7,7 @@ import { getServerEnv } from "./env";
 import { assertProductionServerConfig } from "./config/assert-production-config";
 
 let adminApp: App | null = null;
+let adminFirestore: Firestore | null = null;
 
 export function getFirebaseAdminApp(): App {
   if (adminApp) {
@@ -51,8 +52,16 @@ export function setAdminAuthForTesting(mock: Auth | null): void {
   testAuth = mock;
 }
 
+export function configureAdminFirestore(db: Firestore): Firestore {
+  db.settings({ ignoreUndefinedProperties: true });
+  return db;
+}
+
 export function getAdminFirestore(): Firestore {
-  return getFirestore(getFirebaseAdminApp());
+  if (adminFirestore) return adminFirestore;
+
+  adminFirestore = configureAdminFirestore(getFirestore(getFirebaseAdminApp()));
+  return adminFirestore;
 }
 
 export function getAdminAppCheck(): AppCheck {

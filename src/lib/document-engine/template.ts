@@ -15,6 +15,8 @@
  * (decorrentes de cláusulas não selecionadas que deixam buracos).
  */
 import type { ClausulaDinamica, EtapaModelo } from "../types";
+import { type RenderContext, createRenderContext } from "./types";
+import { converterValorMoedaParaExtenso } from "./money";
 
 /** Marcador de espaço reservado quando um campo obrigatório não foi preenchido. */
 const PLACEHOLDER = "______________________";
@@ -27,38 +29,74 @@ const PLACEHOLDER = "______________________";
  * @param clausulaPorId Mapa de cláusulas (id → objeto ClausulaDinamica)
  * @param clausulasSelecionadas IDs das cláusulas marcadas pelo usuário
  * @param camposOpcionais Chaves dos campos opcionais (vazios viram "" em vez de PLACEHOLDER)
+ * @param context Contexto de renderização determinístico (datas, locale, timezone)
  */
 export function fillTemplate(
   template: string,
   respostas: Record<string, string>,
   clausulaPorId: Record<string, ClausulaDinamica>,
   clausulasSelecionadas: string[],
-  camposOpcionais: string[] = []
+  camposOpcionais: string[] = [],
+  context?: RenderContext
 ): string {
-  // === PASSO 1: injeta cláusulas selecionadas ============================
-  // `{{clausula:id}}` → corpo da cláusula (quando selecionada) ou "".
-  // O corpo pode conter `{{key}}` que será resolvido no passo 2.
-  let result = template.replace(/\{\{\s*clausula:([^}]+?)\s*\}\}/g, (_match, id: string) => {
-    const cid = id.trim();
-    if (!clausulasSelecionadas.includes(cid)) return "";
-    const cl = clausulaPorId[cid];
-    return cl?.corpo ?? "";
+  const ctx = context ?? createRenderContext();
+  let result = template;
+
+  // === PASSO 1: substitui `{{clausula:id}}` ================================
+  result = result.replace(/\{\{\s*clausula:([a-zA-Z0-9_-]+)\s*\}\}/g, (_match, id: string) => {
+    if (!clausulasSelecionadas.includes(id)) return "";
+    const cl = clausulaPorId[id];
+    return cl ? cl.corpo : "";
   });
+
+  // Tratamento da tag {{sem_garantia}} para contrato de locação
+  if (result.includes("{{sem_garantia}}")) {
+    const temGarantiaSelecionada = clausulasSelecionadas.some((id) =>
+      ["caucao", "fiador", "seguro_fianca"].includes(id)
+    );
+    if (!temGarantiaSelecionada) {
+      result = result.replace(
+        "{{sem_garantia}}",
+        "As partes pactuam a presente locação SEM QUALQUER MODALIDADE DE GARANTIA LOCATÍCIA, nos termos do art. 42 da Lei nº 8.245/1991, ficando o LOCADOR autorizado a exigir o pagamento do aluguel e encargos até o sexto dia útil do mês vincendo."
+      );
+    } else {
+      result = result.replace("{{sem_garantia}}", "");
+    }
+  }
 
   // === PASSO 2: substitui `{{key}}` por valores ==========================
   result = result.replace(/\{\{\s*([^}:][^}]*?)\s*\}\}/g, (_match, key: string) => {
     const k = key.trim();
-    const valor = respostas[k];
-    if (valor && valor.trim()) return valor;
+    if (k === "valor_extenso") {
+      const valStr = respostas["valor"] || "";
+      const extenso = converterValorMoedaParaExtenso(valStr);
+      return extenso ? ` (${extenso})` : "";
+    }
+    let valor = respostas[k];
+    if (valor && valor.trim()) {
+      // Normaliza siglas ou formatos de estado civil para formato por extenso minúsculo
+      if (k.endsWith("_estado_civil")) {
+        const v = valor.trim().toUpperCase();
+        if (v === "SO" || v === "SOLTEIRO" || v === "SOLTEIRA") valor = "solteiro(a)";
+        else if (v === "CA" || v === "CASADO" || v === "CASADA") valor = "casado(a)";
+        else if (v === "DIV" || v === "DIVORCIADO" || v === "DIVORCIADA") valor = "divorciado(a)";
+        else if (v === "VI" || v === "VIUVO" || v === "VIUVA") valor = "viúvo(a)";
+        else if (v === "UE" || v === "UNIAO ESTAVEL" || v === "UNIÃO ESTÁVEL") valor = "em união estável";
+        else if (v === "SEPARADO" || v === "SEPARADA") valor = "separado(a) judicialmente";
+        else valor = valor.toLowerCase();
+      }
+      return valor;
+    }
     if (camposOpcionais.includes(k)) return "";
     return PLACEHOLDER;
   });
 
-  // === PASSO 3: substitui [data de assinatura] por data atual ============
-  const dataHoje = new Date().toLocaleDateString("pt-BR", {
+  // === PASSO 3: substitui [data de assinatura] por data do documento =====
+  const dataHoje = ctx.documentDate.toLocaleDateString(ctx.locale, {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: ctx.timeZone,
   });
   result = result.replace(/\[data de assinatura\]/g, dataHoje);
 
@@ -85,9 +123,10 @@ export function fillTemplateOrNull(
   respostas: Record<string, string>,
   clausulaPorId: Record<string, ClausulaDinamica>,
   clausulasSelecionadas: string[],
-  camposOpcionais: string[] = []
+  camposOpcionais: string[] = [],
+  context?: RenderContext
 ): string | null {
-  const filled = fillTemplate(template, respostas, clausulaPorId, clausulasSelecionadas, camposOpcionais);
+  const filled = fillTemplate(template, respostas, clausulaPorId, clausulasSelecionadas, camposOpcionais, context);
   return filled.trim() ? filled : null;
 }
 
@@ -109,3 +148,13 @@ export function buildClausulaMap(
   }
   return map;
 }
+
+export {
+  parseMoneyToCents,
+  formatMoneyFromCents,
+  numberToWords,
+  moneyToWords,
+  converterValorMoedaParaExtenso,
+  numberToWords as formatarNumeroExtenso,
+} from "./money";
+

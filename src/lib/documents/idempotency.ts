@@ -4,10 +4,24 @@ export interface FinalizationIntent {
   createdAt: number;
 }
 
+export const FINALIZATION_INTENT_TTL_MS = 2 * 60 * 1000;
+
 const memoryIntentStorage: Record<string, string> = {};
 
 function getIntentStorageKey(modeloSlug: string): string {
   return `docfacil:intent:v1:${modeloSlug}`;
+}
+
+function isReusableIntent(
+  intent: FinalizationIntent,
+  modeloSlug: string,
+  now = Date.now()
+): boolean {
+  if (!intent.requestId || intent.modeloSlug !== modeloSlug) return false;
+  if (!Number.isFinite(intent.createdAt)) return false;
+
+  const age = now - intent.createdAt;
+  return age >= 0 && age < FINALIZATION_INTENT_TTL_MS;
 }
 
 export function getOrCreateFinalizationRequestId(modeloSlug: string): string {
@@ -18,9 +32,12 @@ export function getOrCreateFinalizationRequestId(modeloSlug: string): string {
       const stored = localStorage.getItem(key);
       if (stored) {
         const parsed = JSON.parse(stored) as FinalizationIntent;
-        if (parsed.requestId) {
+        if (isReusableIntent(parsed, modeloSlug)) {
           return parsed.requestId;
         }
+
+        localStorage.removeItem(key);
+        delete memoryIntentStorage[key];
       }
     } catch {
       // ignore
@@ -28,11 +45,12 @@ export function getOrCreateFinalizationRequestId(modeloSlug: string): string {
   } else if (memoryIntentStorage[key]) {
     try {
       const parsed = JSON.parse(memoryIntentStorage[key]) as FinalizationIntent;
-      if (parsed.requestId) {
+      if (isReusableIntent(parsed, modeloSlug)) {
         return parsed.requestId;
       }
+      delete memoryIntentStorage[key];
     } catch {
-      // ignore
+      delete memoryIntentStorage[key];
     }
   }
 

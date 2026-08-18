@@ -24,12 +24,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const { navigate } = useNav();
 
   if (loading) {
-    return <GateSkeleton />;
+    return <GateSkeleton key="auth-gate-loading" />;
   }
 
   if (!user) {
     return (
-      <div className="pt-[72px] min-h-[calc(100vh-72px)] bg-paper">
+      <div key="auth-gate-unauthenticated" className="pt-[72px] min-h-[calc(100vh-72px)] bg-paper">
         <div className="max-w-md mx-auto px-5 sm:px-8 py-16 sm:py-24 text-center">
           <div
             className="mx-auto w-16 h-16 rounded-full bg-[var(--blue-soft)] text-[var(--blue-royal)] grid place-items-center"
@@ -66,7 +66,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return <div key="auth-gate-authenticated" className="w-full">{children}</div>;
 }
 
 /** Skeleton shown while the auth state resolves (mainly Firebase mode). */

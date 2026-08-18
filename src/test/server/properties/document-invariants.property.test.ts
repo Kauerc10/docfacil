@@ -47,6 +47,37 @@ describe("Document & Cryptographic Invariants (Property-style tests)", () => {
     }
   });
 
+  it("modelSnapshotHash changes when template body, clauses or fields change", () => {
+    const original = MODELOS.find((m) => m.slug === "contrato-locacao")!;
+    const hashOriginal = calculateModelSnapshotHash(original);
+
+    // 1. Modifica o template
+    const modifiedTemplate = {
+      ...original,
+      template: {
+        ...original.template,
+        titulo: "CONTRATO DE LOCAÇÃO MODIFICADO",
+      },
+    };
+    expect(calculateModelSnapshotHash(modifiedTemplate)).not.toBe(hashOriginal);
+
+    // 2. Modifica uma cláusula interna nas etapas
+    const modifiedClause = {
+      ...original,
+      etapas: (original.etapas ?? []).map((e) =>
+        e.tipo === "clausulas"
+          ? {
+              ...e,
+              clausulas: e.clausulas.map((c) =>
+                c.id === "caucao" ? { ...c, corpo: "Corpo da caução alterado" } : c
+              ),
+            }
+          : e
+      ),
+    };
+    expect(calculateModelSnapshotHash(modifiedClause)).not.toBe(hashOriginal);
+  });
+
   it("reconstructAndValidateResponses strips unknown extraneous keys and preserves valid inputs", () => {
     const modelo = MODELOS.find((m) => m.slug === "declaracao-residencia");
     if (!modelo) throw new Error("Modelo não encontrado");

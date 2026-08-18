@@ -35,7 +35,16 @@ describe("server env validation", () => {
 
     const env = parseServerEnv(raw);
     expect(env.FIREBASE_PROJECT_ID).toBe("fallback-project");
-    expect(env.R2_BUCKET_NAME).toBe("docfacil-pdfs");
+    expect(env.R2_BUCKET_NAME).toBeUndefined();
+  });
+
+  it("does not invent an R2 bucket when none was configured", () => {
+    const env = parseServerEnv({
+      NODE_ENV: "test",
+      FIREBASE_PROJECT_ID: "docfacil-test",
+    });
+
+    expect(env.R2_BUCKET_NAME).toBeUndefined();
   });
 
   it("handles boolean string conversions correctly", () => {
