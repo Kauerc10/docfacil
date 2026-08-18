@@ -22,6 +22,7 @@ describe("consent-service", () => {
     expect(record.documentHashes?.termos).toMatch(SHA256_HEX);
     expect(record.documentHashes?.privacidade).toMatch(SHA256_HEX);
     expect(record.documentHashes?.termos).not.toBe(record.documentHashes?.privacidade);
-    expect(record.termsHash).toBe(record.documentHashes?.termos);
+    expect(record.documentHashes?.termos).toBeDefined();
+    expect(record.termsHash).toBe(record.documentHashes!.termos);
   });
 });
