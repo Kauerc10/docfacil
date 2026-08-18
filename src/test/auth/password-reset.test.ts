@@ -35,17 +35,17 @@ describe("password reset service", () => {
   });
 
   it("confirma nova senha com o código recebido", async () => {
-    let received: [string, string] | null = null;
+    const calls: Array<[string, string]> = [];
     const service = createPasswordResetService({
       sendReset: async () => undefined,
       verifyCode: async () => "teste@example.com",
       confirmReset: async (code, password) => {
-        received = [code, password];
+        calls.push([code, password]);
       },
     });
 
     await service.completePasswordReset("codigo", "NovaSenha123");
-    expect(received).toEqual(["codigo", "NovaSenha123"]);
+    expect(calls).toEqual([["codigo", "NovaSenha123"]]);
   });
 
   it("mascara e-mail sem revelar o endereço inteiro", () => {
