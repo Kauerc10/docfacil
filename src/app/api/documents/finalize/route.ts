@@ -95,6 +95,10 @@ export async function POST(req: Request) {
       "falha inesperada ao finalizar documento",
       err
     );
-    return BackendError.fromUnknown(err).toResponse();
+    return new BackendError(
+      "GENERATION_FAILED",
+      500,
+      "Não foi possível concluir a geração. Tente novamente em instantes."
+    ).toResponse();
   }
 }
