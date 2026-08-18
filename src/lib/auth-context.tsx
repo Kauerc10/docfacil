@@ -6,28 +6,21 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   updateProfile,
   signOut as fbSignOut,
   onAuthStateChanged,
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { auth, db, IS_FIREBASE_CONFIGURED } from "./firebase";
+import {
+  auth,
+  db,
+  ensureAuthPersistence,
+  IS_FIREBASE_CONFIGURED,
+} from "./firebase";
 import { resolveInitialProfileName } from "./auth/profile-bootstrap";
 import { MODELOS } from "./modelos";
 import type { AppUser, PerfilUsuario } from "./types";
-
-/**
- * AuthContext — exposes the current user and auth actions.
- *
- * Two modes:
- * - Firebase configured: real Firebase Auth (Google popup, email/password),
- *   user profile synced to Firestore (collection "users").
- * - Demo mode (no credentials): localStorage-backed mock so the team can
- *   click through auth-gated screens immediately. The mock user persists
- *   across reloads and mimics the real API shape.
- *
- * Views consume `useAuth()` — they don't know which mode is active.
- */
 
 type AuthState = {
   user: AppUser | null;
@@ -36,16 +29,15 @@ type AuthState = {
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (nome: string, email: string, password: string) => Promise<Pick<AppUser, "uid" | "email">>;
+  requestPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfileData: (data: Partial<Pick<PerfilUsuario, "nome" | "telefone">>) => Promise<void>;
   clearError: () => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
-
 const DEMO_USER_KEY = "docfacil:demo-user";
 
-// --- Demo-mode helpers (localStorage) ---
 function loadDemoUser(): AppUser | null {
   if (typeof window === "undefined") return null;
   try {
@@ -55,16 +47,18 @@ function loadDemoUser(): AppUser | null {
     return null;
   }
 }
+
 function saveDemoUser(u: AppUser | null) {
   if (typeof window === "undefined") return;
   if (u) localStorage.setItem(DEMO_USER_KEY, JSON.stringify(u));
   else localStorage.removeItem(DEMO_USER_KEY);
 }
 
+function firebaseErrorCode(error: unknown): string {
+  return (error as { code?: string })?.code || "";
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Lazy init: in demo mode we can read localStorage synchronously on first
-  // render — no effect needed, no cascading renders. In Firebase mode we
-  // start null + loading=true and resolve via onAuthStateChanged.
   const [user, setUser] = useState<AppUser | null>(() => {
     if (!IS_FIREBASE_CONFIGURED) return loadDemoUser();
     return null;
@@ -73,7 +67,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const pendingSignupNameRef = useRef<string | null>(null);
 
-  // Subscribe to Firebase Auth state changes (only in Firebase mode).
   useEffect(() => {
     if (!IS_FIREBASE_CONFIGURED || !auth) return;
 
@@ -87,9 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const pendingSignupName = pendingSignupNameRef.current;
-
-      // Load (or create) the user profile from Firestore
       let perfil: PerfilUsuario | null = null;
+
       if (db) {
         try {
           const ref = doc(db, "users", fbUser.uid);
@@ -97,7 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (snap.exists()) {
             perfil = snap.data() as PerfilUsuario;
           } else {
-            // First login → create profile (never pass undefined to Firestore)
             const novoPerfil: PerfilUsuario = {
               uid: fbUser.uid,
               nome: resolveInitialProfileName({
@@ -109,9 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               criadoEm: Date.now(),
               atualizadoEm: Date.now(),
             };
-            if (fbUser.photoURL) {
-              novoPerfil.fotoUrl = fbUser.photoURL;
-            }
+            if (fbUser.photoURL) novoPerfil.fotoUrl = fbUser.photoURL;
             await setDoc(ref, novoPerfil);
             perfil = novoPerfil;
           }
@@ -119,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.warn("[AuthContext] Não foi possível sincronizar perfil do Firestore:", err);
         }
       }
+
       if (cancelled) return;
       setUser({
         uid: fbUser.uid,
@@ -133,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       pendingSignupNameRef.current = null;
       setLoading(false);
     });
+
     return () => {
       cancelled = true;
       unsub();
@@ -142,7 +133,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     setError(null);
     if (!IS_FIREBASE_CONFIGURED || !auth) {
-      // Demo mode
       const demo: AppUser = {
         uid: `demo-${Date.now()}`,
         nome: "Usuário Demo",
@@ -153,9 +143,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(demo);
       return;
     }
+
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await ensureAuthPersistence();
+      await signInWithPopup(auth, new GoogleAuthProvider());
     } catch (e) {
       setError(translateAuthError(e));
       throw e;
@@ -175,7 +166,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(demo);
       return;
     }
+
     try {
+      await ensureAuthPersistence();
       await signInWithEmailAndPassword(auth, email, password);
     } catch (e) {
       setError(translateAuthError(e));
@@ -201,13 +194,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pendingSignupNameRef.current = normalizedName;
 
     try {
+      await ensureAuthPersistence();
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: normalizedName });
-      // O listener de auth usa pendingSignupNameRef para não criar o perfil
-      // como "Usuário" caso dispare antes do displayName ser atualizado.
       return { uid: cred.user.uid, email: cred.user.email || email };
     } catch (e) {
       pendingSignupNameRef.current = null;
+      setError(translateAuthError(e));
+      throw e;
+    }
+  }, []);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    setError(null);
+    if (!IS_FIREBASE_CONFIGURED || !auth) return;
+
+    try {
+      await ensureAuthPersistence();
+      auth.languageCode = "pt-BR";
+      await sendPasswordResetEmail(auth, email.trim());
+    } catch (e) {
+      // O feedback da tela é neutro para não revelar se o e-mail possui conta.
+      if (firebaseErrorCode(e) === "auth/user-not-found") return;
       setError(translateAuthError(e));
       throw e;
     }
@@ -234,9 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
+  const clearError = useCallback(() => setError(null), []);
 
   return (
     <AuthContext.Provider
@@ -247,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmail,
+        requestPasswordReset,
         signOut,
         updateProfileData,
         clearError,
@@ -265,16 +272,18 @@ export function useAuth() {
 
 /** Traduz mensagens de erro do Firebase Auth para PT-BR claro e orientador. */
 export function translateAuthError(e: unknown): string {
-  const code = (e as { code?: string })?.code || "";
+  const code = firebaseErrorCode(e);
+  const invalidCredentials = "E-mail ou senha incorretos. Verifique a digitação ou entre com o Google.";
   const map: Record<string, string> = {
-    "auth/invalid-credential": "E-mail ou senha incorretos. Verifique a digitação ou entre com o Google.",
+    "auth/invalid-credential": invalidCredentials,
+    "auth/user-not-found": invalidCredentials,
+    "auth/wrong-password": invalidCredentials,
     "auth/invalid-email": "E-mail com formato inválido. Verifique se digitou corretamente.",
-    "auth/user-not-found": "Nenhuma conta cadastrada com este e-mail.",
-    "auth/wrong-password": "Senha incorreta. Verifique se digitou corretamente ou clique em 'Esqueci minha senha'.",
     "auth/missing-password": "Por favor, digite sua senha.",
     "auth/missing-email": "Por favor, informe seu e-mail.",
     "auth/email-already-in-use": "Este e-mail já está cadastrado. Tente entrar em vez de criar uma nova conta.",
-    "auth/weak-password": "Senha muito curta. Escolha uma senha com pelo menos 6 caracteres.",
+    "auth/weak-password": "A senha não atende aos requisitos de segurança configurados.",
+    "auth/password-does-not-meet-requirements": "A senha não atende aos requisitos de segurança configurados.",
     "auth/account-exists-with-different-credential": "Esta conta foi cadastrada com outro método (ex: Google). Use o botão correspondente.",
     "auth/credential-already-in-use": "Esta credencial já está associada a outra conta.",
     "auth/user-disabled": "Esta conta foi temporariamente desativada pelo suporte.",
@@ -289,5 +298,4 @@ export function translateAuthError(e: unknown): string {
   return map[code] || "Não foi possível concluir o login. Verifique seus dados e tente novamente.";
 }
 
-/** Re-exporta os modelos locais para uso no demo mode (não remover). */
 export { MODELOS };
