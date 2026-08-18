@@ -7,19 +7,16 @@ import { ReopenPrefsButton } from "./reopen-prefs-button";
  * 6 seções: o que são, tipos (essenciais, funcionais, analíticos, marketing),
  * terceiros, gestão de preferências (botão "Reabrir preferências" que limpa o
  * localStorage e recarrega a página), links para navegadores, atualizações.
- *
- * Server Component. O botão "Reabrir preferências" é um Client Component
- * separado (ReopenPrefsButton) para evitar passar onClick pelo server.
  */
 export function CookiesContent() {
   return (
     <>
       <p>
-        Esta Política explica o que são cookies, quais tipos usamos no{" "}
-        {COMPANY.productName} e como você pode controlá-los. Ao continuar
-        navegando após o banner, você concorda com a utilização descrita aqui
-        — exceto pelos cookies opcionais, que dependem da sua escolha
-        expressa.
+        Esta Política explica o que são cookies e tecnologias semelhantes,
+        quais tipos usamos no {COMPANY.productName} e como você pode
+        controlá-los. Cookies opcionais, como os analíticos e de marketing,
+        permanecem desativados até que você faça uma escolha expressa no
+        banner. Continuar navegando, por si só, não ativa essas categorias.
       </p>
 
       <h2>1. O que são cookies</h2>
@@ -90,17 +87,17 @@ export function CookiesContent() {
 
       <h2>4. Gestão de preferências</h2>
       <p>
-        Você definiu suas preferências ao ver o banner de cookies pela
-        primeira vez. Para revisar ou alterar a qualquer momento, clique no
-        botão abaixo — ele limpa a escolha salva e recarrega a página para o
-        banner reaparecer.
+        Você define suas preferências no banner de cookies. A escolha fica
+        salva neste navegador e vinculada à versão vigente desta Política.
+        Se a versão mudar, pediremos uma nova decisão. Para revisar ou alterar
+        sua escolha a qualquer momento, clique no botão abaixo.
       </p>
       <p>
         <ReopenPrefsButton />
       </p>
       <p className="text-sm">
         (Isso remove a chave <code>docfacil:cookie-prefs</code> do armazenamento
-        local e recarrega a página.)
+        local e recarrega a página para que o banner reapareça.)
       </p>
 
       <h2>5. Configurações no navegador</h2>
@@ -165,4 +162,3 @@ export function CookiesContent() {
     </>
   );
 }
-
