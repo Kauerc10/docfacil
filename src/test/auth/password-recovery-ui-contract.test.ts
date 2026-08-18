@@ -21,6 +21,13 @@ describe("experiência pública de recuperação de senha", () => {
     expect(css).toContain("prefers-reduced-motion");
   });
 
+  it("usa o mascote de recuperação na experiência de esqueci minha senha", () => {
+    const visual = source("src/components/docfacil/auth/password-recovery-visual.tsx");
+
+    expect(visual).toContain("/mascotes/coruja-recuperacao-senha.svg");
+    expect(visual).toContain('alt=""');
+  });
+
   it("rota de solicitação usa feedback neutro e volta para o login", () => {
     const form = source("src/app/esqueci-senha/password-recovery-form.tsx");
     const page = source("src/app/esqueci-senha/page.tsx");
