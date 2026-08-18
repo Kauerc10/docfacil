@@ -60,9 +60,10 @@ export function CadastroView() {
     setSubmitting(true);
 
     try {
-      if (!createdAccount && IS_FIREBASE_CONFIGURED && auth) {
+      const firebaseAuth = auth;
+      if (!createdAccount && IS_FIREBASE_CONFIGURED && firebaseAuth) {
         const passwordError = await validateSignupPassword(password, {
-          validateFirebasePassword: () => validatePassword(auth, password),
+          validateFirebasePassword: () => validatePassword(firebaseAuth, password),
         });
 
         if (passwordError) {
