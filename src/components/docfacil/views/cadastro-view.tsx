@@ -215,9 +215,7 @@ export function CadastroView() {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              <p className="mt-1.5 text-xs text-ink/50">
-                Mínimo 8 caracteres. Outros requisitos configurados no Firebase são validados ao criar a conta.
-              </p>
+              <p className="mt-1.5 text-xs text-ink/50">Mínimo 8 caracteres.</p>
             </div>
 
             <div className="flex items-start gap-3">
