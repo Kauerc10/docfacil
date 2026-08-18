@@ -22,11 +22,12 @@ function sha256Hex(value: string): string {
 }
 
 function renderCanonicalDocument(document: LegalConsentDocument): string {
-  const onNavigate = () => undefined;
+  // A evidência usa a mesma variante SSR das páginas públicas /termos e
+  // /privacidade. Assim, o hash não depende de detalhes do roteamento SPA.
   const content =
     document === "termos"
-      ? TermsContent({ onNavigate })
-      : PrivacyContent({ onNavigate });
+      ? TermsContent({})
+      : PrivacyContent({});
 
   return renderToStaticMarkup(content).replace(/\r\n/g, "\n").trim();
 }
