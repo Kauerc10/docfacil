@@ -5,8 +5,8 @@ import { Eye, EyeOff, Mail, Lock, User, Loader2, AlertCircle } from "lucide-reac
 import { useNav } from "@/components/docfacil/nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { Logo } from "@/components/docfacil/logo";
-import { TermsConsentModal } from "@/components/docfacil/terms-consent-modal";
-import { recordConsent, TERMS_VERSION, type ConsentDocument } from "@/lib/services/consent-service";
+import { recordConsent } from "@/lib/services/consent-service";
+import { auth, IS_FIREBASE_CONFIGURED } from "@/lib/firebase";
 
 /** The standard 4-color Google "G" mark as inline SVG. */
 function GoogleGIcon({ className }: { className?: string }) {
@@ -26,26 +26,20 @@ function GoogleGIcon({ className }: { className?: string }) {
       />
       <path
         fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 0 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"
       />
     </svg>
   );
 }
 
 /**
- * CadastroView (spec 4.8) — sign-up screen.
- * Wired to the real AuthContext (signUpWithEmail / signInWithGoogle).
+ * CadastroView — criação de conta com aceite explícito de Termos e
+ * Privacidade no próprio formulário.
  *
- * Fluxo de consentimento (LGPD-aware):
- *  1. Usuário preenche nome + e-mail + senha + checkbox "Aceito os Termos".
- *  2. Validação client-side (nome, e-mail, senha 8+, checkbox marcado).
- *  3. Em vez de chamar signUpWithEmail direto, abre o TermsConsentModal
- *     (flow="cadastro") — modal bloqueante que força o aceite explícito dos
- *     Termos de Uso + Política de Privacidade (e captura opt-in de marketing).
- *     O registro de consentimento é persistido via consent-service (IP,
- *     user-agent, versão dos termos) para fins de auditoria LGPD.
- *  4. Aceitando → signUpWithEmail(nome, email, password) → navigate("dashboard").
- *     Cancelando → volta pro form (sem signup).
+ * O checkbox é a única etapa de aceite no cadastro. Depois que a conta existe,
+ * o consentimento é persistido server-side com o UID autenticado, hashes e
+ * metadados definidos pelo backend. Não existe um segundo modal repetindo a
+ * mesma decisão.
  */
 export function CadastroView() {
   const { navigate } = useNav();
@@ -58,7 +52,6 @@ export function CadastroView() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [consentOpen, setConsentOpen] = useState(false);
   const [createdAccount, setCreatedAccount] = useState<{ uid: string; email: string } | null>(null);
 
   function clearErrors() {
@@ -71,7 +64,7 @@ export function CadastroView() {
     if (!email.trim()) return "Informe seu e-mail.";
     if (!email.includes("@")) return "E-mail inválido.";
     if (password.length < 8) return "A senha deve ter pelo menos 8 caracteres.";
-    if (!terms) return "Você precisa aceitar os Termos de Uso.";
+    if (!terms) return "Você precisa aceitar os Termos de Uso e a Política de Privacidade.";
     return null;
   }
 
@@ -82,40 +75,58 @@ export function CadastroView() {
       setValidationError(v);
       return;
     }
-    setValidationError(null);
-    // Abre o modal de consentimento (LGPD). O signup só prossegue depois
-    // do aceite ser persistido pelo consent-service.
-    setConsentOpen(true);
-  }
 
-  // No cadastro, a conta precisa existir antes que as regras permitam gravar
-  // o aceite. Se a rede falhar após criar a conta, preservamos a identidade
-  // para que o próximo clique apenas tente registrar o consentimento de novo.
-  async function handleConsentAccepted(documents: ConsentDocument[]) {
+    setValidationError(null);
     setSubmitting(true);
+
     try {
       const account =
         createdAccount || (await signUpWithEmail(nome.trim(), email.trim(), password));
       setCreatedAccount(account);
+
       await recordConsent({
         userId: account.uid,
         userEmail: account.email,
         flow: "cadastro",
-        documents,
-        termsVersion: TERMS_VERSION,
+        documents: ["termos", "privacidade"],
       });
-      setConsentOpen(false);
+
       navigate("dashboard");
     } catch {
+      // Se a conta já foi criada mas o registro do aceite falhou, preservamos
+      // o UID para que o próximo clique tente apenas persistir a evidência.
       setSubmitting(false);
     }
   }
 
   async function handleGoogle() {
     setValidationError(null);
+    if (!terms) {
+      setValidationError("Você precisa aceitar os Termos de Uso e a Política de Privacidade.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await signInWithGoogle();
+      // Em uma repetição após falha no consentimento, evita abrir outro popup.
+      if (!auth?.currentUser) {
+        await signInWithGoogle();
+      }
+
+      if (IS_FIREBASE_CONFIGURED) {
+        const currentUser = auth?.currentUser;
+        if (!currentUser) {
+          throw new Error("Não foi possível identificar a conta Google criada.");
+        }
+
+        await recordConsent({
+          userId: currentUser.uid,
+          userEmail: currentUser.email || undefined,
+          flow: "cadastro",
+          documents: ["termos", "privacidade"],
+        });
+      }
+
       navigate("dashboard");
     } catch {
       setSubmitting(false);
@@ -143,7 +154,6 @@ export function CadastroView() {
           </div>
 
           <form onSubmit={handleSubmit} className="mt-7 space-y-5" noValidate>
-            {/* Nome */}
             <div>
               <label
                 htmlFor="cad-name"
@@ -171,7 +181,6 @@ export function CadastroView() {
               </div>
             </div>
 
-            {/* E-mail */}
             <div>
               <label
                 htmlFor="cad-email"
@@ -199,7 +208,6 @@ export function CadastroView() {
               </div>
             </div>
 
-            {/* Senha */}
             <div>
               <label
                 htmlFor="cad-password"
@@ -242,32 +250,40 @@ export function CadastroView() {
               <p className="mt-1.5 text-xs text-ink/50">Mínimo 8 caracteres</p>
             </div>
 
-            {/* Termos */}
-            <label
-              htmlFor="cad-terms"
-              className="flex items-start gap-3 cursor-pointer group"
-            >
+            <div className="flex items-start gap-3">
               <input
                 id="cad-terms"
                 type="checkbox"
                 checked={terms}
-                onChange={(e) => setTerms(e.target.checked)}
+                onChange={(e) => {
+                  setTerms(e.target.checked);
+                  clearErrors();
+                }}
                 className="mt-0.5 w-5 h-5 rounded border-[var(--border)] accent-[var(--blue-royal)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
               />
               <span className="text-sm text-ink/75 leading-relaxed">
-                Aceito os{" "}
-                <span className="text-[var(--blue-royal)] font-medium hover:underline">
+                <label htmlFor="cad-terms" className="cursor-pointer">
+                  Aceito os{" "}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => navigate("termos")}
+                  className="text-[var(--blue-royal)] font-medium hover:underline"
+                >
                   Termos de Uso
-                </span>{" "}
+                </button>{" "}
                 e a{" "}
-                <span className="text-[var(--blue-royal)] font-medium hover:underline">
+                <button
+                  type="button"
+                  onClick={() => navigate("privacidade")}
+                  className="text-[var(--blue-royal)] font-medium hover:underline"
+                >
                   Política de Privacidade
-                </span>
+                </button>
                 .
               </span>
-            </label>
+            </div>
 
-            {/* Error alert */}
             {shownError && (
               <div
                 role="alert"
@@ -281,7 +297,6 @@ export function CadastroView() {
               </div>
             )}
 
-            {/* Criar conta */}
             <button
               type="submit"
               disabled={!canSubmit}
@@ -298,18 +313,16 @@ export function CadastroView() {
             </button>
           </form>
 
-          {/* Divider */}
           <div className="my-6 flex items-center gap-3" aria-hidden="true">
             <div className="h-px flex-1 bg-[var(--border)]" />
             <span className="text-sm text-ink/50 font-medium">ou</span>
             <div className="h-px flex-1 bg-[var(--border)]" />
           </div>
 
-          {/* Google */}
           <button
             type="button"
             onClick={handleGoogle}
-            disabled={submitting}
+            disabled={!terms || submitting}
             className="w-full h-12 rounded-lg border border-[var(--border)] bg-surface text-ink font-semibold text-lg hover:bg-paper transition inline-flex items-center justify-center gap-3 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <GoogleGIcon className="w-5 h-5" />
@@ -328,17 +341,6 @@ export function CadastroView() {
           </button>
         </p>
       </div>
-
-      {/* TermsConsentModal — fluxo LGPD de cadastro. O aceite é registrado
-          com o UID criado pelo callback, nunca como guest anônimo. */}
-      <TermsConsentModal
-        open={consentOpen}
-        onClose={() => setConsentOpen(false)}
-        onAccept={handleConsentAccepted}
-        flow="cadastro"
-        userEmail={email.trim() || undefined}
-        userId={undefined}
-      />
     </div>
   );
 }
