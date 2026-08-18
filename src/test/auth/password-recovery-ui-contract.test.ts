@@ -20,4 +20,20 @@ describe("experiência pública de recuperação de senha", () => {
     expect(visual).toContain("motion-safe:");
     expect(css).toContain("prefers-reduced-motion");
   });
+
+  it("rota de solicitação usa feedback neutro e volta para o login", () => {
+    const form = source("src/app/esqueci-senha/password-recovery-form.tsx");
+    const page = source("src/app/esqueci-senha/page.tsx");
+
+    expect(form).toContain("Se existir uma conta com esse e-mail");
+    expect(form).toContain('href="/?view=login"');
+    expect(form).toContain("requestPasswordReset");
+    expect(form).toContain("45");
+    expect(page).toContain("PasswordRecoveryForm");
+
+    for (const forbidden of ["Firebase", "oobCode", "apiKey", "SDK"]) {
+      expect(form).not.toContain(forbidden);
+      expect(page).not.toContain(forbidden);
+    }
+  });
 });
