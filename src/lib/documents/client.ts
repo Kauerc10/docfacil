@@ -143,8 +143,22 @@ export async function finalizeDocument(input: {
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || "Falha ao gerar documento.");
+    const payload = await res.json().catch(() => ({}));
+    const code = typeof payload.error?.code === "string" ? payload.error.code : undefined;
+    const message = payload.error?.message || "Falha ao gerar documento.";
+
+    // Se o servidor respondeu, sabemos que a tentativa terminou com erro.
+    // Apenas GENERATION_IN_PROGRESS mantém o mesmo requestId para recuperar a
+    // geração que continua rodando. Erros de rede não passam por este bloco e
+    // preservam a intenção, evitando duplicidade caso o servidor tenha concluído.
+    if (code !== "GENERATION_IN_PROGRESS") {
+      clearFinalizationRequestId(input.modeloSlug);
+    }
+
+    const error = new Error(message) as Error & { code?: string; status?: number };
+    error.code = code;
+    error.status = res.status;
+    throw error;
   }
 
   return await res.json();
