@@ -2,6 +2,7 @@
 
 import { LegalLayout } from "./legal-layout";
 import { CookiesContent } from "@/lib/legal/cookies-content";
+import { COOKIES_VERSION } from "@/lib/legal/versions";
 
 /**
  * CookiesView — Política de Cookies (versão SPA, `?view=cookies`).
@@ -16,7 +17,7 @@ export function CookiesView() {
       title="Política de Cookies"
       subtitle="Como e por que usamos cookies. Você escolhe o que aceitar."
       lastUpdated="13 de julho de 2026"
-      version="1.0"
+      version={COOKIES_VERSION}
     >
       <CookiesContent />
     </LegalLayout>
