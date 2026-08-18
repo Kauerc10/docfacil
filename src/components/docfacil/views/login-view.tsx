@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Eye, EyeOff, Mail, Lock, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Loader2, AlertCircle } from "lucide-react";
 import { useNav } from "@/components/docfacil/nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { Logo } from "@/components/docfacil/logo";
@@ -20,21 +20,13 @@ function GoogleGIcon({ className }: { className?: string }) {
 
 export function LoginView() {
   const { navigate } = useNav();
-  const {
-    signInWithEmail,
-    signInWithGoogle,
-    requestPasswordReset,
-    error,
-    clearError,
-  } = useAuth();
+  const { signInWithEmail, signInWithGoogle, error, clearError } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [resetSubmitting, setResetSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [resetFeedback, setResetFeedback] = useState<string | null>(null);
 
   function validate(): string | null {
     if (!email.trim()) return "Informe seu e-mail.";
@@ -46,7 +38,6 @@ export function LoginView() {
   function handleEmailChange(value: string) {
     setEmail(value);
     if (validationError) setValidationError(null);
-    if (resetFeedback) setResetFeedback(null);
     if (error) clearError();
   }
 
@@ -65,7 +56,6 @@ export function LoginView() {
     }
 
     setValidationError(null);
-    setResetFeedback(null);
     setSubmitting(true);
     try {
       await signInWithEmail(email.trim(), password);
@@ -77,38 +67,12 @@ export function LoginView() {
 
   async function handleGoogle() {
     setValidationError(null);
-    setResetFeedback(null);
     setSubmitting(true);
     try {
       await signInWithGoogle();
       navigate("dashboard");
     } catch {
       setSubmitting(false);
-    }
-  }
-
-  async function handlePasswordReset() {
-    const normalizedEmail = email.trim();
-    if (!normalizedEmail || !normalizedEmail.includes("@")) {
-      setResetFeedback(null);
-      setValidationError("Informe um e-mail válido para redefinir sua senha.");
-      return;
-    }
-
-    setValidationError(null);
-    if (error) clearError();
-    setResetFeedback(null);
-    setResetSubmitting(true);
-
-    try {
-      await requestPasswordReset(normalizedEmail);
-      setResetFeedback(
-        "Se existir uma conta com esse e-mail, enviaremos as instruções para redefinir sua senha."
-      );
-    } catch {
-      // O AuthContext já expõe uma mensagem segura para falhas operacionais.
-    } finally {
-      setResetSubmitting(false);
     }
   }
 
@@ -178,15 +142,12 @@ export function LoginView() {
             </div>
 
             <div className="flex justify-end -mt-1">
-              <button
-                type="button"
-                onClick={handlePasswordReset}
-                disabled={resetSubmitting || submitting}
-                className="text-sm font-medium text-[var(--blue-royal)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)] rounded px-1 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              <a
+                href="/esqueci-senha"
+                className="text-sm font-medium text-[var(--blue-royal)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)] rounded px-1"
               >
-                {resetSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
-                {resetSubmitting ? "Enviando..." : "Esqueci minha senha"}
-              </button>
+                Esqueci minha senha
+              </a>
             </div>
 
             {shownError && (
@@ -196,16 +157,9 @@ export function LoginView() {
               </div>
             )}
 
-            {resetFeedback && !shownError && (
-              <div role="status" className="flex items-start gap-2.5 rounded-lg border border-emerald-500/25 bg-emerald-500/8 px-3.5 py-3 text-sm text-ink/75">
-                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" aria-hidden="true" />
-                <span className="leading-relaxed">{resetFeedback}</span>
-              </div>
-            )}
-
             <button
               type="submit"
-              disabled={submitting || resetSubmitting}
+              disabled={submitting}
               className="w-full h-12 rounded-lg bg-[var(--blue-royal)] text-white font-semibold text-lg hover:bg-[var(--navy)] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)] disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
             >
               {submitting ? (
@@ -228,7 +182,7 @@ export function LoginView() {
           <button
             type="button"
             onClick={handleGoogle}
-            disabled={submitting || resetSubmitting}
+            disabled={submitting}
             className="w-full h-12 rounded-lg border border-[var(--border)] bg-surface text-ink font-semibold text-lg hover:bg-paper transition inline-flex items-center justify-center gap-3 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)] disabled:opacity-70 disabled:cursor-not-allowed"
           >
             <GoogleGIcon className="w-5 h-5" />
