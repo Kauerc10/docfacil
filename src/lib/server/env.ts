@@ -24,7 +24,7 @@ const serverEnvSchema = z.object({
   R2_ACCOUNT_ID: z.string().min(1).optional(),
   R2_ACCESS_KEY_ID: z.string().min(1).optional(),
   R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-  R2_BUCKET_NAME: z.string().min(1).default("docfacil-pdfs"),
+  R2_BUCKET_NAME: z.string().min(1).optional(),
   ALLOW_DEMO_BILLING: booleanString.default(false),
   ALLOW_IN_MEMORY_ARTIFACT_STORAGE: booleanString.default(false),
   APP_CHECK_ENFORCED: booleanString.default(false),
