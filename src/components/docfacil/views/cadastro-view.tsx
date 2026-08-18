@@ -8,7 +8,6 @@ import { Logo } from "@/components/docfacil/logo";
 import { recordConsent } from "@/lib/services/consent-service";
 import { auth, IS_FIREBASE_CONFIGURED } from "@/lib/firebase";
 
-/** The standard 4-color Google "G" mark as inline SVG. */
 function GoogleGIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
@@ -93,8 +92,6 @@ export function CadastroView() {
 
       navigate("dashboard");
     } catch {
-      // Se a conta já foi criada mas o registro do aceite falhou, preservamos
-      // o UID para que o próximo clique tente apenas persistir a evidência.
       setSubmitting(false);
     }
   }
@@ -108,7 +105,6 @@ export function CadastroView() {
 
     setSubmitting(true);
     try {
-      // Em uma repetição após falha no consentimento, evita abrir outro popup.
       if (!auth?.currentUser) {
         await signInWithGoogle();
       }
@@ -155,17 +151,11 @@ export function CadastroView() {
 
           <form onSubmit={handleSubmit} className="mt-7 space-y-5" noValidate>
             <div>
-              <label
-                htmlFor="cad-name"
-                className="block text-sm font-semibold text-ink mb-1.5"
-              >
+              <label htmlFor="cad-name" className="block text-sm font-semibold text-ink mb-1.5">
                 Nome completo
               </label>
               <div className="relative">
-                <User
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40"
-                  aria-hidden="true"
-                />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40" aria-hidden="true" />
                 <input
                   id="cad-name"
                   type="text"
@@ -182,17 +172,11 @@ export function CadastroView() {
             </div>
 
             <div>
-              <label
-                htmlFor="cad-email"
-                className="block text-sm font-semibold text-ink mb-1.5"
-              >
+              <label htmlFor="cad-email" className="block text-sm font-semibold text-ink mb-1.5">
                 E-mail
               </label>
               <div className="relative">
-                <Mail
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40"
-                  aria-hidden="true"
-                />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40" aria-hidden="true" />
                 <input
                   id="cad-email"
                   type="email"
@@ -209,17 +193,11 @@ export function CadastroView() {
             </div>
 
             <div>
-              <label
-                htmlFor="cad-password"
-                className="block text-sm font-semibold text-ink mb-1.5"
-              >
+              <label htmlFor="cad-password" className="block text-sm font-semibold text-ink mb-1.5">
                 Senha
               </label>
               <div className="relative">
-                <Lock
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40"
-                  aria-hidden="true"
-                />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40" aria-hidden="true" />
                 <input
                   id="cad-password"
                   type={showPassword ? "text" : "password"}
@@ -240,11 +218,7 @@ export function CadastroView() {
                   aria-pressed={showPassword}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-ink/50 hover:text-ink hover:bg-[var(--blue-soft)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)]"
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
               <p className="mt-1.5 text-xs text-ink/50">Mínimo 8 caracteres</p>
@@ -265,34 +239,30 @@ export function CadastroView() {
                 <label htmlFor="cad-terms" className="cursor-pointer">
                   Aceito os{" "}
                 </label>
-                <button
-                  type="button"
-                  onClick={() => navigate("termos")}
+                <a
+                  href="/termos"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-[var(--blue-royal)] font-medium hover:underline"
                 >
                   Termos de Uso
-                </button>{" "}
+                </a>{" "}
                 e a{" "}
-                <button
-                  type="button"
-                  onClick={() => navigate("privacidade")}
+                <a
+                  href="/privacidade"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-[var(--blue-royal)] font-medium hover:underline"
                 >
                   Política de Privacidade
-                </button>
+                </a>
                 .
               </span>
             </div>
 
             {shownError && (
-              <div
-                role="alert"
-                className="flex items-start gap-2.5 rounded-lg border border-[var(--coral)]/30 bg-[var(--coral)]/8 px-3.5 py-3 text-sm text-[var(--coral)]"
-              >
-                <AlertCircle
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                  aria-hidden="true"
-                />
+              <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-[var(--coral)]/30 bg-[var(--coral)]/8 px-3.5 py-3 text-sm text-[var(--coral)]">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
                 <span className="leading-relaxed">{shownError}</span>
               </div>
             )}
