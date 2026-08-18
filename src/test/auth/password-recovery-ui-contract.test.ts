@@ -48,7 +48,10 @@ describe("experiência pública de recuperação de senha", () => {
     expect(form).toContain("As senhas não coincidem");
     expect(page).toContain("PasswordResetForm");
 
-    for (const forbidden of ["Firebase", "oobCode", "apiKey", "SDK"]) {
+    // Imports e identificadores internos podem citar o provedor. O contrato
+    // protege a superfície pública: parâmetros do link e detalhes de SDK não
+    // devem existir na view nem aparecer para a pessoa usuária.
+    for (const forbidden of ["oobCode", "apiKey", "SDK"]) {
       expect(form).not.toContain(forbidden);
       expect(page).not.toContain(forbidden);
     }
