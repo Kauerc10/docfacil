@@ -42,29 +42,59 @@ type NavState = {
 
 const NavContext = createContext<NavState | null>(null);
 
-export function NavProvider({ children }: { children: React.ReactNode }) {
-  const [view, setView] = useState<View>(() => {
-    if (typeof window !== "undefined") {
-      const search = new URLSearchParams(window.location.search);
-      const v = search.get("view") as View;
-      if (v) return v;
-      const h = window.location.hash.replace("#/", "").replace("#", "") as View;
-      if (h) return h;
-    }
-    return "home";
+const VALID_VIEWS = new Set<View>([
+  "home",
+  "modelos",
+  "modelo-detalhe",
+  "criar",
+  "sucesso",
+  "ia",
+  "planos",
+  "checkout",
+  "dashboard",
+  "documento-detalhe",
+  "perfil",
+  "ajuda",
+  "login",
+  "cadastro",
+  "termos",
+  "privacidade",
+  "cookies",
+]);
+
+function readLocationState(): { view: View; params: NavParams } {
+  if (typeof window === "undefined") {
+    return { view: "home", params: {} };
+  }
+
+  const search = new URLSearchParams(window.location.search);
+  const queryView = search.get("view");
+  const hashView = window.location.hash.replace("#/", "").replace("#", "");
+  const candidate = queryView || hashView;
+  const view = candidate && VALID_VIEWS.has(candidate as View) ? (candidate as View) : "home";
+
+  const params: NavParams = {};
+  search.forEach((value, key) => {
+    if (key !== "view") params[key] = value;
   });
 
-  const [params, setParams] = useState<NavParams>(() => {
-    if (typeof window !== "undefined") {
-      const search = new URLSearchParams(window.location.search);
-      const p: NavParams = {};
-      search.forEach((value, key) => {
-        if (key !== "view") p[key] = value;
-      });
-      return p;
-    }
-    return {};
-  });
+  return { view, params };
+}
+
+export function NavProvider({ children }: { children: React.ReactNode }) {
+  // SSR e o primeiro render do cliente precisam produzir exatamente a mesma
+  // árvore. Ler window/location dentro do initializer do useState fazia o
+  // servidor renderizar "home" enquanto o browser já renderizava "login",
+  // "criar" etc., causando React hydration error #418.
+  const [view, setView] = useState<View>("home");
+  const [params, setParams] = useState<NavParams>({});
+
+  // Sincroniza a URL apenas depois que a hidratação inicial terminou.
+  useEffect(() => {
+    const state = readLocationState();
+    setView(state.view);
+    setParams(state.params);
+  }, []);
 
   const navigate = useCallback((next: View, p: NavParams = {}) => {
     setView(next);
@@ -84,14 +114,9 @@ export function NavProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onPopState = () => {
-      const search = new URLSearchParams(window.location.search);
-      const v = (search.get("view") as View) || "home";
-      const p: NavParams = {};
-      search.forEach((value, key) => {
-        if (key !== "view") p[key] = value;
-      });
-      setView(v);
-      setParams(p);
+      const state = readLocationState();
+      setView(state.view);
+      setParams(state.params);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
