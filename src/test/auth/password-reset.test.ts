@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   maskEmail,
   createPasswordResetService,
+  parsePasswordResetAction,
 } from "@/lib/auth/password-reset";
 
 describe("password reset service", () => {
@@ -49,5 +50,18 @@ describe("password reset service", () => {
 
   it("mascara e-mail sem revelar o endereço inteiro", () => {
     expect(maskEmail("kauerruon@gmail.com")).toBe("ka***@gmail.com");
+  });
+
+  it("aceita somente ação de redefinição com código presente", () => {
+    expect(
+      parsePasswordResetAction(
+        "mode=resetPassword&oobCode=codigo-valido&lang=pt-BR"
+      )
+    ).toEqual({ code: "codigo-valido" });
+
+    expect(parsePasswordResetAction("mode=resetPassword")).toBeNull();
+    expect(
+      parsePasswordResetAction("mode=verifyEmail&oobCode=codigo-email")
+    ).toBeNull();
   });
 });
