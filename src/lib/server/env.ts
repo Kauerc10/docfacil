@@ -10,6 +10,7 @@ const booleanString = z
 
 const serverEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
   FIREBASE_PROJECT_ID: z.string().min(1).optional(),
   NEXT_PUBLIC_FIREBASE_PROJECT_ID: z.string().min(1).optional(),
   FIREBASE_CLIENT_EMAIL: z.string().min(1).optional(),
