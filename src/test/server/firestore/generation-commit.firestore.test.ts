@@ -1,7 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { deleteApp, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import { FirestoreGenerationCommitRepository } from "@/lib/server/firestore/repositories";
+import {
+  FirestoreDocumentsRepository,
+  FirestoreGenerationCommitRepository,
+} from "@/lib/server/firestore/repositories";
+import { configureAdminFirestore } from "@/lib/server/firebase-admin";
 
 const RUN_FIRESTORE_COMMIT_TESTS =
   process.env.RUN_FIRESTORE_COMMIT_TESTS === "true";
@@ -11,6 +15,7 @@ describe.skipIf(!RUN_FIRESTORE_COMMIT_TESTS)(
   () => {
     let app: App;
     let db: Firestore;
+    let documentsRepository: FirestoreDocumentsRepository;
     let repository: FirestoreGenerationCommitRepository;
 
     beforeAll(() => {
@@ -18,7 +23,8 @@ describe.skipIf(!RUN_FIRESTORE_COMMIT_TESTS)(
         { projectId: "demo-docfacil-generation-commit" },
         "generation-commit-emulator-test"
       );
-      db = getFirestore(app);
+      db = configureAdminFirestore(getFirestore(app));
+      documentsRepository = new FirestoreDocumentsRepository(db);
       repository = new FirestoreGenerationCommitRepository(db);
     });
 
@@ -44,6 +50,33 @@ describe.skipIf(!RUN_FIRESTORE_COMMIT_TESTS)(
 
     afterAll(async () => {
       await deleteApp(app);
+    });
+
+    it("persists a free document when optional orderId is undefined", async () => {
+      const now = Date.now();
+      const created = await documentsRepository.createDocument({
+        owner: { type: "user", userId: "user-free" },
+        modeloSlug: "declaracao-residencia",
+        modeloNome: "Declaração de Residência",
+        respostas: {},
+        entitlement: {
+          type: "free",
+          orderId: undefined,
+          watermarked: true,
+        },
+        artifactState: "generating",
+        currentVersion: null,
+        targetVersion: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      const snapshot = await db.collection("documents").doc(created.id!).get();
+      expect(snapshot.exists).toBe(true);
+      expect(snapshot.data()?.entitlement).toEqual({
+        type: "free",
+        watermarked: true,
+      });
     });
 
     it(
