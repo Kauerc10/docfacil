@@ -65,19 +65,13 @@ export function TermsConsentModal({
   userEmail,
   userId,
 }: TermsConsentModalProps) {
-  // Bloqueio de backdrop/ESC para flows sensíveis. Em "document-generation",
-  // o usuário pode fechar normalmente; nos flows de cadastro/checkout, ele
-  // precisa decidir entre aceitar ou cancelar via botão explícito.
   const lockClose = flow === "cadastro" || flow === "checkout";
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next && lockClose) {
-          // Ignora tentativa de fechar via ESC/backdrop nos flows sensíveis.
-          return;
-        }
+        if (!next && lockClose) return;
         if (!next) onClose();
       }}
     >
@@ -105,8 +99,6 @@ export function TermsConsentModal({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Monta o form só quando aberto — estado dos checkboxes nasce
-            limpo a cada abertura, sem precisar de useEffect para resetar. */}
         {open && (
           <ConsentForm
             flow={flow}
@@ -156,20 +148,19 @@ function ConsentForm({
       const documents: ConsentDocument[] = acceptedMarketing
         ? ["termos", "privacidade", "marketing"]
         : ["termos", "privacidade"];
+
       if (flow === "cadastro") {
-        // No cadastro ainda não existe auth.uid. O callback cria a conta e
-        // persiste o aceite com a identidade real recém-autenticada.
+        // O callback cria/autentica a conta antes de registrar o aceite.
         await onAccept(documents);
       } else {
         if (!userId) {
-          throw new Error("Usuário autenticado obrigatório para registrar o aceite.");
+          throw new Error("Identificação do consentimento ausente.");
         }
         await recordConsent({
           userId,
           userEmail: userEmail || undefined,
           flow,
           documents,
-          termsVersion: TERMS_VERSION,
         });
         await onAccept(documents);
       }
@@ -184,87 +175,52 @@ function ConsentForm({
   return (
     <>
       <div className="mt-4 space-y-4">
-        {/* Termos */}
         <ConsentRow
           id="consent-terms"
           checked={acceptedTerms}
-          onChecked={(v) => setAcceptedTerms(Boolean(v))}
+          onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
           required
-          label={
-            <>
-              Li e aceito os{" "}
-              <button
-                type="button"
-                onClick={() => navigate("termos")}
-                className="text-[var(--blue-royal)] font-medium hover:underline"
-              >
-                Termos de Uso
-              </button>
-              .
-            </>
-          }
+          label="Li e aceito os Termos de Uso"
+          linkLabel="Ler Termos de Uso"
+          onLink={() => navigate("termos")}
         />
 
-        {/* Privacidade */}
         <ConsentRow
           id="consent-privacy"
           checked={acceptedPrivacy}
-          onChecked={(v) => setAcceptedPrivacy(Boolean(v))}
+          onCheckedChange={(checked) => setAcceptedPrivacy(checked === true)}
           required
-          label={
-            <>
-              Li e aceito a{" "}
-              <button
-                type="button"
-                onClick={() => navigate("privacidade")}
-                className="text-[var(--blue-royal)] font-medium hover:underline"
-              >
-                Política de Privacidade
-              </button>
-              .
-            </>
-          }
+          label="Li e aceito a Política de Privacidade"
+          linkLabel="Ler Política de Privacidade"
+          onLink={() => navigate("privacidade")}
         />
 
-        {/* Marketing */}
         <ConsentRow
           id="consent-marketing"
           checked={acceptedMarketing}
-          onChecked={(v) => setAcceptedMarketing(Boolean(v))}
-          label={
-            <>
-              Quero receber novidades e ofertas do {COMPANY.productName}{" "}
-              <span className="text-ink/50 font-normal">(opcional)</span>.
-            </>
-          }
+          onCheckedChange={(checked) => setAcceptedMarketing(checked === true)}
+          label="Quero receber novidades e dicas do DocFacil"
+          optional
         />
       </div>
 
-      <div className="mt-6 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-        {!lockClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] bg-surface px-5 py-3 text-sm font-semibold text-ink hover:bg-paper transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)] disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-        )}
+      <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={submitting}
+          className="h-11 px-5 rounded-lg border border-[var(--border)] text-ink/70 font-semibold text-sm hover:bg-paper transition disabled:opacity-50"
+        >
+          {lockClose ? "Cancelar" : "Agora não"}
+        </button>
         <button
           type="button"
           onClick={handleAccept}
           disabled={!canSubmit}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--coral)] px-6 py-3 text-sm font-bold text-white hover:bg-[var(--coral-hover)] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--coral)]/30 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-11 px-5 rounded-lg bg-[var(--blue-royal)] text-white font-semibold text-sm inline-flex items-center justify-center gap-2 hover:brightness-95 transition disabled:opacity-45 disabled:cursor-not-allowed"
         >
-          {submitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-              Registrando…
-            </>
-          ) : (
-            "Aceitar e continuar"
-          )}
+          {submitting && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+          Aceitar e continuar
         </button>
       </div>
     </>
@@ -274,31 +230,46 @@ function ConsentForm({
 function ConsentRow({
   id,
   checked,
-  onChecked,
+  onCheckedChange,
   label,
   required,
+  optional,
+  linkLabel,
+  onLink,
 }: {
   id: string;
   checked: boolean;
-  onChecked: (v: boolean) => void;
-  label: React.ReactNode;
+  onCheckedChange: (checked: boolean | "indeterminate") => void;
+  label: string;
   required?: boolean;
+  optional?: boolean;
+  linkLabel?: string;
+  onLink?: () => void;
 }) {
   return (
-    <label
-      htmlFor={id}
-      className="flex items-start gap-3 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-paper transition-colors"
-    >
+    <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-paper/60 p-3.5">
       <Checkbox
         id={id}
         checked={checked}
-        onCheckedChange={(v) => onChecked(v === true)}
+        onCheckedChange={onCheckedChange}
         className="mt-0.5"
       />
-      <span className="text-sm text-ink/75 leading-relaxed">
-        {label}
-        {required && <span className="text-[var(--coral)] font-semibold"> *</span>}
-      </span>
-    </label>
+      <div className="min-w-0 flex-1">
+        <label htmlFor={id} className="text-sm font-medium text-ink cursor-pointer">
+          {label}
+          {required && <span className="text-[var(--coral)] ml-1">*</span>}
+          {optional && <span className="text-ink/45 font-normal ml-1">(opcional)</span>}
+        </label>
+        {linkLabel && onLink && (
+          <button
+            type="button"
+            onClick={onLink}
+            className="mt-1 block text-xs font-semibold text-[var(--blue-royal)] hover:underline"
+          >
+            {linkLabel}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
