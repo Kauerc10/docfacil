@@ -14,6 +14,7 @@ describe("consent-service safety", () => {
     expect(content).not.toContain("setDoc(");
     expect(content).not.toContain("updateDoc(");
     expect(content).not.toContain("deleteDoc(");
-    expect(content).toContain('fetch("/api/consents"');
+    expect(content).toContain('apiFetch("/api/consents"');
+    expect(content).toContain('from "@/lib/auth/api-fetch"');
   });
 });
