@@ -32,9 +32,14 @@ function createLocalStorageMock(): Storage {
 }
 
 describe("preferências de cookies", () => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
   const originalLocalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
 
   beforeEach(() => {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: globalThis,
+    });
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,
       value: createLocalStorageMock(),
@@ -42,6 +47,12 @@ describe("preferências de cookies", () => {
   });
 
   afterEach(() => {
+    if (originalWindow) {
+      Object.defineProperty(globalThis, "window", originalWindow);
+    } else {
+      delete (globalThis as { window?: unknown }).window;
+    }
+
     if (originalLocalStorage) {
       Object.defineProperty(globalThis, "localStorage", originalLocalStorage);
     } else {
