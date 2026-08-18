@@ -19,10 +19,17 @@ describe("consent-service", () => {
       flow: "cadastro",
     })) as ConsentWithDocumentHashes;
 
-    expect(record.documentHashes?.termos).toMatch(SHA256_HEX);
-    expect(record.documentHashes?.privacidade).toMatch(SHA256_HEX);
-    expect(record.documentHashes?.termos).not.toBe(record.documentHashes?.privacidade);
-    expect(record.documentHashes?.termos).toBeDefined();
-    expect(record.termsHash).toBe(record.documentHashes!.termos);
+    const termsHash = record.documentHashes?.termos;
+    const privacyHash = record.documentHashes?.privacidade;
+
+    expect(termsHash).toMatch(SHA256_HEX);
+    expect(privacyHash).toMatch(SHA256_HEX);
+    expect(termsHash).not.toBe(privacyHash);
+
+    if (!termsHash) {
+      throw new Error("Hash dos Termos não foi registrado.");
+    }
+
+    expect(record.termsHash).toBe(termsHash);
   });
 });
