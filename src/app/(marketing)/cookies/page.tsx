@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { COMPANY } from "@/lib/company";
 import { LegalPageWrapper } from "@/lib/legal/legal-page-wrapper";
 import { CookiesContent } from "@/lib/legal/cookies-content";
+import { COOKIES_VERSION } from "@/lib/legal/versions";
 
 /**
  * /cookies — Política de Cookies (server-rendered).
@@ -29,8 +30,8 @@ export default function CookiesPage() {
     <LegalPageWrapper
       title="Política de Cookies"
       subtitle="Como e por que usamos cookies. Você escolhe o que aceitar."
-      lastUpdated="13 de julho de 2026"
-      version="1.0"
+      lastUpdated="18 de agosto de 2026"
+      version={COOKIES_VERSION}
     >
       <CookiesContent />
     </LegalPageWrapper>

@@ -196,7 +196,20 @@ describe.skipIf(!RUN_FIRESTORE_RULES)("Firestore Security Rules", () => {
   });
 
   describe("consents rules", () => {
-    it("allows an authenticated user to record and read only their own consent", async () => {
+    it("allows owner to read legacy consent but blocks other users", async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection("consents").doc("alice-terms-v1").set({
+          userId: "alice",
+          userEmail: "alice@example.com",
+          documents: ["termos", "privacidade"],
+          termsVersion: "1.0",
+          flow: "cadastro",
+          acceptedAt: 1,
+          userAgent: "test-agent",
+          termsHash: "docfacil-terms-v1.0",
+        });
+      });
+
       const alice = testEnv.authenticatedContext("alice", {
         email: "alice@example.com",
       });
@@ -205,34 +218,28 @@ describe.skipIf(!RUN_FIRESTORE_RULES)("Firestore Security Rules", () => {
       });
 
       await assertSucceeds(
-        alice.firestore().collection("consents").doc("alice-terms-v1").set({
-          userId: "alice",
-          userEmail: "alice@example.com",
-          documents: ["termos", "privacidade"],
-          termsVersion: "1.0",
-          flow: "cadastro",
-          acceptedAt: 1,
-          userAgent: "test-agent",
-          termsHash: "docfacil-terms-v1.0",
-        })
-      );
-
-      await assertSucceeds(
         alice.firestore().collection("consents").doc("alice-terms-v1").get()
       );
       await assertFails(
         bob.firestore().collection("consents").doc("alice-terms-v1").get()
       );
+    });
+
+    it("blocks authenticated clients from forging consent evidence", async () => {
+      const alice = testEnv.authenticatedContext("alice", {
+        email: "alice@example.com",
+      });
+
       await assertFails(
-        bob.firestore().collection("consents").doc("forged").set({
+        alice.firestore().collection("consents").doc("forged").set({
           userId: "alice",
           userEmail: "alice@example.com",
           documents: ["termos", "privacidade"],
           termsVersion: "1.0",
           flow: "cadastro",
           acceptedAt: 1,
-          userAgent: "test-agent",
-          termsHash: "docfacil-terms-v1.0",
+          userAgent: "forged-agent",
+          termsHash: "forged-hash",
         })
       );
     });

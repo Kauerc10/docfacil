@@ -2,105 +2,92 @@ import { COMPANY } from "@/lib/company";
 import { ReopenPrefsButton } from "./reopen-prefs-button";
 
 /**
- * CookiesContent — conteúdo da Política de Cookies, versão 1.0.
+ * CookiesContent — conteúdo da Política de Cookies.
  *
- * 6 seções: o que são, tipos (essenciais, funcionais, analíticos, marketing),
- * terceiros, gestão de preferências (botão "Reabrir preferências" que limpa o
- * localStorage e recarrega a página), links para navegadores, atualizações.
- *
- * Server Component. O botão "Reabrir preferências" é um Client Component
- * separado (ReopenPrefsButton) para evitar passar onClick pelo server.
+ * 6 seções: o que são, tipos (essenciais, analíticos e marketing), terceiros,
+ * gestão de preferências, configurações do navegador e atualizações.
  */
 export function CookiesContent() {
   return (
     <>
       <p>
-        Esta Política explica o que são cookies, quais tipos usamos no{" "}
-        {COMPANY.productName} e como você pode controlá-los. Ao continuar
-        navegando após o banner, você concorda com a utilização descrita aqui
-        — exceto pelos cookies opcionais, que dependem da sua escolha
-        expressa.
+        Esta Política explica o que são cookies e tecnologias semelhantes,
+        quais tipos usamos no {COMPANY.productName} e como você pode
+        controlá-los. Cookies opcionais, como os analíticos e de marketing,
+        permanecem desativados até que você faça uma escolha expressa no
+        banner. Continuar navegando, por si só, não ativa essas categorias.
       </p>
 
       <h2>1. O que são cookies</h2>
       <p>
         Cookies são pequenos arquivos de texto armazenados no seu navegador
-        quando você visita um site. Eles permitem que o site
-        &quot;lembre&quot; suas ações e preferências ao longo do tempo, sem
-        precisar pedir a mesma informação toda hora. Cookies não são
-        programas e não podem executar código malicioso no seu dispositivo.
+        quando você visita um site. Tecnologias de armazenamento local também
+        podem ser usadas para manter preferências e informações necessárias ao
+        funcionamento da aplicação. Cookies não são programas e não podem
+        executar código malicioso no seu dispositivo.
       </p>
 
-      <h2>2. Tipos de cookies que usamos</h2>
+      <h2>2. Tipos que usamos</h2>
       <p>
-        Classificamos os cookies em quatro categorias. Apenas as{" "}
-        <strong>essenciais</strong> são obrigatórias; as demais dependem do
-        seu consentimento.
+        O banner do {COMPANY.productName} trabalha com três categorias. Apenas
+        as <strong>essenciais</strong> ficam sempre ativas; analíticos e
+        marketing dependem da sua escolha.
       </p>
       <ul>
         <li>
-          <strong>Essenciais (sempre ativos):</strong> mantêm você
-          autenticado, preservam itens no carrinho e permitem que a
-          plataforma funcione. Sem eles, o {COMPANY.productName} não consegue
-          abrir uma sessão ou gerar um documento.
+          <strong>Essenciais (sempre ativos):</strong> recursos necessários
+          para autenticação, sessão, segurança e funcionalidades básicas da
+          plataforma.
         </li>
         <li>
-          <strong>Funcionais:</strong> lembram preferências como idioma e
-          tema, oferecendo uma experiência mais personalizada.
+          <strong>Analíticos:</strong> métricas de uso e desempenho que ajudam
+          a entender como o produto é utilizado. Só são ativados quando você
+          autoriza essa categoria.
         </li>
         <li>
-          <strong>Analíticos:</strong> coletam métricas agregadas (páginas
-          mais visitadas, tempo na tela, taxa de saída) para melhorarmos o
-          produto. Nenhum dado identifica você individualmente.
-        </li>
-        <li>
-          <strong>Marketing:</strong> usados para mostrar anúncios relevantes
-          em outros sites e medir a performance de campanhas. Ativam somente
-          com o seu aceite explícito.
+          <strong>Marketing:</strong> tecnologias usadas para mensuração de
+          campanhas e publicidade. Só são ativadas com seu aceite explícito.
         </li>
       </ul>
 
-      <h2>3. Cookies de terceiros</h2>
+      <h2>3. Serviços de terceiros</h2>
       <p>
-        Alguns cookies são definidos por serviços de terceiros que usamos:
+        Dependendo da configuração vigente da plataforma, podemos utilizar
+        serviços de terceiros para finalidades específicas:
       </p>
       <ul>
         <li>
-          <strong>Google Analytics / Firebase Analytics</strong>{" "}
-          (analíticos): métricas de uso agregadas.
+          <strong>Google Firebase Auth</strong> (essencial): autenticação e
+          manutenção da sessão da conta.
         </li>
         <li>
-          <strong>Google Firebase Auth</strong> (essencial): mantém sua
-          sessão de login.
+          <strong>Google Analytics 4</strong> (analítico, quando configurado):
+          métricas de uso da plataforma, ativadas somente após autorização.
         </li>
         <li>
-          <strong>Gateways de pagamento</strong> (essencial durante o
-          checkout): segurança da transação.
-        </li>
-        <li>
-          <strong>Meta / Google Ads</strong> (marketing, opcional): mensuração
-          de campanhas.
+          <strong>Meta Pixel</strong> (marketing, quando configurado):
+          mensuração de campanhas, ativada somente após autorização.
         </li>
       </ul>
       <p>
-        Cada terceiro trata os dados conforme sua própria política. Sempre que
-        possível, usamos versões &quot;consent mode&quot; que respeitam a sua
-        escolha no banner.
+        Cada terceiro trata os dados conforme sua própria política. O
+        {COMPANY.productName} não carrega os scripts opcionais de analytics ou
+        marketing antes da escolha correspondente no banner.
       </p>
 
       <h2>4. Gestão de preferências</h2>
       <p>
-        Você definiu suas preferências ao ver o banner de cookies pela
-        primeira vez. Para revisar ou alterar a qualquer momento, clique no
-        botão abaixo — ele limpa a escolha salva e recarrega a página para o
-        banner reaparecer.
+        Você define suas preferências no banner. A escolha fica salva neste
+        navegador e vinculada à versão vigente desta Política. Se a versão
+        mudar, pediremos uma nova decisão. Para revisar ou alterar sua escolha
+        a qualquer momento, clique no botão abaixo.
       </p>
       <p>
         <ReopenPrefsButton />
       </p>
       <p className="text-sm">
         (Isso remove a chave <code>docfacil:cookie-prefs</code> do armazenamento
-        local e recarrega a página.)
+        local e recarrega a página para que o banner reapareça.)
       </p>
 
       <h2>5. Configurações no navegador</h2>
@@ -147,16 +134,16 @@ export function CookiesContent() {
         </li>
       </ul>
       <p>
-        Bloquear cookies essenciais pode quebrar funcionalidades do{" "}
-        {COMPANY.productName} (login, geração de PDF, checkout).
+        Bloquear tecnologias essenciais pode impedir o funcionamento correto
+        de recursos como login e outras funções da plataforma.
       </p>
 
       <h2>6. Atualizações desta Política</h2>
       <p>
         Esta Política pode ser atualizada para refletir mudanças nos serviços
-        que usamos ou em exigências legais. Alterações relevantes serão
-        comunicadas por banner na plataforma ou por e-mail, com a data no
-        cabeçalho indicando a versão vigente.
+        que usamos ou em exigências legais. Quando a versão for alterada, a
+        preferência salva deixa de valer para a nova versão e o banner volta a
+        pedir sua escolha.
       </p>
       <p>
         Em caso de dúvida, escreva para{" "}
@@ -165,4 +152,3 @@ export function CookiesContent() {
     </>
   );
 }
-

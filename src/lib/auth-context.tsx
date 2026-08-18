@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import {
   GoogleAuthProvider,
   signInWithPopup,
@@ -12,6 +12,7 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db, IS_FIREBASE_CONFIGURED } from "./firebase";
+import { resolveInitialProfileName } from "./auth/profile-bootstrap";
 import { MODELOS } from "./modelos";
 import type { AppUser, PerfilUsuario } from "./types";
 
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [loading, setLoading] = useState<boolean>(() => IS_FIREBASE_CONFIGURED);
   const [error, setError] = useState<string | null>(null);
+  const pendingSignupNameRef = useRef<string | null>(null);
 
   // Subscribe to Firebase Auth state changes (only in Firebase mode).
   useEffect(() => {
@@ -83,6 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
+
+      const pendingSignupName = pendingSignupNameRef.current;
+
       // Load (or create) the user profile from Firestore
       let perfil: PerfilUsuario | null = null;
       if (db) {
@@ -95,7 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // First login → create profile (never pass undefined to Firestore)
             const novoPerfil: PerfilUsuario = {
               uid: fbUser.uid,
-              nome: fbUser.displayName || "Usuário",
+              nome: resolveInitialProfileName({
+                pendingSignupName,
+                firebaseDisplayName: fbUser.displayName,
+              }),
               email: fbUser.email || "",
               plano: "gratis",
               criadoEm: Date.now(),
@@ -114,11 +122,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       setUser({
         uid: fbUser.uid,
-        nome: perfil?.nome || fbUser.displayName || "Usuário",
+        nome: perfil?.nome || resolveInitialProfileName({
+          pendingSignupName,
+          firebaseDisplayName: fbUser.displayName,
+        }),
         email: fbUser.email || "",
         fotoUrl: perfil?.fotoUrl || fbUser.photoURL || undefined,
         plano: perfil?.plano || "gratis",
       });
+      pendingSignupNameRef.current = null;
       setLoading(false);
     });
     return () => {
@@ -184,12 +196,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(demo);
       return { uid: demo.uid, email: demo.email };
     }
+
+    const normalizedName = nome.trim();
+    pendingSignupNameRef.current = normalizedName;
+
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(cred.user, { displayName: nome });
-      // Profile doc created by onAuthStateChanged bootstrap
+      await updateProfile(cred.user, { displayName: normalizedName });
+      // O listener de auth usa pendingSignupNameRef para não criar o perfil
+      // como "Usuário" caso dispare antes do displayName ser atualizado.
       return { uid: cred.user.uid, email: cred.user.email || email };
     } catch (e) {
+      pendingSignupNameRef.current = null;
       setError(translateAuthError(e));
       throw e;
     }

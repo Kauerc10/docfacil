@@ -169,7 +169,6 @@ function ConsentForm({
           userEmail: userEmail || undefined,
           flow,
           documents,
-          termsVersion: TERMS_VERSION,
         });
         await onAccept(documents);
       }
