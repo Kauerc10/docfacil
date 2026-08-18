@@ -22,4 +22,13 @@ describe("contrato de autenticação das APIs client-side", () => {
     expect(text).not.toContain("getIdToken(");
     expect(text).not.toContain("getConsentHeaders");
   });
+
+  it("checkout preserva a identidade Firebase e não chama APIs diretamente", () => {
+    const text = source("src/lib/services/checkout-service.ts");
+    expect(text).toContain('from "@/lib/auth/api-fetch"');
+    expect(text).toContain('apiFetch("/api/checkout/demo"');
+    expect(text).toContain('apiFetch("/api/checkout/create"');
+    expect(text).not.toContain("getClientAppCheckToken");
+    expect(text).not.toContain('fetch("/api/checkout/');
+  });
 });
