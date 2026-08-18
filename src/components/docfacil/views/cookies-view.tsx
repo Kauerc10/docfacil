@@ -16,7 +16,7 @@ export function CookiesView() {
     <LegalLayout
       title="Política de Cookies"
       subtitle="Como e por que usamos cookies. Você escolhe o que aceitar."
-      lastUpdated="13 de julho de 2026"
+      lastUpdated="18 de agosto de 2026"
       version={COOKIES_VERSION}
     >
       <CookiesContent />
