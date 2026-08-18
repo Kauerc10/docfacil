@@ -4,6 +4,7 @@ import { requireAppCheck, resolvePrincipal } from "@/lib/server/security";
 import { documentDraftInputSchema } from "@/lib/server/domain/documents";
 import { generateDocumentArtifact } from "@/lib/server/domain/orchestrator";
 import { BackendError } from "@/lib/server/errors";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -66,6 +67,12 @@ export async function POST(req: Request) {
     if (err instanceof BackendError) {
       return err.toResponse();
     }
+
+    logger.error(
+      "DocumentsFinalize",
+      "falha inesperada ao finalizar documento",
+      err
+    );
     return BackendError.fromUnknown(err).toResponse();
   }
 }
