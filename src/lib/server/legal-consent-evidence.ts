@@ -1,5 +1,4 @@
 import "server-only";
-import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createHash } from "node:crypto";
 import { TermsContent } from "@/lib/legal/terms-content";
@@ -24,13 +23,12 @@ function sha256Hex(value: string): string {
 
 function renderCanonicalDocument(document: LegalConsentDocument): string {
   const onNavigate = () => undefined;
-
-  const markup =
+  const content =
     document === "termos"
-      ? renderToStaticMarkup(createElement(TermsContent, { onNavigate }))
-      : renderToStaticMarkup(createElement(PrivacyContent, { onNavigate }));
+      ? TermsContent({ onNavigate })
+      : PrivacyContent({ onNavigate });
 
-  return markup.replace(/\r\n/g, "\n").trim();
+  return renderToStaticMarkup(content).replace(/\r\n/g, "\n").trim();
 }
 
 function buildEvidenceCache(): Record<LegalConsentDocument, LegalDocumentEvidence> {
