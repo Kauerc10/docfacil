@@ -10,6 +10,11 @@ export type AuthSessionErrorCode =
   | "AUTH_TOKEN_UNAVAILABLE"
   | "AUTH_SESSION_EXPIRED";
 
+export type FetchLike = (
+  input: RequestInfo | URL,
+  init?: RequestInit
+) => Promise<Response>;
+
 export class AuthSessionError extends Error {
   readonly code: AuthSessionErrorCode;
 
@@ -23,7 +28,7 @@ export class AuthSessionError extends Error {
 type AuthenticatedFetchOptions = {
   auth: AuthenticatedFetchAuth | null;
   getAppCheckToken?: () => Promise<string | null>;
-  fetchImpl?: typeof fetch;
+  fetchImpl?: FetchLike;
   signOutUser?: () => Promise<void>;
 };
 
@@ -90,7 +95,7 @@ export async function firebaseAuthenticatedFetch(
   init: RequestInit = {},
   options: AuthenticatedFetchOptions
 ): Promise<Response> {
-  const fetchImpl = options.fetchImpl || fetch;
+  const fetchImpl: FetchLike = options.fetchImpl || fetch;
   const user = options.auth?.currentUser || null;
 
   let requestInit = await addAppCheckHeader(init, options.getAppCheckToken);
