@@ -1,0 +1,53 @@
+import { describe, expect, it } from "bun:test";
+import {
+  maskEmail,
+  createPasswordResetService,
+} from "@/lib/auth/password-reset";
+
+describe("password reset service", () => {
+  it("mantém feedback neutro quando o provedor informa usuário inexistente", async () => {
+    const service = createPasswordResetService({
+      sendReset: async () => {
+        const error = new Error("not found") as Error & { code?: string };
+        error.code = "auth/user-not-found";
+        throw error;
+      },
+      verifyCode: async () => "teste@example.com",
+      confirmReset: async () => undefined,
+    });
+
+    await expect(
+      service.requestPasswordReset("teste@example.com")
+    ).resolves.toBeUndefined();
+  });
+
+  it("valida código e devolve apenas o e-mail associado", async () => {
+    const service = createPasswordResetService({
+      sendReset: async () => undefined,
+      verifyCode: async () => "teste@example.com",
+      confirmReset: async () => undefined,
+    });
+
+    await expect(service.verifyPasswordReset("codigo-valido")).resolves.toEqual({
+      email: "teste@example.com",
+    });
+  });
+
+  it("confirma nova senha com o código recebido", async () => {
+    let received: [string, string] | null = null;
+    const service = createPasswordResetService({
+      sendReset: async () => undefined,
+      verifyCode: async () => "teste@example.com",
+      confirmReset: async (code, password) => {
+        received = [code, password];
+      },
+    });
+
+    await service.completePasswordReset("codigo", "NovaSenha123");
+    expect(received).toEqual(["codigo", "NovaSenha123"]);
+  });
+
+  it("mascara e-mail sem revelar o endereço inteiro", () => {
+    expect(maskEmail("kauerruon@gmail.com")).toBe("ka***@gmail.com");
+  });
+});
