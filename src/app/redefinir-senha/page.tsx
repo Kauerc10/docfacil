@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { parsePasswordResetAction } from "@/lib/auth/password-reset";
+import { parsePasswordResetAction } from "@/lib/auth/password-reset-action";
 import { PasswordResetForm } from "./password-reset-form";
 
 export const metadata: Metadata = {
