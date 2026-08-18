@@ -6,7 +6,6 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
   updateProfile,
   signOut as fbSignOut,
   onAuthStateChanged,
@@ -29,7 +28,6 @@ type AuthState = {
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (nome: string, email: string, password: string) => Promise<Pick<AppUser, "uid" | "email">>;
-  requestPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfileData: (data: Partial<Pick<PerfilUsuario, "nome" | "telefone">>) => Promise<void>;
   clearError: () => void;
@@ -205,22 +203,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const requestPasswordReset = useCallback(async (email: string) => {
-    setError(null);
-    if (!IS_FIREBASE_CONFIGURED || !auth) return;
-
-    try {
-      await ensureAuthPersistence();
-      auth.languageCode = "pt-BR";
-      await sendPasswordResetEmail(auth, email.trim());
-    } catch (e) {
-      // O feedback da tela é neutro para não revelar se o e-mail possui conta.
-      if (firebaseErrorCode(e) === "auth/user-not-found") return;
-      setError(translateAuthError(e));
-      throw e;
-    }
-  }, []);
-
   const signOut = useCallback(async () => {
     if (!IS_FIREBASE_CONFIGURED || !auth) {
       saveDemoUser(null);
@@ -253,7 +235,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmail,
-        requestPasswordReset,
         signOut,
         updateProfileData,
         clearError,
