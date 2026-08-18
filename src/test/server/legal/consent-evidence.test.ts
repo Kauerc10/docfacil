@@ -17,6 +17,6 @@ describe("legal consent evidence", () => {
     expect(first.privacidade?.sha256).toMatch(SHA256_HEX);
     expect(first.termos?.sha256).not.toBe(first.privacidade?.sha256);
     expect(second).toEqual(first);
-    expect(LEGAL_HASH_SCOPE).toBe("canonical-rendered-html-v1");
+    expect(LEGAL_HASH_SCOPE).toBe("canonical-react-content-v1");
   });
 });
