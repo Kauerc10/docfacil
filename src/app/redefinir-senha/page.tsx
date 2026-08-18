@@ -30,6 +30,9 @@ export default async function ResetPasswordPage({
   searchParams: SearchParams;
 }) {
   const params = await searchParams;
+
+  // A rota resolve a ação antes de chegar ao componente client. Assim, a UI
+  // recebe somente o código necessário e não precisa conhecer o formato do link.
   const action = parsePasswordResetAction(toQueryString(params));
 
   return <PasswordResetForm code={action?.code ?? null} />;
