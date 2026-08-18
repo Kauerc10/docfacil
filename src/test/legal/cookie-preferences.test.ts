@@ -87,4 +87,19 @@ describe("preferências de cookies", () => {
 
     expect(getCookiePreferences()).toBeNull();
   });
+
+  it("ignora preferência corrompida ou incompleta", () => {
+    localStorage.setItem(COOKIE_PREFS_KEY, "{quebrado");
+    expect(getCookiePreferences()).toBeNull();
+
+    localStorage.setItem(
+      COOKIE_PREFS_KEY,
+      JSON.stringify({
+        version: COOKIES_VERSION,
+        essential: true,
+        analytics: true,
+      })
+    );
+    expect(getCookiePreferences()).toBeNull();
+  });
 });
