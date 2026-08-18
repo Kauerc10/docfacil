@@ -68,6 +68,20 @@ describe("mensagem da política de senha", () => {
 
     expect(result).toContain("letra maiúscula");
     expect(result).toContain("número");
+    expect(result).not.toContain("Firebase");
+    expect(result).not.toContain("configurada");
+  });
+
+  it("usa fallback humano quando não há requisito específico para listar", async () => {
+    const mod = await loadPolicyModule();
+    expect(typeof mod.validateSignupPassword).toBe("function");
+    if (!mod.validateSignupPassword) return;
+
+    const result = await mod.validateSignupPassword("abcdefgh", {
+      validateFirebasePassword: async () => ({ isValid: false }),
+    });
+
+    expect(result).toBe("Escolha uma senha mais forte e tente novamente.");
   });
 
   it("aceita senha válida conforme mínimo local e política Firebase", async () => {
