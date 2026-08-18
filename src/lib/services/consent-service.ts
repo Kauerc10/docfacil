@@ -129,6 +129,8 @@ export async function recordConsent(params: {
   userEmail?: string;
   documents: ConsentDocument[];
   flow: ConsentFlow;
+  /** @deprecated Compatibilidade temporária. A versão real é definida pelo servidor. */
+  termsVersion?: string;
 }): Promise<ConsentRecord> {
   if (!IS_FIREBASE_CONFIGURED || !db) {
     const record = await createDemoConsentRecord(params);
