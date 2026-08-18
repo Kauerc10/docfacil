@@ -4,12 +4,8 @@
  * envia somente a decisão do usuário e, no checkout guest, o e-mail informado.
  */
 import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
-import {
-  auth,
-  db,
-  getClientAppCheckToken,
-  IS_FIREBASE_CONFIGURED,
-} from "../firebase";
+import { apiFetch } from "@/lib/auth/api-fetch";
+import { db, IS_FIREBASE_CONFIGURED } from "../firebase";
 import { STORAGE_KEYS } from "../constants";
 import {
   COOKIES_VERSION,
@@ -108,22 +104,6 @@ async function createDemoConsentRecord(params: {
   };
 }
 
-async function getConsentHeaders(): Promise<HeadersInit> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (auth?.currentUser) {
-    const idToken = await auth.currentUser.getIdToken();
-    if (idToken) headers.Authorization = `Bearer ${idToken}`;
-  }
-
-  const appCheckToken = await getClientAppCheckToken().catch(() => null);
-  if (appCheckToken) headers["X-Firebase-AppCheck"] = appCheckToken;
-
-  return headers;
-}
-
 export async function recordConsent(params: {
   userId: string;
   userEmail?: string;
@@ -141,11 +121,10 @@ export async function recordConsent(params: {
     return saved;
   }
 
-  const headers = await getConsentHeaders();
   const isGuest = params.userId === "guest";
-  const response = await fetch("/api/consents", {
+  const response = await apiFetch("/api/consents", {
     method: "POST",
-    headers,
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       documents: params.documents.filter((doc) => doc !== "cookies"),
       flow: params.flow,
