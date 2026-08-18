@@ -43,7 +43,7 @@ test.describe("Guest Purchase and Download Flow", () => {
     if (await nacSelect.isVisible()) await nacSelect.selectOption("Brasileiro(a)");
 
     const ecSelect = page.locator("#g-declarante_estado_civil");
-    if (await ecSelect.isVisible()) await ecSelect.selectOption("Solteiro(a)");
+    if (await ecSelect.isVisible()) await ecSelect.selectOption("solteiro(a)");
 
     const profInput = page.locator("#g-declarante_profissao");
     if (await profInput.isVisible()) await profInput.fill("Engenheira");
@@ -141,7 +141,7 @@ test.describe("Guest Purchase and Download Flow", () => {
     const locadorNac = page.locator("#g-locador_nacionalidade");
     if (await locadorNac.isVisible()) await locadorNac.selectOption("Brasileiro(a)");
     const locadorEc = page.locator("#g-locador_estado_civil");
-    if (await locadorEc.isVisible()) await locadorEc.selectOption("Solteiro(a)");
+    if (await locadorEc.isVisible()) await locadorEc.selectOption("solteiro(a)");
     const locadorProf = page.locator("#g-locador_profissao");
     if (await locadorProf.isVisible()) await locadorProf.fill("Empresário");
     const locadorCpf = page.locator("#g-locador_cpf");
@@ -155,7 +155,7 @@ test.describe("Guest Purchase and Download Flow", () => {
     const locatarioNac = page.locator("#g-locatario_nacionalidade");
     if (await locatarioNac.isVisible()) await locatarioNac.selectOption("Brasileiro(a)");
     const locatarioEc = page.locator("#g-locatario_estado_civil");
-    if (await locatarioEc.isVisible()) await locatarioEc.selectOption("Solteiro(a)");
+    if (await locatarioEc.isVisible()) await locatarioEc.selectOption("solteiro(a)");
     const locatarioProf = page.locator("#g-locatario_profissao");
     if (await locatarioProf.isVisible()) await locatarioProf.fill("Arquiteta");
     const locatarioCpf = page.locator("#g-locatario_cpf");
