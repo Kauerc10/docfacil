@@ -72,7 +72,7 @@ export async function validateSignupPassword(
   }
 
   if (requirements.length === 0) {
-    return "A senha não atende à política de segurança configurada.";
+    return "Escolha uma senha mais forte e tente novamente.";
   }
 
   return `Sua senha precisa ter ${requirements.join(", ")}.`;
