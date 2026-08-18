@@ -17,7 +17,6 @@ import { validateSignupPassword } from "@/lib/auth/password-policy";
 import {
   completePasswordReset,
   maskEmail,
-  parsePasswordResetAction,
   verifyPasswordReset,
 } from "@/lib/auth/password-reset";
 
@@ -39,9 +38,8 @@ function isInvalidActionError(error: unknown): boolean {
   );
 }
 
-export function PasswordResetForm() {
-  const [state, setState] = useState<ResetState>("checking");
-  const [code, setCode] = useState<string | null>(null);
+export function PasswordResetForm({ code }: { code: string | null }) {
+  const [state, setState] = useState<ResetState>(code ? "checking" : "invalid");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -50,16 +48,10 @@ export function PasswordResetForm() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!code) return;
+
     let cancelled = false;
-    const action = parsePasswordResetAction(window.location.search);
-
-    if (!action) {
-      setState("invalid");
-      return;
-    }
-
-    setCode(action.code);
-    void verifyPasswordReset(action.code)
+    void verifyPasswordReset(code)
       .then((result) => {
         if (cancelled) return;
         setEmail(result.email);
@@ -72,7 +64,7 @@ export function PasswordResetForm() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [code]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
