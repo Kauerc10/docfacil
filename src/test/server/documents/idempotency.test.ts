@@ -1,5 +1,6 @@
-import { describe, expect, it, beforeEach } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import {
+  FINALIZATION_INTENT_TTL_MS,
   getOrCreateFinalizationRequestId,
   clearFinalizationRequestId,
 } from "@/lib/documents/idempotency";
@@ -18,6 +19,48 @@ describe("Document Idempotency Management", () => {
     clearFinalizationRequestId("contrato-locacao");
     const req3 = getOrCreateFinalizationRequestId("contrato-locacao");
     expect(req3).not.toBe(req1);
+  });
+
+  it("rotates an abandoned finalization request after the client retry window", () => {
+    const previousLocalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+    const store = new Map<string, string>();
+    const fakeLocalStorage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => { store.set(key, value); },
+      removeItem: (key: string) => { store.delete(key); },
+      clear: () => { store.clear(); },
+      key: (index: number) => Array.from(store.keys())[index] ?? null,
+      get length() { return store.size; },
+    } as Storage;
+
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: fakeLocalStorage,
+    });
+
+    const slug = "declaracao-residencia";
+    const key = `docfacil:intent:v1:${slug}`;
+    const staleRequestId = "00000000-0000-0000-0000-000000000099";
+
+    try {
+      clearFinalizationRequestId(slug);
+      localStorage.setItem(key, JSON.stringify({
+        requestId: staleRequestId,
+        modeloSlug: slug,
+        createdAt: Date.now() - FINALIZATION_INTENT_TTL_MS - 1000,
+      }));
+
+      const freshRequestId = getOrCreateFinalizationRequestId(slug);
+      expect(freshRequestId).not.toBe(staleRequestId);
+      expect(getOrCreateFinalizationRequestId(slug)).toBe(freshRequestId);
+    } finally {
+      clearFinalizationRequestId(slug);
+      if (previousLocalStorage) {
+        Object.defineProperty(globalThis, "localStorage", previousLocalStorage);
+      } else {
+        delete (globalThis as { localStorage?: Storage }).localStorage;
+      }
+    }
   });
 
   const validAnswers = {
@@ -64,19 +107,16 @@ describe("Document Idempotency Management", () => {
       deps,
     };
 
-    // Make user pro
     await usersRepo.setUserProfile("user_pro", { plano: "pro" });
 
     const result1 = await generateDocumentArtifact(input);
     expect(result1.documentId).toBeDefined();
     expect(result1.version).toBe(1);
 
-    // Call again with same requestId
     const result2 = await generateDocumentArtifact(input);
     expect(result2.documentId).toBe(result1.documentId);
     expect(result2.version).toBe(1);
 
-    // Only 1 document artifact should have been created
     const artifacts = await docsRepo.listArtifacts(result1.documentId);
     expect(artifacts.length).toBe(1);
   });
