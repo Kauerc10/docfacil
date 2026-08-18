@@ -13,9 +13,11 @@ export async function apiFetch(
   input: RequestInfo | URL,
   init: RequestInit = {}
 ): Promise<Response> {
+  const clientAuth = auth;
+
   return firebaseAuthenticatedFetch(input, init, {
-    auth,
+    auth: clientAuth,
     getAppCheckToken: getClientAppCheckToken,
-    signOutUser: auth ? () => signOut(auth) : undefined,
+    signOutUser: clientAuth ? () => signOut(clientAuth) : undefined,
   });
 }
