@@ -47,6 +47,19 @@ if (IS_FIREBASE_CONFIGURED && typeof window !== "undefined") {
   db = getFirestore(app);
 }
 
+function isDisposableVercelPreview(): boolean {
+  if (typeof window === "undefined") return false;
+
+  const hostname = window.location.hostname;
+  if (!hostname.endsWith(".vercel.app")) return false;
+
+  // Branch aliases usam "-git-" e deployments imutáveis da Vercel terminam
+  // com o slug do time/projeto. Esses hosts mudam a cada preview e não devem
+  // depender de um domínio reCAPTCHA registrado. O domínio oficial de produção
+  // (ex.: docfacil-indol.vercel.app ou domínio próprio) não cai nesta regra.
+  return hostname.includes("-git-") || hostname.endsWith("-projects.vercel.app");
+}
+
 function ensureClientAppCheck(): AppCheck | null {
   if (appCheck) return appCheck;
   if (appCheckInitializationAttempted) return null;
@@ -58,6 +71,13 @@ function ensureClientAppCheck(): AppCheck | null {
   const debugToken = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_DEBUG_TOKEN;
 
   if (!siteKey) return null;
+
+  // O backend já não aplica App Check em Vercel Preview. Evita pedir um token
+  // reCAPTCHA para um hostname descartável que não está registrado no provider.
+  // Se um debug token foi configurado explicitamente, ainda permitimos App Check.
+  if (isDisposableVercelPreview() && !debugToken) {
+    return null;
+  }
 
   if (debugToken) {
     (self as typeof self & { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean | string })
