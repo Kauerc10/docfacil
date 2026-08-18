@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test";
 import {
   maskEmail,
   createPasswordResetService,
-  parsePasswordResetAction,
 } from "@/lib/auth/password-reset";
+import { parsePasswordResetAction } from "@/lib/auth/password-reset-action";
 
 describe("password reset service", () => {
   it("mantém feedback neutro quando o provedor informa usuário inexistente", async () => {
