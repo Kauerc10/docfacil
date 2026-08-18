@@ -36,4 +36,21 @@ describe("experiência pública de recuperação de senha", () => {
       expect(page).not.toContain(forbidden);
     }
   });
+
+  it("redefinição cobre link inválido e sucesso sem expor parâmetros técnicos", () => {
+    const form = source("src/app/redefinir-senha/password-reset-form.tsx");
+    const page = source("src/app/redefinir-senha/page.tsx");
+
+    expect(form).toContain("verifyPasswordReset");
+    expect(form).toContain("completePasswordReset");
+    expect(form).toContain("Esse link não é mais válido");
+    expect(form).toContain("Entrar no DocFácil");
+    expect(form).toContain("As senhas não coincidem");
+    expect(page).toContain("PasswordResetForm");
+
+    for (const forbidden of ["Firebase", "oobCode", "apiKey", "SDK"]) {
+      expect(form).not.toContain(forbidden);
+      expect(page).not.toContain(forbidden);
+    }
+  });
 });
