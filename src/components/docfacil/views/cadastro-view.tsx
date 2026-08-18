@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { validatePassword } from "firebase/auth";
 import { Eye, EyeOff, Mail, Lock, User, Loader2, AlertCircle } from "lucide-react";
 import { useNav } from "@/components/docfacil/nav-context";
 import { useAuth } from "@/lib/auth-context";
+import { validateSignupPassword } from "@/lib/auth/password-policy";
 import { Logo } from "@/components/docfacil/logo";
 import { recordConsent } from "@/lib/services/consent-service";
 import { auth, IS_FIREBASE_CONFIGURED } from "@/lib/firebase";
@@ -11,35 +13,14 @@ import { auth, IS_FIREBASE_CONFIGURED } from "@/lib/firebase";
 function GoogleGIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path
-        fill="#4285F4"
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.84 14.09a6.51 6.51 0 0 1 0-4.18V7.07H2.18a10.01 10.01 0 0 0 0 8.86l3.66-2.84z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 0 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"
-      />
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+      <path fill="#FBBC05" d="M5.84 14.09a6.51 6.51 0 0 1 0-4.18V7.07H2.18a10.01 10.01 0 0 0 0 8.86l3.66-2.84z" />
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 0 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
     </svg>
   );
 }
 
-/**
- * CadastroView — criação de conta com aceite explícito de Termos e
- * Privacidade no próprio formulário.
- *
- * O checkbox é a única etapa de aceite no cadastro. Depois que a conta existe,
- * o consentimento é persistido server-side com o UID autenticado, hashes e
- * metadados definidos pelo backend. Não existe um segundo modal repetindo a
- * mesma decisão.
- */
 export function CadastroView() {
   const { navigate } = useNav();
   const { signUpWithEmail, signInWithGoogle, error, clearError } = useAuth();
@@ -69,9 +50,9 @@ export function CadastroView() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const v = validate();
-    if (v) {
-      setValidationError(v);
+    const validation = validate();
+    if (validation) {
+      setValidationError(validation);
       return;
     }
 
@@ -79,6 +60,18 @@ export function CadastroView() {
     setSubmitting(true);
 
     try {
+      if (!createdAccount && IS_FIREBASE_CONFIGURED && auth) {
+        const passwordError = await validateSignupPassword(password, {
+          validateFirebasePassword: () => validatePassword(auth, password),
+        });
+
+        if (passwordError) {
+          setValidationError(passwordError);
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const account =
         createdAccount || (await signUpWithEmail(nome.trim(), email.trim(), password));
       setCreatedAccount(account);
@@ -213,7 +206,7 @@ export function CadastroView() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((v) => !v)}
+                  onClick={() => setShowPassword((value) => !value)}
                   aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
                   aria-pressed={showPassword}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-ink/50 hover:text-ink hover:bg-[var(--blue-soft)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)]"
@@ -221,7 +214,9 @@ export function CadastroView() {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              <p className="mt-1.5 text-xs text-ink/50">Mínimo 8 caracteres</p>
+              <p className="mt-1.5 text-xs text-ink/50">
+                Mínimo 8 caracteres. Outros requisitos configurados no Firebase são validados ao criar a conta.
+              </p>
             </div>
 
             <div className="flex items-start gap-3">
@@ -236,27 +231,14 @@ export function CadastroView() {
                 className="mt-0.5 w-5 h-5 rounded border-[var(--border)] accent-[var(--blue-royal)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
               />
               <span className="text-sm text-ink/75 leading-relaxed">
-                <label htmlFor="cad-terms" className="cursor-pointer">
-                  Aceito os{" "}
-                </label>
-                <a
-                  href="/termos"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[var(--blue-royal)] font-medium hover:underline"
-                >
+                <label htmlFor="cad-terms" className="cursor-pointer">Aceito os{" "}</label>
+                <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-[var(--blue-royal)] font-medium hover:underline">
                   Termos de Uso
                 </a>{" "}
                 e a{" "}
-                <a
-                  href="/privacidade"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[var(--blue-royal)] font-medium hover:underline"
-                >
+                <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="text-[var(--blue-royal)] font-medium hover:underline">
                   Política de Privacidade
-                </a>
-                .
+                </a>.
               </span>
             </div>
 
