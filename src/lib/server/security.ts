@@ -4,10 +4,42 @@ import { type AppCheck } from "firebase-admin/app-check";
 import { getAdminAuth, getAdminAppCheck } from "./firebase-admin";
 import { BackendError } from "./errors";
 import { getServerEnv } from "./env";
+import { logger } from "@/lib/logger";
 
 export type Principal =
   | { type: "guest" }
   | { type: "user"; userId: string; email?: string };
+
+function readTokenProjectHints(token: string): {
+  audience?: string;
+  issuerProject?: string;
+} {
+  try {
+    const payloadPart = token.split(".")[1];
+    if (!payloadPart) return {};
+
+    const payload = JSON.parse(
+      Buffer.from(payloadPart, "base64url").toString("utf8")
+    ) as { aud?: unknown; iss?: unknown };
+
+    const audience = typeof payload.aud === "string" ? payload.aud : undefined;
+    const issuer = typeof payload.iss === "string" ? payload.iss : undefined;
+    const issuerPrefix = "https://securetoken.google.com/";
+    const issuerProject = issuer?.startsWith(issuerPrefix)
+      ? issuer.slice(issuerPrefix.length)
+      : undefined;
+
+    return { audience, issuerProject };
+  } catch {
+    return {};
+  }
+}
+
+function getFirebaseErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
 
 export async function resolvePrincipal(
   req: Request,
@@ -39,7 +71,21 @@ export async function resolvePrincipal(
       userId: decoded.uid,
       email: decoded.email,
     };
-  } catch {
+  } catch (error) {
+    const env = getServerEnv();
+    const tokenHints = readTokenProjectHints(token);
+
+    logger.warn("Auth", "Falha ao validar token do Firebase", {
+      firebaseErrorCode: getFirebaseErrorCode(error) || "unknown",
+      expectedProjectId: env.FIREBASE_PROJECT_ID,
+      tokenAudience: tokenHints.audience,
+      tokenIssuerProject: tokenHints.issuerProject,
+      projectMatches:
+        Boolean(tokenHints.audience) &&
+        tokenHints.audience === env.FIREBASE_PROJECT_ID &&
+        tokenHints.issuerProject === env.FIREBASE_PROJECT_ID,
+    });
+
     throw new BackendError(
       "INVALID_AUTH_TOKEN",
       401,
