@@ -29,25 +29,31 @@ O DocFácil continuará usando os mecanismos nativos do Firebase Authentication 
 
 Não serão criados JWT próprio, token de recuperação próprio, tabela adicional de tokens, SMTP próprio ou serviço paralelo de autenticação nesta PR.
 
-### 2. Criar duas superfícies dedicadas de produto
+### 2. Criar duas rotas reais de produto
 
-O fluxo passa a ter duas telas próprias:
+O fluxo passa a ter duas páginas próprias do App Router:
 
-1. `esqueci-senha`: coleta o e-mail e envia as instruções;
-2. `redefinir-senha`: recebe a ação do e-mail, valida o código e permite definir a nova senha.
+1. `/esqueci-senha` — coleta o e-mail e envia as instruções;
+2. `/redefinir-senha` — recebe a ação do e-mail, valida o código e permite definir a nova senha.
 
-Como o produto ainda usa o roteador client-side próprio (`NavContext`) a partir da entrada `/`, essas superfícies serão adicionadas ao sistema de `View` existente, preservando a arquitetura atual da aplicação. O handler de e-mail deve aceitar os parâmetros que o Firebase acrescenta ao URL, especialmente `mode`, `oobCode`, `apiKey`, `continueUrl` e `lang`, sem expor esses detalhes na interface.
+A aplicação principal continuará usando o `NavContext` a partir de `/` para as views já existentes. Não haverá migração geral de roteamento nesta PR.
+
+Essas duas páginas são exceções intencionais porque precisam de URLs estáveis, canônicas e acessíveis diretamente de fora da SPA, especialmente a partir do e-mail de recuperação. Elas devem reutilizar os mesmos tokens visuais, logo e componentes-base do login/cadastro, sem carregar Header/Footer/WhatsApp quando isso prejudicar a experiência focada de recuperação.
+
+O botão `Esqueci minha senha` do login navegará para `/esqueci-senha` usando navegação normal do browser/Next, e não uma nova `View` do `NavContext`.
+
+O handler `/redefinir-senha` deve aceitar os parâmetros que o Firebase acrescenta ao URL, especialmente `mode`, `oobCode`, `apiKey`, `continueUrl` e `lang`, sem expor esses detalhes na interface.
 
 ## Fluxo funcional
 
 ### Solicitação de recuperação
 
 ```text
-/login
+login
   ↓
 Esqueci minha senha
   ↓
-esqueci-senha
+/esqueci-senha
   ↓
 informa e-mail
   ↓
@@ -67,7 +73,7 @@ Nenhuma diferença visual ou textual deve revelar se o endereço existe no siste
 Após o envio, a tela muda de estado sem navegar para uma página genérica. O usuário vê:
 
 - confirmação clara;
-- e-mail parcialmente mascarado, quando tecnicamente possível sem aumentar o risco de enumeração;
+- e-mail parcialmente mascarado somente a partir do valor que a própria pessoa acabou de digitar;
 - botão para voltar ao login;
 - ação de reenvio protegida por cooldown visual para evitar cliques repetidos;
 - animação discreta do envelope/chave seguindo o DNA visual do DocFácil.
@@ -81,7 +87,7 @@ O e-mail aponta para o handler customizado do DocFácil.
 ```text
 link do e-mail
   ↓
-redefinir-senha?mode=resetPassword&oobCode=...
+/redefinir-senha?mode=resetPassword&oobCode=...
   ↓
 verifyPasswordResetCode(auth, oobCode)
   ↓
@@ -90,6 +96,8 @@ verifyPasswordResetCode(auth, oobCode)
 ```
 
 A interface não mostra `oobCode`, `apiKey`, nomes de SDK, Firebase ou qualquer mensagem técnica.
+
+Se `mode` não for `resetPassword` ou o código estiver ausente, a página entra diretamente no estado amigável de link inválido.
 
 ### Definição da nova senha
 
@@ -111,11 +119,11 @@ sucesso
 CTA "Entrar no DocFácil"
 ```
 
-Não será feito login automático após redefinir a senha. O usuário retorna conscientemente à tela de login e autentica com a nova credencial.
+Não será feito login automático após redefinir a senha. O usuário retorna conscientemente ao login e autentica com a nova credencial.
 
 ## Estados da interface
 
-### `esqueci-senha`
+### `/esqueci-senha`
 
 Estados previstos:
 
@@ -131,7 +139,7 @@ Copy-base:
 **CTA:** `Enviar instruções`  
 **Retorno:** `Voltar para entrar`
 
-### `redefinir-senha`
+### `/redefinir-senha`
 
 Estados previstos:
 
@@ -173,7 +181,7 @@ A implementação deve reaproveitar os tokens visuais existentes do produto e ev
 
 A aplicação continuará chamando `sendPasswordResetEmail()` usando a infraestrutura nativa de Authentication.
 
-Quando necessário para preservar o retorno ao produto, o envio pode usar `ActionCodeSettings` com uma URL autorizada do DocFácil.
+O envio deverá fornecer `ActionCodeSettings` com uma URL autorizada do próprio DocFácil para manter o retorno sob o domínio do produto. A URL de ação principal continuará sendo controlada pelo template customizado no Console; o `continueUrl`, quando presente, será tratado como estado auxiliar e nunca como destino arbitrário vindo do usuário.
 
 ### Responsabilidade de configuração no console
 
@@ -185,7 +193,7 @@ A configuração operacional inclui:
 - assunto de recuperação em linguagem de produto;
 - corpo do template sem nome interno do projeto;
 - domínio personalizado de autenticação;
-- URL de ação customizada apontando para o handler do DocFácil;
+- URL de ação customizada apontando para `https://<dominio>/redefinir-senha`;
 - registros DNS exigidos pelo Firebase para verificação do domínio;
 - SPF ajustado sem criar múltiplos registros SPF conflitantes.
 
@@ -239,20 +247,23 @@ Requisitos obrigatórios:
 - link inválido/expirado recebe mensagem genérica e CTA para novo pedido;
 - nova senha validada antes de `confirmPasswordReset`;
 - nenhuma alteração em JWT/session architecture;
-- nenhuma verificação de e-mail adicionada nesta PR.
+- nenhuma verificação de e-mail adicionada nesta PR;
+- `continueUrl` não será usado para redirecionamento aberto sem validação.
 
 ## Alterações previstas
 
 Arquivos/componentes esperados:
 
-- `src/components/docfacil/nav-context.tsx` — novas views;
-- `src/components/docfacil/views/login-view.tsx` — navegar para recuperação;
-- nova view de solicitação de recuperação;
-- nova view de redefinição de senha;
-- integração dessas views no renderer principal da aplicação;
-- `src/lib/auth-context.tsx` — manter envio e, se necessário, aceitar `ActionCodeSettings`;
+- `src/components/docfacil/views/login-view.tsx` — navegar para `/esqueci-senha`;
+- `src/app/esqueci-senha/page.tsx` — rota real de solicitação;
+- `src/app/redefinir-senha/page.tsx` — rota real do handler/formulário;
+- componentes client-side focados para os dois fluxos, se necessário para manter as páginas enxutas;
+- camada de recuperação de senha compartilhada entre `AuthContext` e as páginas, evitando duplicação de chamadas ao SDK;
+- `src/lib/auth-context.tsx` — manter integração pública do login e delegar ao helper compartilhado;
 - `src/lib/auth/password-policy.ts` — reaproveitar validação existente;
 - testes de contrato/UX/auth correspondentes.
+
+Não é necessário alterar `NavContext` nem o switch principal apenas para essas páginas.
 
 A configuração de domínio e template no Console Firebase é uma etapa operacional documentada, não uma mutação automatizada do repositório.
 
@@ -262,11 +273,12 @@ Implementação seguirá TDD.
 
 Cobertura mínima esperada:
 
-- login navega para a view de recuperação;
+- login navega para `/esqueci-senha`;
 - envio exige e-mail válido;
 - feedback de envio permanece neutro;
 - nenhuma copy pública contém `Firebase` nesse fluxo;
 - link sem `oobCode` é rejeitado com estado amigável;
+- `mode` incorreto é rejeitado;
 - `verifyPasswordResetCode` válido libera o formulário;
 - código inválido/expirado mostra estado correto;
 - senhas diferentes são bloqueadas localmente;
@@ -308,10 +320,10 @@ Essa última frente será tratada em branch/PR separada após a conclusão da #1
 
 O fluxo é considerado concluído quando uma pessoa consegue:
 
-1. sair do login para uma tela DocFácil de recuperação;
+1. sair do login para `/esqueci-senha`;
 2. solicitar o reset sem descobrir se a conta existe;
 3. receber o e-mail real;
-4. abrir um link que leva à experiência DocFácil, e não à tela genérica do provedor;
+4. abrir um link que leva a `/redefinir-senha`, e não à tela genérica do provedor;
 5. definir uma nova senha válida;
 6. retornar ao login;
 7. entrar com a nova senha;
