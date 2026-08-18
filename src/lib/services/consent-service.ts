@@ -187,6 +187,7 @@ export async function listConsents(userId: string): Promise<ConsentRecord[]> {
 export const COOKIE_PREFS_KEY = STORAGE_KEYS.COOKIE_PREFS;
 
 export interface CookiePreferences {
+  version?: string;
   essential: true;
   analytics: boolean;
   marketing: boolean;
@@ -194,11 +195,24 @@ export interface CookiePreferences {
   rejectedAt?: number;
 }
 
+function isCookiePreferences(value: unknown): value is CookiePreferences {
+  if (!value || typeof value !== "object") return false;
+  const prefs = value as Partial<CookiePreferences>;
+  return (
+    prefs.version === COOKIES_VERSION &&
+    prefs.essential === true &&
+    typeof prefs.analytics === "boolean" &&
+    typeof prefs.marketing === "boolean"
+  );
+}
+
 export function getCookiePreferences(): CookiePreferences | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(COOKIE_PREFS_KEY);
-    return raw ? (JSON.parse(raw) as CookiePreferences) : null;
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return isCookiePreferences(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -206,5 +220,8 @@ export function getCookiePreferences(): CookiePreferences | null {
 
 export function saveCookiePreferences(prefs: CookiePreferences): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(COOKIE_PREFS_KEY, JSON.stringify(prefs));
+  localStorage.setItem(
+    COOKIE_PREFS_KEY,
+    JSON.stringify({ ...prefs, version: COOKIES_VERSION })
+  );
 }
