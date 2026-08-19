@@ -2,16 +2,9 @@
  * Fonte única de verdade para preços e rótulos de planos do DocFacil.
  *
  * Toda referência a preço ou nome de plano no app DEVE partir daqui.
- * Isso evita inconsistências (ex.: perfil mostrando R$29,90 enquanto o
- * checkout cobra R$24,90) e permite mudar o preço em um único lugar.
- *
- * Módulos que consomem:
- *  - checkout-service.ts (re-exporta PLAN_PRICES/PLAN_LABELS)
- *  - planos-view.tsx (preço exibido)
- *  - checkout-view.tsx (resumo do pedido)
- *  - perfil-view.tsx (plano atual do usuário)
- *  - termos-view.tsx (preço citado nos Termos)
+ * Regras de elegibilidade e quota gratuita vivem em document-access-policy.
  */
+import { FREE_MONTHLY_LIMIT } from "@/lib/document-access-policy";
 
 /** Planos de conta de usuário autoritativos no sistema. */
 export type AccountPlan = "gratis" | "pro";
@@ -28,13 +21,12 @@ export type PaidPlan = Exclude<Plan, "gratis">;
 /** Preço numérico (BRL) de cada plano. Grátis = 0. */
 export const PLAN_PRICES = {
   gratis: 0,
-  avulso: 9.9,
-  pro: 24.9,
+  avulso: 19.9,
+  pro: 39.9,
 } as const;
 
 /**
  * Converte o preço do plano/produto para valor inteiro em centavos.
- * Ex: avulso (R$ 9,90) -> 990 centavos.
  */
 export function planPriceToCents(plan: keyof typeof PLAN_PRICES): number {
   return Math.round(PLAN_PRICES[plan] * 100);
@@ -54,19 +46,21 @@ export const PLAN_FULL_LABELS: Record<Plan, string> = {
   pro: "Plano Pro (mensal)",
 };
 
-/** Descrição de cobrança exibida sob o nome do plano (ex.: "R$ 24,90/mês"). */
+/** Descrição de cobrança exibida sob o nome do plano. */
 export const PLAN_BILLING_DESC: Record<Plan, string> = {
   gratis: "Gratuito",
-  avulso: "R$ 9,90 / documento avulso",
-  pro: "R$ 24,90/mês",
+  avulso: "R$ 19,90 / documento avulso",
+  pro: "R$ 39,90/mês",
 };
 
-/** Limite mensal de documentos do plano grátis. Pro é ilimitado. */
-export const FREE_PLAN_MONTHLY_LIMIT = 3;
+/**
+ * Alias temporário para consumidores antigos. A fonte autoritativa é
+ * FREE_MONTHLY_LIMIT em document-access-policy.
+ */
+export const FREE_PLAN_MONTHLY_LIMIT = FREE_MONTHLY_LIMIT;
 
 /**
  * Formata um valor numérico como moeda brasileira (R$ X,XX).
- * Aceita 0 → "Gratuito" quando usado em contexto de plano.
  */
 export function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", {
@@ -75,10 +69,7 @@ export function formatBRL(value: number): string {
   });
 }
 
-/**
- * Texto de preço de exibição para cards/hero (ex.: "R$ 9,90", "R$ 24,90", "R$ 0").
- * Não inclui o sufixo de periodicidade — use PLAN_BILLING_DESC para isso.
- */
+/** Texto de preço de exibição para cards/hero. */
 export function formatPlanPrice(plan: Plan): string {
   if (plan === "gratis") return "R$ 0";
   return formatBRL(PLAN_PRICES[plan]);
