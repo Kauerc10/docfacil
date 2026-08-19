@@ -60,7 +60,12 @@ function applyClosingRhythm(nodes: unknown[], recipe: PdfVisualRecipe): unknown[
   if (isPdfNode(last) && Array.isArray(last.stack)) {
     out[lastIndex] = {
       ...last,
-      margin: [0, recipe.closingTopMargin, 0, 0] as [number, number, number, number],
+      margin: [
+        0,
+        recipe.closingTopMargin,
+        0,
+        recipe.closingBottomMargin,
+      ] as [number, number, number, number],
     };
   }
 
@@ -84,6 +89,8 @@ export function buildDocDefinition(
   const dividerWidth = recipe.dividerWidthCm === null ? CONTENT_WIDTH : cm(recipe.dividerWidthCm);
   const dividerX1 = (CONTENT_WIDTH - dividerWidth) / 2;
   const dividerX2 = dividerX1 + dividerWidth;
+  const footerHorizontalInset = cm(recipe.footerHorizontalInsetCm);
+  const footerWidth = cm(21) - 2 * footerHorizontalInset;
 
   return {
     pageSize: "A4" as const,
@@ -173,11 +180,18 @@ export function buildDocDefinition(
       followingNodesOnPage.length === 0
     ),
     footer: (currentPage: number, pageCount: number) => ({
-      margin: [pageMargins[0], 0, pageMargins[2], cm(1.0)] as [number, number, number, number],
+      // Footer nativo do pdfmake: usa a faixa física inferior da página e não
+      // herda as margens laterais do corpo, como em editores de texto.
+      margin: [
+        footerHorizontalInset,
+        0,
+        footerHorizontalInset,
+        cm(recipe.footerBottomMarginCm),
+      ] as [number, number, number, number],
       stack: [
         {
           canvas: [{
-            type: "line" as const, x1: 0, y1: 0, x2: CONTENT_WIDTH, y2: 0,
+            type: "line" as const, x1: 0, y1: 0, x2: footerWidth, y2: 0,
             lineWidth: 0.6, lineColor: "#cbd5e1",
           }],
         },
@@ -202,7 +216,13 @@ export function buildDocDefinition(
       clauseHeading: { font: "Roboto", fontSize: 12, bold: true, color: "#14315c" },
       body: { font: "Roboto", fontSize: recipe.bodyFontSize, color: "#0e2340", lineHeight: recipe.bodyLineHeight },
       label: { font: "Roboto", fontSize: 12, bold: true, color: "#0e2340" },
-      signature: { font: "Roboto", fontSize: 12, color: "#0e2340", lineHeight: recipe.signatureLineHeight },
+      signature: {
+        font: "Roboto",
+        fontSize: 12,
+        color: "#0e2340",
+        lineHeight: recipe.signatureLineHeight,
+        characterSpacing: recipe.signatureCharacterSpacing,
+      },
       legalQuote: { font: "Roboto", fontSize: 10.5, italics: true, color: "#5a6b82", lineHeight: recipe.legalQuoteLineHeight },
       witness: { font: "Roboto", fontSize: 9.5, italics: true, color: "#5a6b82" },
       headerContinuation: { font: "Roboto", fontSize: 9, color: "#5a6b82" },
