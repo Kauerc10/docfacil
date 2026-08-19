@@ -20,15 +20,17 @@ export function PasswordRecoveryVisual({
       >
         <div className="absolute inset-5 rounded-full bg-[var(--blue-soft)]/65 blur-2xl" />
         <div className="absolute inset-2 rounded-full border border-dashed border-[var(--blue-royal)]/25 motion-safe:animate-[spin_12s_linear_infinite]" />
-        <Image
-          src="/mascotes/coruja-recuperacao-senha.svg"
-          alt=""
-          width={160}
-          height={160}
-          priority
-          unoptimized
-          className="relative h-40 w-40 object-contain drop-shadow-[0_18px_26px_rgba(37,84,199,0.18)] motion-safe:animate-[bounce_4.6s_ease-in-out_infinite]"
-        />
+        <div className="absolute inset-2 grid place-items-center overflow-hidden rounded-full">
+          <Image
+            src="/mascotes/coruja-recuperacao-senha.svg"
+            alt=""
+            width={128}
+            height={128}
+            priority
+            unoptimized
+            className="relative h-32 w-32 object-contain drop-shadow-[0_12px_20px_rgba(37,84,199,0.16)] password-recovery-mascot-float"
+          />
+        </div>
       </div>
     );
   }
@@ -41,13 +43,15 @@ export function PasswordRecoveryVisual({
       >
         <div className="absolute inset-5 rounded-full bg-[var(--green-tint)]/70 blur-2xl" />
         <div className="absolute inset-2 rounded-full border border-dashed border-[var(--selo-green)]/25 motion-safe:animate-[spin_14s_linear_infinite]" />
-        <Image
-          src="/mascotes/coruja-email-enviado.webp"
-          alt=""
-          width={160}
-          height={160}
-          className="relative h-40 w-40 object-contain drop-shadow-[0_18px_26px_rgba(37,84,199,0.16)] motion-safe:animate-[bounce_4.8s_ease-in-out_infinite]"
-        />
+        <div className="absolute inset-2 grid place-items-center overflow-hidden rounded-full">
+          <Image
+            src="/mascotes/coruja-email-enviado.webp"
+            alt=""
+            width={128}
+            height={128}
+            className="relative h-32 w-32 object-contain drop-shadow-[0_12px_20px_rgba(37,84,199,0.14)] password-recovery-mascot-float"
+          />
+        </div>
       </div>
     );
   }
