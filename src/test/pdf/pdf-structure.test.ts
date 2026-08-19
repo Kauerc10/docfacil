@@ -26,11 +26,7 @@ describe("PDF Structure & Layout Protection", () => {
 
     expect(closingStack).toBeDefined();
     expect(closingStack.stack).toBeDefined();
-
-    // O fecho completo precisa poder aproveitar o espaço restante da página.
     expect(closingStack.unbreakable).not.toBe(true);
-
-    // As linhas/blocos de assinatura continuam protegidas individualmente.
     expect(JSON.stringify(closingStack)).toContain('"unbreakable":true');
   });
 
@@ -42,7 +38,8 @@ describe("PDF Structure & Layout Protection", () => {
     const background = ddo.background?.();
     const serialized = JSON.stringify(background);
 
-    expect(serialized).toContain("DOCFACIL");
+    expect(serialized).toContain("DOCFÁCIL");
+    expect(serialized).toContain("DOCUMENTO GERADO");
     expect(serialized).not.toContain("VALIDADE LEGAL");
   });
 
