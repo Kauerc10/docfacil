@@ -26,24 +26,9 @@ import {
 import { TermsConsentModal } from "@/components/docfacil/terms-consent-modal";
 import { loadGuestDraft, saveGuestDraft } from "@/lib/documents/client";
 
-/**
- * CheckoutView — tela de checkout para os planos Avulso e Pro.
- *
- * - Plano vem de `useNav().params.plan`.
- * - **Pro exige login** (lógica AuthGate-style inline, sem importar o AuthGate
- *   para mantermos o contexto do checkout: exibe login + volta pra cá).
- * - **Avulso não exige login** — qualquer visitante pode pagar.
- * - Order summary card + CTA coral "Pagar R$ X,XX" + trust badges + demo note.
- * - CTA abre o `TermsConsentModal` (flow="checkout"). Aceitando, dispara
- *   `createCheckout()` e redireciona para a URL do gateway (ou sucesso,
- *   em demo mode).
- *
- * Não importa o `PaymentBarrier` — esse componente pertence ao fluxo de
- * geração de documento (sucesso-view), não ao de checkout de plano.
- */
 export function CheckoutView() {
   const { params, navigate } = useNav();
-  const { user, loading } = useAuth();
+  const { user, loading, refreshProfile } = useAuth();
 
   const planParam = (params.plan as CheckoutPlan | undefined) ?? "avulso";
   const plan: CheckoutPlan = planParam === "pro" ? "pro" : "avulso";
@@ -83,8 +68,22 @@ export function CheckoutView() {
         documentId: params.docId,
         successUrl,
       });
-      toast.success("Redirecionando para o pagamento…");
-      // Pequeno delay para o toast aparecer antes do redirect.
+
+      if (result.provider === "demo" && plan === "pro") {
+        await refreshProfile();
+        toast.success("Plano Pro ativado no modo demonstração.", {
+          description: "Sua conta já está com documentos ilimitados para os testes.",
+        });
+        setSubmitting(false);
+        navigate("perfil");
+        return;
+      }
+
+      toast.success(
+        result.provider === "demo"
+          ? "Pagamento demo aprovado. Finalizando seu documento…"
+          : "Redirecionando para o pagamento…"
+      );
       setTimeout(() => {
         if (typeof window !== "undefined") {
           window.location.href = result.checkoutUrl;
@@ -95,9 +94,8 @@ export function CheckoutView() {
       toast.error("Não foi possível iniciar o pagamento. Tente novamente.");
       setSubmitting(false);
     }
-  }, [plan, userId, userEmail, params.docId, params.slug, user, guestEmail]);
+  }, [plan, userId, userEmail, params.docId, params.slug, user, guestEmail, refreshProfile, navigate]);
 
-  // Pro sem login → AuthGate-style inline. Hooks já foram chamados acima.
   if (plan === "pro" && loading) return <CheckoutSkeleton />;
   if (plan === "pro" && !user) return <ProLoginPrompt />;
 
@@ -114,7 +112,11 @@ export function CheckoutView() {
   }
 
   const isAvulso = plan === "avulso";
-  const ctaText = submitting ? "Redirecionando…" : `Pagar ${formatBRL(price)}`;
+  const ctaText = submitting
+    ? plan === "pro" && ACTIVE_PROVIDER === "demo"
+      ? "Ativando Pro…"
+      : "Redirecionando…"
+    : `Pagar ${formatBRL(price)}`;
 
   return (
     <section className="pt-[72px] pb-16 min-h-[calc(100vh-72px)] bg-paper">
@@ -145,7 +147,6 @@ export function CheckoutView() {
           </p>
         </div>
 
-        {/* Order summary card */}
         <div className="bg-surface border border-[var(--border)] rounded-2xl shadow-[0_12px_40px_-12px_rgba(14,35,64,0.16)] overflow-hidden">
           <div className="px-6 sm:px-7 py-5 border-b border-[var(--border)] bg-[var(--blue-soft)]/30">
             <p className="text-xs uppercase tracking-wider text-ink/55 font-semibold">
@@ -222,7 +223,6 @@ export function CheckoutView() {
           </div>
         </div>
 
-        {/* Trust badges */}
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
           <TrustBadge
             icon={FileText}
@@ -241,7 +241,6 @@ export function CheckoutView() {
           />
         </div>
 
-        {/* Demo note */}
         {ACTIVE_PROVIDER === "demo" && (
           <div className="mt-6 rounded-xl border border-[var(--blue-royal)]/25 bg-[var(--blue-soft)]/40 px-4 py-3 text-sm text-ink/70 flex items-start gap-2.5">
             <ShieldCheck
@@ -249,15 +248,13 @@ export function CheckoutView() {
               aria-hidden="true"
             />
             <span>
-              <strong>Modo demonstração:</strong> nenhum pagamento real será
-              processado. Ao clicar em &quot;Pagar&quot;, você será
-              redirecionado para a tela de sucesso para testar o fluxo
-              completo. Em produção, a integração com o gateway está pronta.
+              <strong>Modo demonstração:</strong> nenhum pagamento real será processado. {isAvulso
+                ? "O pedido será marcado como pago e o documento será liberado para testar o fluxo completo."
+                : "Ao confirmar, sua conta será ativada como Pro imediatamente para testar os recursos ilimitados."}
             </span>
           </div>
         )}
 
-        {/* Footer links */}
         <p className="mt-8 text-center text-sm text-ink/55">
           Ao continuar, você concorda com os{" "}
           <button
@@ -313,7 +310,6 @@ function TrustBadge({
   );
 }
 
-/** Skeleton exibido enquanto o auth state resolve (apenas para plano Pro). */
 function CheckoutSkeleton() {
   return (
     <div className="pt-[72px] min-h-[calc(100vh-72px)] bg-paper">
@@ -328,10 +324,6 @@ function CheckoutSkeleton() {
   );
 }
 
-/**
- * Prompt de login para o plano Pro (mesmo visual do AuthGate, mas com copy
- * focada em checkout e CTA que volta para esta mesma tela após login).
- */
 function ProLoginPrompt() {
   const { navigate } = useNav();
   return (
@@ -347,8 +339,7 @@ function ProLoginPrompt() {
           Faça login para assinar o Pro
         </h1>
         <p className="mt-3 text-ink/65 text-base leading-relaxed text-pretty">
-          O plano Pro é uma assinatura mensal — precisamos de uma conta para
-          gerenciar suas cobranças, histórico e documentos ilimitados.
+          O plano Pro é uma assinatura mensal, então precisamos de uma conta para gerenciar sua assinatura, histórico e documentos ilimitados.
         </p>
         <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
           <button
