@@ -46,7 +46,7 @@ import {
 export function CriarView() {
   const { params, navigate } = useNav();
   const slug = params.slug ?? "";
-  const documentId = params.id;
+  const requestedDocumentId = params.id;
   const requestedDraftId = params.draftId;
   const { user } = useAuth();
 
@@ -56,13 +56,12 @@ export function CriarView() {
   const [mostrandoLoading, setMostrandoLoading] = useState(false);
   const [accessPaywallReason, setAccessPaywallReason] = useState<AccessPaywallReason | null>(null);
   const [activeDraftId, setActiveDraftId] = useState<string | undefined>(requestedDraftId);
+  const [activeDocumentId, setActiveDocumentId] = useState<string | undefined>(requestedDocumentId);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [clausulasSelecionadas, setClausulasSelecionadas] = useState<string[]>([]);
-  const [extrasPorClausula, setExtrasPorClausula] = useState<
-    Record<string, Record<string, string>>
-  >({});
+  const [extrasPorClausula, setExtrasPorClausula] = useState<Record<string, Record<string, string>>>({});
   const [petMood, setPetMood] = useState<PetMood>("falando");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [petOverride, setPetOverride] = useState<string | null>(null);
@@ -75,20 +74,23 @@ export function CriarView() {
     setClausulasSelecionadas([]);
     setExtrasPorClausula({});
     setStepIndex(0);
+    setActiveDocumentId(requestedDocumentId);
+    setActiveDraftId(requestedDraftId);
 
     try {
       const m = await getModel(slug);
       setModelo(m);
       if (!m || !slug) return;
 
-      if (user && documentId) {
-        const editable = await duplicateDocument(documentId);
+      if (user && requestedDocumentId) {
+        const editable = await duplicateDocument(requestedDocumentId);
         if (!editable || editable.modeloSlug !== slug) {
           throw new Error("Não foi possível carregar as respostas deste documento.");
         }
         setAnswers(editable.respostas || {});
         setClausulasSelecionadas(editable.clausulasSelecionadas || []);
         setExtrasPorClausula(editable.extrasPorClausula || {});
+        setActiveDocumentId(requestedDocumentId);
         setActiveDraftId(undefined);
         return;
       }
@@ -103,6 +105,7 @@ export function CriarView() {
         setExtrasPorClausula(draft.extrasPorClausula || {});
         setStepIndex(Math.max(0, draft.stepIndex || 0));
         setActiveDraftId(draft.id);
+        setActiveDocumentId(draft.sourceDocumentId);
         return;
       }
 
@@ -116,14 +119,14 @@ export function CriarView() {
     } catch (e) {
       logger.error("CriarView", "falha ao carregar modelo ou estado editável", e, {
         slug,
-        documentId,
+        documentId: requestedDocumentId,
         draftId: requestedDraftId,
       });
       setModelo(null);
     } finally {
       setLoading(false);
     }
-  }, [slug, documentId, requestedDraftId, user?.uid]);
+  }, [slug, requestedDocumentId, requestedDraftId, user?.uid]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -189,11 +192,7 @@ export function CriarView() {
     }
   };
 
-  const handleGrupoFieldChange = (
-    _grupoKey: string,
-    fieldKey: string,
-    value: string
-  ) => {
+  const handleGrupoFieldChange = (_grupoKey: string, fieldKey: string, value: string) => {
     setAnswers((prev) => ({ ...prev, [fieldKey]: value }));
     if (fieldError) {
       setFieldError(null);
@@ -280,6 +279,7 @@ export function CriarView() {
       const saved = await saveAccountDraft({
         draftId: activeDraftId,
         modeloSlug: slug,
+        sourceDocumentId: activeDocumentId,
         respostas: answers,
         stepIndex,
         clausulasSelecionadas,
@@ -324,8 +324,8 @@ export function CriarView() {
       if (user) {
         const requestId = getOrCreateFinalizationRequestId(modelo.slug);
 
-        if (documentId) {
-          const result = await createDocumentVersion(documentId, {
+        if (activeDocumentId) {
+          const result = await createDocumentVersion(activeDocumentId, {
             requestId,
             respostas: respostasFinais,
             clausulasSelecionadas,
@@ -414,7 +414,7 @@ export function CriarView() {
         ...encodeClausulasSelecionadas(clausulasSelecionadas),
       };
       for (const extraMap of Object.values(extrasPorClausula)) {
-        for (const [k, v] of Object.entries(extraMap)) respostasFinais[k] = v;
+        for (const [key, value] of Object.entries(extraMap)) respostasFinais[key] = value;
       }
       void salvarDocumento(respostasFinais);
       return;
@@ -427,8 +427,8 @@ export function CriarView() {
   };
 
   const handleVoltar = () => {
-    if (documentId) {
-      navigate("documento-detalhe", { id: documentId });
+    if (activeDocumentId) {
+      navigate("documento-detalhe", { id: activeDocumentId });
       return;
     }
     if (activeDraftId || requestedDraftId) {
@@ -530,8 +530,8 @@ export function CriarView() {
           onChoosePro={() => {
             void (async () => {
               try {
-                await persistCurrentDraft();
-                navigate("checkout", { plan: "pro", slug });
+                const draftId = await persistCurrentDraft();
+                navigate("checkout", { plan: "pro", slug, draftId });
               } catch {
                 toast.error("Não foi possível salvar o rascunho antes de abrir o checkout.");
               }
@@ -540,8 +540,8 @@ export function CriarView() {
           onChooseSingle={() => {
             void (async () => {
               try {
-                await persistCurrentDraft();
-                navigate("checkout", { plan: "avulso", slug });
+                const draftId = await persistCurrentDraft();
+                navigate("checkout", { plan: "avulso", slug, draftId });
               } catch {
                 toast.error("Não foi possível salvar o rascunho antes de abrir o checkout.");
               }
