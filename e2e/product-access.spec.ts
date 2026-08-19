@@ -16,7 +16,10 @@ test.describe("Document access product UX", () => {
       "Contrato de Comodato",
       "Contrato de Locação Comercial",
     ]) {
-      const card = page.getByRole("button", { name: new RegExp(modelName, "i") });
+      const card = page.getByRole("button", {
+        name: `Abrir detalhes do modelo ${modelName}, grátis este mês`,
+        exact: true,
+      });
       await expect(card).toContainText("Grátis este mês");
     }
   });
