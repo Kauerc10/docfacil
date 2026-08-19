@@ -31,6 +31,23 @@ describe("InMemoryDraftStore", () => {
     expect(updated.stepIndex).toBe(3);
   });
 
+  it("preserva o documento de origem ao salvar uma edicao para depois", async () => {
+    const store = new InMemoryDraftStore();
+    const created = await store.save("usr_1", {
+      ...base,
+      sourceDocumentId: "doc_original",
+    });
+
+    const updated = await store.save("usr_1", {
+      ...base,
+      draftId: created.id,
+      respostas: { nome: "Maria Atualizada" },
+    });
+
+    expect(updated.sourceDocumentId).toBe("doc_original");
+    expect((await store.get("usr_1", created.id))?.sourceDocumentId).toBe("doc_original");
+  });
+
   it("isola ownership entre contas", async () => {
     const store = new InMemoryDraftStore();
     const created = await store.save("usr_owner", base);
