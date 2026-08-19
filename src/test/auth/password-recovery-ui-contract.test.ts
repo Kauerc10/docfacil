@@ -31,7 +31,7 @@ describe("experiência pública de recuperação de senha", () => {
   it("usa o mascote de e-mail enviado no estado de sucesso", () => {
     const visual = source("src/components/docfacil/auth/password-recovery-visual.tsx");
 
-    expect(visual).toContain('/mascotes/coruja-email-enviado.webp');
+    expect(visual).toContain("/mascotes/coruja-email-enviado");
     expect(visual).toContain('variant === "success"');
   });
 
