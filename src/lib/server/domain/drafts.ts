@@ -5,6 +5,7 @@ export interface AccountDraft {
   id: string;
   ownerUserId: string;
   modeloSlug: string;
+  sourceDocumentId?: string;
   respostas: Record<string, string>;
   stepIndex: number;
   clausulasSelecionadas: string[];
@@ -16,6 +17,7 @@ export interface AccountDraft {
 export const accountDraftInputSchema = z.object({
   draftId: z.string().min(1).max(160).optional(),
   modeloSlug: z.string().min(1).max(100),
+  sourceDocumentId: z.string().min(1).max(160).optional(),
   respostas: z.record(z.string().min(1).max(100), z.string().max(10000)).default({}),
   stepIndex: z.number().int().min(0).max(500).default(0),
   clausulasSelecionadas: z.array(z.string().min(1).max(100)).max(50).default([]),
