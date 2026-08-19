@@ -36,8 +36,11 @@ describe("PDF Structure & Layout Protection", () => {
 
   it("não promete validade legal na marca d'água do DocFácil", () => {
     const locacao = getModelo("contrato-locacao")!;
-    const ddo = buildDocDefinition(locacao, answers, { watermark: true });
-    const serialized = JSON.stringify(ddo);
+    const ddo = buildDocDefinition(locacao, answers, { watermark: true }) as {
+      background?: () => unknown;
+    };
+    const background = ddo.background?.();
+    const serialized = JSON.stringify(background);
 
     expect(serialized).toContain("DOCFACIL");
     expect(serialized).not.toContain("VALIDADE LEGAL");
