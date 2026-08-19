@@ -35,6 +35,17 @@ describe("experiência pública de recuperação de senha", () => {
     expect(visual).toContain('variant === "success"');
   });
 
+  it("mantém os mascotes dentro do selo com microflutuação suave", () => {
+    const visual = source("src/components/docfacil/auth/password-recovery-visual.tsx");
+    const css = source("src/app/globals.css");
+
+    expect(visual).toContain("password-recovery-mascot-float");
+    expect(visual).not.toContain("animate-[bounce_");
+    expect(visual).toContain("h-32 w-32");
+    expect(css).toContain("@keyframes password-recovery-mascot-float");
+    expect(css).toContain("translateY(-2px)");
+  });
+
   it("rota de solicitação usa feedback neutro e volta para o login", () => {
     const form = source("src/app/esqueci-senha/password-recovery-form.tsx");
     const page = source("src/app/esqueci-senha/page.tsx");
