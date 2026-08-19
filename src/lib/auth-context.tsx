@@ -30,6 +30,7 @@ type AuthState = {
   signUpWithEmail: (nome: string, email: string, password: string) => Promise<Pick<AppUser, "uid" | "email">>;
   signOut: () => Promise<void>;
   updateProfileData: (data: Partial<Pick<PerfilUsuario, "nome" | "telefone">>) => Promise<void>;
+  refreshProfile: () => Promise<void>;
   clearError: () => void;
 };
 
@@ -224,6 +225,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+
+    if (!IS_FIREBASE_CONFIGURED || !auth || !db) {
+      setUser(loadDemoUser());
+      return;
+    }
+
+    const fbUser = auth.currentUser;
+    if (!fbUser) return;
+
+    const snap = await getDoc(doc(db, "users", fbUser.uid));
+    if (!snap.exists()) return;
+
+    const perfil = snap.data() as PerfilUsuario;
+    setUser({
+      uid: fbUser.uid,
+      nome: perfil.nome || fbUser.displayName || user.nome,
+      email: fbUser.email || user.email,
+      fotoUrl: perfil.fotoUrl || fbUser.photoURL || undefined,
+      plano: perfil.plano || "gratis",
+    });
+  }, [user]);
+
   const clearError = useCallback(() => setError(null), []);
 
   return (
@@ -237,6 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUpWithEmail,
         signOut,
         updateProfileData,
+        refreshProfile,
         clearError,
       }}
     >
