@@ -45,4 +45,34 @@ describe("PDF Structure & Layout Protection", () => {
     expect(serialized).toContain("DOCFACIL");
     expect(serialized).not.toContain("VALIDADE LEGAL");
   });
+
+  it("usa perfis editoriais diferentes para declaração e contrato", () => {
+    const locacao = getModelo("contrato-locacao")!;
+    const declaracao = getModelo("declaracao-residencia")!;
+
+    const contratoDdo = buildDocDefinition(locacao, answers) as {
+      styles: { body: { lineHeight: number }; signature: { lineHeight: number } };
+    };
+    const declaracaoDdo = buildDocDefinition(declaracao, {}) as {
+      styles: { body: { lineHeight: number }; signature: { lineHeight: number } };
+    };
+
+    expect(declaracaoDdo.styles.body.lineHeight).toBeGreaterThan(
+      contratoDdo.styles.body.lineHeight
+    );
+    expect(declaracaoDdo.styles.signature.lineHeight).toBeGreaterThanOrEqual(
+      contratoDdo.styles.signature.lineHeight
+    );
+  });
+
+  it("expõe proteção semântica contra heading órfão na paginação real", () => {
+    const locacao = getModelo("contrato-locacao")!;
+    const ddo = buildDocDefinition(locacao, answers) as {
+      pageBreakBefore?: (...args: unknown[]) => boolean;
+      content: unknown[];
+    };
+
+    expect(typeof ddo.pageBreakBefore).toBe("function");
+    expect(JSON.stringify(ddo.content)).toContain('"headlineLevel"');
+  });
 });
