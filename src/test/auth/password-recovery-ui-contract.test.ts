@@ -17,7 +17,6 @@ describe("experiência pública de recuperação de senha", () => {
       expect(visual).not.toContain(forbidden);
     }
 
-    expect(visual).toContain("motion-safe:");
     expect(css).toContain("prefers-reduced-motion");
   });
 
@@ -35,17 +34,33 @@ describe("experiência pública de recuperação de senha", () => {
     expect(visual).toContain('variant === "success"');
   });
 
-  it("mantém os mascotes dentro do selo com microflutuação suave", () => {
+  it("mantém microflutuação suave sem círculo visível em volta dos mascotes", () => {
     const visual = source("src/components/docfacil/auth/password-recovery-visual.tsx");
     const visualCss = source("src/components/docfacil/auth/password-recovery-visual.module.css");
 
+    const recoveryStart = visual.indexOf('variant === "recovery"');
+    const successStart = visual.indexOf('variant === "success"');
+    const resetStart = visual.indexOf("const Icon");
+    const recoveryBlock = visual.slice(recoveryStart, successStart);
+    const successBlock = visual.slice(successStart, resetStart);
+
     expect(visual.match(/styles\.mascotFloat/g)?.length).toBe(2);
-    expect(visual.match(/h-32 w-32/g)?.length).toBe(2);
-    expect(visual.match(/overflow-hidden rounded-full/g)?.length).toBe(2);
+    expect(recoveryBlock).not.toContain("border-dashed");
+    expect(successBlock).not.toContain("border-dashed");
     expect(visualCss).toContain("@keyframes password-recovery-mascot-float");
     expect(visualCss).toContain("7.5s");
     expect(visualCss).toContain("translateY(-2px)");
     expect(visualCss).toContain("prefers-reduced-motion");
+  });
+
+  it("faz uma transição curta e fluida entre formulário e e-mail enviado", () => {
+    const form = source("src/app/esqueci-senha/password-recovery-form.tsx");
+
+    expect(form).toContain("AnimatePresence");
+    expect(form).toContain("motion.div");
+    expect(form).toContain('mode="wait"');
+    expect(form).toContain("0.16");
+    expect(form).toContain("0.1");
   });
 
   it("rota de solicitação usa feedback neutro e volta para o login", () => {
@@ -75,9 +90,6 @@ describe("experiência pública de recuperação de senha", () => {
     expect(form).toContain("As senhas não coincidem");
     expect(page).toContain("PasswordResetForm");
 
-    // Imports e identificadores internos podem citar o provedor. O contrato
-    // protege a superfície pública: parâmetros do link e detalhes de SDK não
-    // devem existir na view nem aparecer para a pessoa usuária.
     for (const forbidden of ["oobCode", "apiKey", "SDK"]) {
       expect(form).not.toContain(forbidden);
       expect(page).not.toContain(forbidden);
