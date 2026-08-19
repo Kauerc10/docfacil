@@ -20,12 +20,13 @@ describe("cadastro - experiência de senha", () => {
   it("exibe medidor orientativo sem torná-lo uma regra de bloqueio", () => {
     const cadastro = source("src/components/docfacil/views/cadastro-view.tsx");
     const meter = source("src/components/docfacil/auth/password-strength-meter.tsx");
+    const strength = source("src/lib/auth/password-strength.ts");
 
     expect(cadastro).toContain("PasswordStrengthMeter");
     expect(meter).toContain('role="meter"');
-    expect(meter).toContain("Muito fraca");
-    expect(meter).toContain("Forte");
     expect(meter).toContain("aria-live");
+    expect(strength).toContain("Muito fraca");
+    expect(strength).toContain("Forte");
     expect(cadastro).not.toContain("strength.score >=");
   });
 
