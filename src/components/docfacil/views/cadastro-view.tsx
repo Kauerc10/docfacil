@@ -2,7 +2,17 @@
 
 import { useState, type FormEvent } from "react";
 import { validatePassword } from "firebase/auth";
-import { Eye, EyeOff, Mail, Lock, User, Loader2, AlertCircle } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  User,
+} from "lucide-react";
+import { PasswordStrengthMeter } from "@/components/docfacil/auth/password-strength-meter";
 import { useNav } from "@/components/docfacil/nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { validateSignupPassword } from "@/lib/auth/password-policy";
@@ -28,8 +38,10 @@ export function CadastroView() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [terms, setTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [createdAccount, setCreatedAccount] = useState<{ uid: string; email: string } | null>(null);
@@ -44,6 +56,8 @@ export function CadastroView() {
     if (!email.trim()) return "Informe seu e-mail.";
     if (!email.includes("@")) return "E-mail inválido.";
     if (password.length < 8) return "A senha deve ter pelo menos 8 caracteres.";
+    if (!confirmPassword) return "Confirme sua senha.";
+    if (password !== confirmPassword) return "As senhas não coincidem.";
     if (!terms) return "Você precisa aceitar os Termos de Uso e a Política de Privacidade.";
     return null;
   }
@@ -124,7 +138,14 @@ export function CadastroView() {
   }
 
   const shownError = validationError || error;
-  const canSubmit = terms && !submitting;
+  const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  const canSubmit =
+    terms &&
+    password.length >= 8 &&
+    confirmPassword.length > 0 &&
+    password === confirmPassword &&
+    !submitting;
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-paper flex items-center justify-center px-4 py-12">
@@ -202,6 +223,7 @@ export function CadastroView() {
                     clearErrors();
                   }}
                   minLength={8}
+                  aria-describedby="cad-password-help"
                   placeholder="••••••••"
                   className="w-full h-12 pl-11 pr-12 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
                 />
@@ -215,7 +237,59 @@ export function CadastroView() {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              <p className="mt-1.5 text-xs text-ink/50">Mínimo 8 caracteres.</p>
+              <p id="cad-password-help" className="mt-1.5 text-xs text-ink/50">
+                Mínimo 8 caracteres.
+              </p>
+              <PasswordStrengthMeter password={password} name={nome} email={email} />
+            </div>
+
+            <div>
+              <label htmlFor="cad-confirm-password" className="block text-sm font-semibold text-ink mb-1.5">
+                Confirmar senha
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40" aria-hidden="true" />
+                <input
+                  id="cad-confirm-password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    clearErrors();
+                  }}
+                  aria-invalid={passwordsMismatch}
+                  aria-describedby="cad-confirm-password-help"
+                  placeholder="••••••••"
+                  className={`w-full h-12 pl-11 pr-12 text-xl rounded-lg border bg-paper focus:bg-surface outline-none focus:ring-4 transition placeholder:text-ink/35 ${
+                    passwordsMismatch
+                      ? "border-[var(--coral)]/65 focus:border-[var(--coral)] focus:ring-[var(--coral)]/10"
+                      : passwordsMatch
+                        ? "border-[var(--selo-green)]/55 focus:border-[var(--selo-green)] focus:ring-[var(--green-tint)]"
+                        : "border-[var(--border)] focus:border-[var(--blue-royal)] focus:ring-[var(--blue-soft)]"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((value) => !value)}
+                  aria-label={showConfirmPassword ? "Esconder confirmação da senha" : "Mostrar confirmação da senha"}
+                  aria-pressed={showConfirmPassword}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-ink/50 hover:text-ink hover:bg-[var(--blue-soft)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)]"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <div id="cad-confirm-password-help" className="mt-1.5 min-h-5 text-xs" aria-live="polite">
+                {passwordsMatch && (
+                  <span className="inline-flex items-center gap-1.5 text-[var(--selo-green)]">
+                    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Senhas coincidem.
+                  </span>
+                )}
+                {passwordsMismatch && (
+                  <span className="text-[var(--coral)]">As senhas não coincidem.</span>
+                )}
+              </div>
             </div>
 
             <div className="flex items-start gap-3">
