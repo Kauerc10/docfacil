@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Check, KeyRound, ShieldAlert } from "lucide-react";
+import { KeyRound, ShieldAlert } from "lucide-react";
 
 export type PasswordRecoveryVisualVariant =
   | "recovery"
@@ -33,12 +33,26 @@ export function PasswordRecoveryVisual({
     );
   }
 
-  const Icon =
-    variant === "success"
-      ? Check
-      : variant === "invalid"
-        ? ShieldAlert
-        : KeyRound;
+  if (variant === "success") {
+    return (
+      <div
+        className="relative mx-auto grid h-40 w-40 place-items-center"
+        aria-hidden="true"
+      >
+        <div className="absolute inset-5 rounded-full bg-[var(--green-tint)]/70 blur-2xl" />
+        <div className="absolute inset-2 rounded-full border border-dashed border-[var(--selo-green)]/25 motion-safe:animate-[spin_14s_linear_infinite]" />
+        <Image
+          src="/mascotes/coruja-email-enviado.webp"
+          alt=""
+          width={160}
+          height={160}
+          className="relative h-40 w-40 object-contain drop-shadow-[0_18px_26px_rgba(37,84,199,0.16)] motion-safe:animate-[bounce_4.8s_ease-in-out_infinite]"
+        />
+      </div>
+    );
+  }
+
+  const Icon = variant === "invalid" ? ShieldAlert : KeyRound;
 
   return (
     <div
