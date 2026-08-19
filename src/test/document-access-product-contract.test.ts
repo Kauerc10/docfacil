@@ -1,0 +1,60 @@
+import { describe, expect, it } from "bun:test";
+import { classifyFinalizationError } from "@/components/docfacil/views/criar/finalization-error";
+
+async function readSource(path: string): Promise<string> {
+  return await Bun.file(path).text();
+}
+
+describe("document access product contract", () => {
+  it("classifica separadamente limite, modelo nao gratis e edicao Pro", () => {
+    expect(
+      classifyFinalizationError(Object.assign(new Error("limit"), { code: "FREE_LIMIT_REACHED", status: 402 }))
+    ).toBe("free_limit");
+    expect(
+      classifyFinalizationError(Object.assign(new Error("model"), { code: "FREE_MODEL_NOT_ELIGIBLE", status: 402 }))
+    ).toBe("model_not_free");
+    expect(
+      classifyFinalizationError(Object.assign(new Error("pro"), { code: "PRO_REQUIRED", status: 402 }))
+    ).toBe("pro_required");
+    expect(
+      classifyFinalizationError(Object.assign(new Error("payment"), { code: "ORDER_NOT_PAID", status: 402 }))
+    ).toBe("generic");
+  });
+
+  it("catalogo mostra selo mensal usando a politica compartilhada", async () => {
+    const source = await readSource("src/components/docfacil/views/modelos-view.tsx");
+    expect(source).toContain("isMonthlyFreeModel");
+    expect(source).toContain("Grátis este mês");
+    expect(source).toContain("1 geração grátis por mês com uma conta DocFácil");
+    expect(source).toContain("pode mudar mensalmente");
+  });
+
+  it("planos nao anunciam mais a regra antiga", async () => {
+    const source = await readSource("src/components/docfacil/views/planos-view.tsx");
+    expect(source).toContain("1 geração grátis por mês");
+    expect(source).toContain("Conta DocFácil necessária");
+    expect(source).toContain("Sem conta obrigatória");
+    expect(source).toContain("formatPlanPrice(\"avulso\")");
+    expect(source).toContain("formatPlanPrice(\"pro\")");
+    expect(source).not.toContain("3 documentos por mês");
+    expect(source).not.toContain("Sem necessidade de conta");
+    expect(source).not.toContain("R$ 9,90");
+    expect(source).not.toContain("R$ 24,90");
+  });
+
+  it("barreira avulsa oferece login gratis somente com politica por slug", async () => {
+    const source = await readSource("src/components/docfacil/payment-barrier.tsx");
+    expect(source).toContain("isMonthlyFreeModel(slug)");
+    expect(source).toContain("Comprar por");
+    expect(source).toContain("Entrar ou criar conta para usar a geração grátis");
+    expect(source).toContain("Avulso sem conta obrigatória");
+  });
+
+  it("dashboard executa download real e edita com document id", async () => {
+    const source = await readSource("src/components/docfacil/views/dashboard-view.tsx");
+    expect(source).toContain("getDocumentDownloadUrl(doc.id)");
+    expect(source).toContain('navigate("criar", { slug: doc.modeloSlug, id: doc.id })');
+    expect(source).toContain("listAccountDrafts()");
+    expect(source).not.toContain("Preparando PDF... Abrirá em instantes.");
+  });
+});
