@@ -47,7 +47,6 @@ async function createEstimator() {
       ...portuguese.dictionary,
       userInputs: ["DocFácil", "DocFacil", "K-HUB", "KHub"],
     },
-    useLevenshtein: true,
   });
 }
 
