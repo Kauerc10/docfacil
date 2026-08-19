@@ -14,6 +14,13 @@ const EMPTY: PasswordStrengthResult = {
   percent: 0,
 };
 
+type EvaluatedPassword = {
+  password: string;
+  name: string;
+  email: string;
+  result: PasswordStrengthResult;
+};
+
 function activeSegmentClass(score: PasswordStrengthScore): string {
   if (score <= 1) return "bg-[var(--coral)]";
   if (score === 2) return "bg-[var(--blue-royal)]";
@@ -35,37 +42,46 @@ export function PasswordStrengthMeter({
   name?: string;
   email?: string;
 }) {
-  const [strength, setStrength] = useState<PasswordStrengthResult>(EMPTY);
-  const [loading, setLoading] = useState(false);
+  const normalizedName = name?.trim() ?? "";
+  const normalizedEmail = email?.trim() ?? "";
+  const [evaluated, setEvaluated] = useState<EvaluatedPassword | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    if (!password) return;
 
-    if (!password) {
-      setStrength(EMPTY);
-      setLoading(false);
-      return;
-    }
+    const currentPassword = password;
+    const currentName = normalizedName;
+    const currentEmail = normalizedEmail;
 
-    setLoading(true);
     const timeout = window.setTimeout(() => {
-      void estimatePasswordStrength(password, [name ?? "", email ?? ""])
-        .then((result) => {
-          if (!cancelled) setStrength(result);
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
+      void estimatePasswordStrength(currentPassword, [currentName, currentEmail]).then(
+        (result) => {
+          if (cancelled) return;
+          setEvaluated({
+            password: currentPassword,
+            name: currentName,
+            email: currentEmail,
+            result,
+          });
+        }
+      );
     }, 120);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [password, name, email]);
+  }, [password, normalizedName, normalizedEmail]);
 
   if (!password) return null;
 
+  const isCurrent =
+    evaluated?.password === password &&
+    evaluated.name === normalizedName &&
+    evaluated.email === normalizedEmail;
+  const strength = isCurrent ? evaluated.result : EMPTY;
+  const loading = !isCurrent;
   const score = strength.score;
   const activeClass = score === null ? "" : activeSegmentClass(score);
 
@@ -80,7 +96,7 @@ export function PasswordStrengthMeter({
               : `font-semibold ${labelClass(score)}`
           }
         >
-          {loading && score === null ? "Analisando..." : strength.label}
+          {loading ? "Analisando..." : strength.label}
         </span>
       </div>
 
