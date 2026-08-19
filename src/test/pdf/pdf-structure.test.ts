@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { getModelo } from "@/lib/modelos";
 import { buildDocDefinition, getPdfLayoutProfile } from "@/lib/pdf/styles";
-import { buildContent } from "@/lib/pdf/content-builder";
+import { buildContent, CONTENT_WIDTH } from "@/lib/pdf/content-builder";
 
 const answers: Record<string, string> = {
   locador_nome: "Carlos Eduardo",
@@ -82,5 +82,69 @@ describe("PDF Structure & Layout Protection", () => {
 
     expect(typeof ddo.pageBreakBefore).toBe("function");
     expect(JSON.stringify(ddo.content)).toContain('"headlineLevel"');
+  });
+
+  it("calibra declarações curtas individualmente em vez de aplicar o mesmo ritmo às duas", () => {
+    const propria = getModelo("declaracao-residencia")!;
+    const terceiro = getModelo("declaracao-residencia-terceiro")!;
+
+    const propriaDdo = buildDocDefinition(propria, {}) as {
+      styles: { body: { lineHeight: number } };
+    };
+    const terceiroDdo = buildDocDefinition(terceiro, {}) as {
+      styles: { body: { lineHeight: number } };
+    };
+
+    expect(propriaDdo.styles.body.lineHeight).toBeGreaterThan(
+      terceiroDdo.styles.body.lineHeight
+    );
+  });
+
+  it("usa composição mais densa na locação comercial do que na residencial", () => {
+    const residencial = getModelo("contrato-locacao")!;
+    const comercial = getModelo("contrato-locacao-comercial")!;
+
+    const residencialDdo = buildDocDefinition(residencial, answers) as {
+      styles: { body: { lineHeight: number } };
+    };
+    const comercialDdo = buildDocDefinition(comercial, answers) as {
+      styles: { body: { lineHeight: number } };
+    };
+
+    expect(residencialDdo.styles.body.lineHeight).toBeGreaterThan(
+      comercialDdo.styles.body.lineHeight
+    );
+  });
+
+  it("dá mais solenidade editorial à união estável do que à procuração simples", () => {
+    const uniao = getModelo("uniao-estavel")!;
+    const procuracao = getModelo("procuracao-simples")!;
+
+    const uniaoDdo = buildDocDefinition(uniao, {}) as {
+      styles: { body: { lineHeight: number } };
+    };
+    const procuracaoDdo = buildDocDefinition(procuracao, {}) as {
+      styles: { body: { lineHeight: number } };
+    };
+
+    expect(uniaoDdo.styles.body.lineHeight).toBeGreaterThan(
+      procuracaoDdo.styles.body.lineHeight
+    );
+  });
+
+  it("usa filete curto e centralizado no título das declarações em vez de uma linha de página inteira", () => {
+    const declaracao = getModelo("declaracao-residencia")!;
+    const ddo = buildDocDefinition(declaracao, {}) as {
+      content: Array<{
+        canvas?: Array<{ x1: number; x2: number }>;
+      }>;
+    };
+
+    const divider = ddo.content[1]?.canvas?.[0];
+
+    expect(divider).toBeDefined();
+    expect(divider!.x1).toBeGreaterThan(0);
+    expect(divider!.x2).toBeLessThan(CONTENT_WIDTH);
+    expect(divider!.x2 - divider!.x1).toBeLessThan(CONTENT_WIDTH / 2);
   });
 });
