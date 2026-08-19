@@ -4,15 +4,45 @@ import { buildDocDefinition, getPdfLayoutProfile } from "@/lib/pdf/styles";
 import { buildContent, CONTENT_WIDTH } from "@/lib/pdf/content-builder";
 
 const answers: Record<string, string> = {
-  locador_nome: "Carlos Eduardo",
+  locador_nome: "Carlos Eduardo Souza",
+  locador_nacionalidade: "brasileiro",
+  locador_estado_civil: "casado(a)",
+  locador_profissao: "Engenheiro",
   locador_cpf: "111.222.333-44",
-  locatario_nome: "Mariana Alves",
+  locatario_nome: "Mariana Alves Pereira",
+  locatario_nacionalidade: "brasileira",
+  locatario_estado_civil: "solteiro(a)",
+  locatario_profissao: "Advogada",
   locatario_cpf: "555.666.777-88",
   imovel: "Rua XV de Novembro, 500, Blumenau - SC",
+  imovel_cidade: "Blumenau",
+  imovel_uf: "SC",
   valor: "1.500,00",
   prazo: "30",
   dia_vencimento: "5",
   forma_pagamento: "PIX",
+  atividade: "Comércio de roupas",
+};
+
+const declarationAnswers: Record<string, string> = {
+  declarante_nome: "Carlos Eduardo Souza",
+  declarante_nacionalidade: "brasileiro",
+  declarante_estado_civil: "casado(a)",
+  declarante_profissao: "Engenheiro",
+  declarante_cpf: "111.222.333-44",
+  declarante_rg: "12345678-9",
+  declarante_rg_emissor: "SSP/SC",
+  declarante_endereco: "Rua das Flores, nº 100, Centro, Blumenau - SC, CEP 89000-000",
+  declarante_cidade: "Blumenau",
+  declarante_uf: "SC",
+  finalidade: "Abertura de conta corrente bancária",
+};
+
+const thirdPartyDeclarationAnswers: Record<string, string> = {
+  ...declarationAnswers,
+  residente_nome: "Lucas Pereira Souza",
+  residente_documento: "RG nº 45.678.910-1 SSP/SC",
+  residente_cpf: "999.888.777-66",
 };
 
 type InspectablePdfNode = {
@@ -56,9 +86,12 @@ function nodeText(node: InspectablePdfNode): string {
     .join("");
 }
 
-function firstBodyParagraph(slug: string): InspectablePdfNode {
+function firstBodyParagraph(
+  slug: string,
+  modelAnswers: Record<string, string>
+): InspectablePdfNode {
   const modelo = getModelo(slug)!;
-  const nodes = collectPdfNodes(buildContent(modelo, answers, [], []));
+  const nodes = collectPdfNodes(buildContent(modelo, modelAnswers, [], []));
   const paragraph = nodes.find(
     (node) => node.style === "body" && node.alignment === "justify" && Array.isArray(node.margin)
   );
@@ -118,7 +151,7 @@ describe("PDF Structure & Layout Protection", () => {
     const contratoDdo = buildDocDefinition(locacao, answers) as {
       styles: { body: { lineHeight: number }; signature: { lineHeight: number } };
     };
-    const declaracaoDdo = buildDocDefinition(declaracao, {}) as {
+    const declaracaoDdo = buildDocDefinition(declaracao, declarationAnswers) as {
       styles: { body: { lineHeight: number }; signature: { lineHeight: number } };
     };
     const instrumentoDdo = buildDocDefinition(uniao, {}) as {
@@ -151,10 +184,10 @@ describe("PDF Structure & Layout Protection", () => {
     const propria = getModelo("declaracao-residencia")!;
     const terceiro = getModelo("declaracao-residencia-terceiro")!;
 
-    const propriaDdo = buildDocDefinition(propria, {}) as {
+    const propriaDdo = buildDocDefinition(propria, declarationAnswers) as {
       styles: { body: { lineHeight: number } };
     };
-    const terceiroDdo = buildDocDefinition(terceiro, {}) as {
+    const terceiroDdo = buildDocDefinition(terceiro, thirdPartyDeclarationAnswers) as {
       styles: { body: { lineHeight: number } };
     };
 
@@ -197,7 +230,7 @@ describe("PDF Structure & Layout Protection", () => {
 
   it("usa filete curto e centralizado no título das declarações em vez de uma linha de página inteira", () => {
     const declaracao = getModelo("declaracao-residencia")!;
-    const ddo = buildDocDefinition(declaracao, {}) as {
+    const ddo = buildDocDefinition(declaracao, declarationAnswers) as {
       content: Array<{
         canvas?: Array<{ x1: number; x2: number }>;
       }>;
@@ -213,7 +246,7 @@ describe("PDF Structure & Layout Protection", () => {
 
   it("centraliza a data das declarações com respiro próprio antes da assinatura", () => {
     const declaracao = getModelo("declaracao-residencia")!;
-    const nodes = collectPdfNodes(buildContent(declaracao, {}, [], []));
+    const nodes = collectPdfNodes(buildContent(declaracao, declarationAnswers, [], []));
     const dateNode = nodes.find(
       (node) => node.style === "body" && /,\s*\d{1,2}\s+de\s+[a-zç]+\s+de\s+\d{4}/i.test(nodeText(node))
     );
@@ -224,8 +257,11 @@ describe("PDF Structure & Layout Protection", () => {
   });
 
   it("usa mais espaço entre parágrafos na declaração própria do que na declaração por terceiro", () => {
-    const propria = firstBodyParagraph("declaracao-residencia");
-    const terceiro = firstBodyParagraph("declaracao-residencia-terceiro");
+    const propria = firstBodyParagraph("declaracao-residencia", declarationAnswers);
+    const terceiro = firstBodyParagraph(
+      "declaracao-residencia-terceiro",
+      thirdPartyDeclarationAnswers
+    );
 
     expect(propria.margin![3]).toBeGreaterThan(terceiro.margin![3]);
   });
