@@ -29,8 +29,7 @@ describe("coerência jurídica das locações", () => {
   });
 
   it("não atribui despesas condominiais extraordinárias ao locatário comercial", () => {
-    const modelo = getModelo("contrato-locacao-comercial")!;
-    const texto = modelo.template.corpo.join("\n");
+    const texto = renderModelo("contrato-locacao-comercial", {});
 
     expect(texto).not.toContain("despesas condominiais ordinárias e extraordinárias");
     expect(texto).toContain("despesas condominiais extraordinárias");
@@ -38,8 +37,7 @@ describe("coerência jurídica das locações", () => {
   });
 
   it("distingue constituição e reposição do fundo de reserva na locação residencial", () => {
-    const modelo = getModelo("contrato-locacao")!;
-    const texto = modelo.template.corpo.join("\n");
+    const texto = renderModelo("contrato-locacao", { prazo: "30" });
 
     expect(texto).not.toContain("incluindo fundo de reserva quando exigido pela convenção condominial");
     expect(texto).toContain("constituição do fundo de reserva");
