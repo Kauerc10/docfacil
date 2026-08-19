@@ -9,6 +9,7 @@ import {
 } from "./documents";
 import { BackendError } from "../errors";
 import { MODELOS } from "../../modelos";
+import type { Modelo } from "../../types";
 
 describe("documentDraftInputSchema", () => {
   it("validates a valid draft input payload", () => {
@@ -97,6 +98,48 @@ describe("reconstructAndValidateResponses", () => {
       expect(err.code).toBe("INVALID_REQUEST");
       expect(err.status).toBe(400);
     }
+  });
+
+  const modeloLocacaoMinimo: Modelo = {
+    slug: "contrato-locacao",
+    nome: "Locação residencial",
+    desc: "fixture semântica",
+    quandoUsar: "teste",
+    categoria: "Locação",
+    minutos: 1,
+    icone: "key",
+    campos: [],
+    etapas: [
+      {
+        tipo: "clausulas",
+        clausulas: [
+          { id: "caucao", titulo: "Caução", descricao: "", corpo: "" },
+          { id: "fiador", titulo: "Fiador", descricao: "", corpo: "" },
+          { id: "seguro_fianca", titulo: "Seguro-fiança", descricao: "", corpo: "" },
+        ],
+      },
+    ],
+    template: { titulo: "CONTRATO", corpo: ["Texto"] },
+  };
+
+  it("rejects more than one rental guarantee modality", () => {
+    expect(() =>
+      reconstructAndValidateResponses(
+        modeloLocacaoMinimo,
+        {},
+        ["caucao", "fiador"]
+      )
+    ).toThrow(BackendError);
+  });
+
+  it("rejects cash deposit above three months of rent", () => {
+    expect(() =>
+      reconstructAndValidateResponses(
+        modeloLocacaoMinimo,
+        { caucao_meses: "4" },
+        ["caucao"]
+      )
+    ).toThrow(BackendError);
   });
 });
 
