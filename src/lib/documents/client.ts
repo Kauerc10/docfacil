@@ -13,6 +13,18 @@ export interface GuestDraftData {
   updatedAt: number;
 }
 
+export interface AccountDraftData {
+  id: string;
+  ownerUserId: string;
+  modeloSlug: string;
+  respostas: Record<string, string>;
+  stepIndex: number;
+  clausulasSelecionadas: string[];
+  extrasPorClausula: Record<string, Record<string, string>>;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export function getGuestDraftKey(modeloSlug: string): string {
   return `docfacil:draft:v1:${modeloSlug}`;
 }
@@ -120,10 +132,6 @@ export async function finalizeDocument(input: {
     const code = typeof payload.error?.code === "string" ? payload.error.code : undefined;
     const message = payload.error?.message || "Falha ao gerar documento.";
 
-    // Se o servidor respondeu, sabemos que a tentativa terminou com erro.
-    // Apenas GENERATION_IN_PROGRESS mantém o mesmo requestId para recuperar a
-    // geração que continua rodando. Erros de rede/autenticação não passam por
-    // este bloco e preservam a intenção, evitando duplicidade em uma repetição.
     if (code !== "GENERATION_IN_PROGRESS") {
       clearFinalizationRequestId(input.modeloSlug);
     }
@@ -165,7 +173,10 @@ export async function createDocumentVersion(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || "Falha ao criar nova versão do documento.");
+    const error = new Error(err.error?.message || "Falha ao criar nova versão do documento.") as Error & { code?: string; status?: number };
+    error.code = err.error?.code;
+    error.status = res.status;
+    throw error;
   }
 
   return await res.json();
@@ -246,33 +257,22 @@ export async function deleteDocumentApi(documentId: string): Promise<{
 }
 
 export async function listDocumentsApi(): Promise<import("./dto").DocumentSummaryDto[]> {
-  const res = await apiFetch("/api/documents", {
-    method: "GET",
-  });
-
+  const res = await apiFetch("/api/documents", { method: "GET" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao listar documentos.");
   }
-
   const data = await res.json();
   return data.documents || [];
 }
 
 export async function getDocumentApi(documentId: string): Promise<import("./dto").DocumentDetailDto | null> {
-  const res = await apiFetch(`/api/documents/${documentId}`, {
-    method: "GET",
-  });
-
-  if (res.status === 404) {
-    return null;
-  }
-
+  const res = await apiFetch(`/api/documents/${documentId}`, { method: "GET" });
+  if (res.status === 404) return null;
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao carregar documento.");
   }
-
   const data = await res.json();
   return data.document || null;
 }
@@ -285,14 +285,57 @@ export async function duplicateDocumentApi(documentId: string): Promise<{
     extrasPorClausula: Record<string, Record<string, string>>;
   };
 }> {
-  const res = await apiFetch(`/api/documents/${documentId}/duplicate`, {
-    method: "POST",
-  });
-
+  const res = await apiFetch(`/api/documents/${documentId}/duplicate`, { method: "POST" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao duplicar documento.");
   }
-
   return await res.json();
+}
+
+export async function saveAccountDraft(input: {
+  draftId?: string;
+  modeloSlug: string;
+  respostas: Record<string, string>;
+  stepIndex: number;
+  clausulasSelecionadas: string[];
+  extrasPorClausula: Record<string, Record<string, string>>;
+}): Promise<AccountDraftData> {
+  const res = await apiFetch("/api/drafts", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Falha ao salvar rascunho.");
+  }
+  return (await res.json()).draft;
+}
+
+export async function listAccountDrafts(): Promise<AccountDraftData[]> {
+  const res = await apiFetch("/api/drafts", { method: "GET" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Falha ao listar rascunhos.");
+  }
+  return (await res.json()).drafts || [];
+}
+
+export async function getAccountDraft(draftId: string): Promise<AccountDraftData | null> {
+  const res = await apiFetch(`/api/drafts/${draftId}`, { method: "GET" });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Falha ao carregar rascunho.");
+  }
+  return (await res.json()).draft || null;
+}
+
+export async function deleteAccountDraft(draftId: string): Promise<void> {
+  const res = await apiFetch(`/api/drafts/${draftId}`, { method: "DELETE" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Falha ao excluir rascunho.");
+  }
 }
