@@ -37,13 +37,15 @@ describe("experiência pública de recuperação de senha", () => {
 
   it("mantém os mascotes dentro do selo com microflutuação suave", () => {
     const visual = source("src/components/docfacil/auth/password-recovery-visual.tsx");
-    const css = source("src/app/globals.css");
+    const visualCss = source("src/components/docfacil/auth/password-recovery-visual.module.css");
 
-    expect(visual).toContain("password-recovery-mascot-float");
-    expect(visual).not.toContain("animate-[bounce_");
-    expect(visual).toContain("h-32 w-32");
-    expect(css).toContain("@keyframes password-recovery-mascot-float");
-    expect(css).toContain("translateY(-2px)");
+    expect(visual.match(/styles\.mascotFloat/g)?.length).toBe(2);
+    expect(visual.match(/h-32 w-32/g)?.length).toBe(2);
+    expect(visual.match(/overflow-hidden rounded-full/g)?.length).toBe(2);
+    expect(visualCss).toContain("@keyframes password-recovery-mascot-float");
+    expect(visualCss).toContain("7.5s");
+    expect(visualCss).toContain("translateY(-2px)");
+    expect(visualCss).toContain("prefers-reduced-motion");
   });
 
   it("rota de solicitação usa feedback neutro e volta para o login", () => {
