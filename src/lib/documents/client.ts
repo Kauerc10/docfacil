@@ -17,6 +17,7 @@ export interface AccountDraftData {
   id: string;
   ownerUserId: string;
   modeloSlug: string;
+  sourceDocumentId?: string;
   respostas: Record<string, string>;
   stepIndex: number;
   clausulasSelecionadas: string[];
@@ -131,11 +132,9 @@ export async function finalizeDocument(input: {
     const payload = await res.json().catch(() => ({}));
     const code = typeof payload.error?.code === "string" ? payload.error.code : undefined;
     const message = payload.error?.message || "Falha ao gerar documento.";
-
     if (code !== "GENERATION_IN_PROGRESS") {
       clearFinalizationRequestId(input.modeloSlug);
     }
-
     const error = new Error(message) as Error & { code?: string; status?: number };
     error.code = code;
     error.status = res.status;
@@ -153,14 +152,9 @@ export async function createDocumentVersion(
     clausulasSelecionadas?: string[];
   }
 ): Promise<{
-  document: {
-    id: string;
-    version: number;
-    artifactState: string;
-  };
+  document: { id: string; version: number; artifactState: string };
 }> {
   const requestId = input.requestId || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "req_" + Date.now());
-
   const res = await apiFetch(`/api/documents/${documentId}/versions`, {
     method: "POST",
     headers: JSON_HEADERS,
@@ -170,7 +164,6 @@ export async function createDocumentVersion(
       clausulasSelecionadas: input.clausulasSelecionadas || [],
     }),
   });
-
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const error = new Error(err.error?.message || "Falha ao criar nova versão do documento.") as Error & { code?: string; status?: number };
@@ -178,14 +171,10 @@ export async function createDocumentVersion(
     error.status = res.status;
     throw error;
   }
-
   return await res.json();
 }
 
-export async function getDocumentDownloadUrl(
-  documentId: string,
-  version?: number
-): Promise<{
+export async function getDocumentDownloadUrl(documentId: string, version?: number): Promise<{
   downloadUrl: string;
   filename: string;
   version: number;
@@ -197,12 +186,10 @@ export async function getDocumentDownloadUrl(
     headers: JSON_HEADERS,
     body: JSON.stringify({ version }),
   });
-
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao obter link de download.");
   }
-
   return await res.json();
 }
 
@@ -212,47 +199,29 @@ export async function shareDocument(documentId: string): Promise<{
   version: number;
   active: boolean;
 }> {
-  const res = await apiFetch(`/api/documents/${documentId}/share`, {
-    method: "POST",
-  });
-
+  const res = await apiFetch(`/api/documents/${documentId}/share`, { method: "POST" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao gerar link de compartilhamento.");
   }
-
   return await res.json();
 }
 
-export async function revokeDocumentShare(documentId: string): Promise<{
-  success: boolean;
-  revokedAt: number;
-}> {
-  const res = await apiFetch(`/api/documents/${documentId}/share/revoke`, {
-    method: "POST",
-  });
-
+export async function revokeDocumentShare(documentId: string): Promise<{ success: boolean; revokedAt: number }> {
+  const res = await apiFetch(`/api/documents/${documentId}/share/revoke`, { method: "POST" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao revogar compartilhamento.");
   }
-
   return await res.json();
 }
 
-export async function deleteDocumentApi(documentId: string): Promise<{
-  success: boolean;
-  deletedDocumentId: string;
-}> {
-  const res = await apiFetch(`/api/documents/${documentId}`, {
-    method: "DELETE",
-  });
-
+export async function deleteDocumentApi(documentId: string): Promise<{ success: boolean; deletedDocumentId: string }> {
+  const res = await apiFetch(`/api/documents/${documentId}`, { method: "DELETE" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao excluir documento.");
   }
-
   return await res.json();
 }
 
@@ -296,6 +265,7 @@ export async function duplicateDocumentApi(documentId: string): Promise<{
 export async function saveAccountDraft(input: {
   draftId?: string;
   modeloSlug: string;
+  sourceDocumentId?: string;
   respostas: Record<string, string>;
   stepIndex: number;
   clausulasSelecionadas: string[];
