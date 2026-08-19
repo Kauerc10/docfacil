@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { describe, expect, it } from "bun:test";
 import {
   documentDraftInputSchema,
@@ -6,15 +7,17 @@ import {
   hashToken,
   calculateSourceHash,
   calculateModelSnapshotHash,
+  canonicalizeJson,
 } from "./documents";
 import { BackendError } from "../errors";
 import { MODELOS } from "../../modelos";
+import { DOCUMENT_RENDER_RULES_VERSION } from "../../document-engine/legal-rules";
 import type { Modelo } from "../../types";
 
 describe("documentDraftInputSchema", () => {
   it("validates a valid draft input payload", () => {
     const valid = {
-      requestId: "a8098c1a-f86e-11da-bd1a-00112444be1e", // or v4 uuid
+      requestId: "a8098c1a-f86e-11da-bd1a-00112444be1e",
       modeloSlug: "declaracao-residencia",
       respostas: {
         declarante_nome: "Maria Silva",
@@ -85,7 +88,6 @@ describe("reconstructAndValidateResponses", () => {
   it("throws BackendError(INVALID_REQUEST) when required field is missing", () => {
     const incompleteRespostas = {
       declarante_nome: "Carlos",
-      // missing declarante_cpf and others
     };
 
     expect(() =>
@@ -149,7 +151,7 @@ describe("tokens and hashes", () => {
     expect(token).toBeDefined();
     expect(token.length).toBeGreaterThanOrEqual(40);
     expect(tokenHash).toBe(hashToken(token));
-    expect(tokenHash.length).toBe(64); // 256 bits in hex
+    expect(tokenHash.length).toBe(64);
   });
 
   it("calculates deterministic sourceHash regardless of key insertion order", () => {
@@ -170,5 +172,27 @@ describe("tokens and hashes", () => {
 
     expect(h1).toBe(h2);
     expect(h1.length).toBe(64);
+  });
+
+  it("includes the material render-rules version in modelSnapshotHash", () => {
+    const modelo = MODELOS[0];
+    const snapshot = {
+      slug: modelo.slug,
+      nome: modelo.nome,
+      template: modelo.template,
+      etapas: modelo.etapas ?? [],
+      campos: (modelo.campos || []).map((c) => ({
+        key: c.key,
+        pergunta: c.pergunta,
+        tipo: c.tipo,
+        obrigatorio: c.obrigatorio,
+      })),
+      renderRulesVersion: DOCUMENT_RENDER_RULES_VERSION,
+    };
+    const expected = createHash("sha256")
+      .update(JSON.stringify(canonicalizeJson(snapshot)))
+      .digest("hex");
+
+    expect(calculateModelSnapshotHash(modelo)).toBe(expected);
   });
 });
