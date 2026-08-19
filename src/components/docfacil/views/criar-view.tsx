@@ -34,6 +34,8 @@ import {
   getProgressLine,
   getErrorLine,
 } from "./criar/pet-lines";
+import { classifyFinalizationError } from "./criar/finalization-error";
+import { FreeLimitPaywall } from "./criar/free-limit-paywall";
 
 /**
  * CriarView — thin orchestrator (~250 lines) for the DocFacil "Concierge" flow.
@@ -66,6 +68,7 @@ export function CriarView() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [mostrandoLoading, setMostrandoLoading] = useState(false);
+  const [showFreeLimitPaywall, setShowFreeLimitPaywall] = useState(false);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -306,6 +309,19 @@ export function CriarView() {
     });
   };
 
+  const persistCurrentDraft = () => {
+    if (!modelo || !slug) return;
+    const requestId = getOrCreateFinalizationRequestId(modelo.slug);
+    saveGuestDraft(slug, {
+      requestId,
+      modeloSlug: slug,
+      answers,
+      stepIndex,
+      clausulasSelecionadas,
+      extrasPorClausula,
+    });
+  };
+
   const salvarDocumento = async (respostasFinais: Record<string, string>) => {
     if (!modelo) return;
     setSubmitting(true);
@@ -325,18 +341,23 @@ export function CriarView() {
         clearGuestDraft(slug);
         navigate("sucesso", { slug, id: result.document.id });
       } else {
-        const requestId = getOrCreateFinalizationRequestId(modelo.slug);
-        saveGuestDraft(slug, {
-          requestId,
-          modeloSlug: slug,
-          answers,
-          stepIndex,
-          clausulasSelecionadas,
-          extrasPorClausula,
-        });
+        persistCurrentDraft();
         navigate("sucesso", { slug });
       }
     } catch (e) {
+      if (classifyFinalizationError(e) === "free_limit") {
+        // Limite é um estado comercial esperado, não uma falha de geração.
+        // Preservamos o preenchimento antes de oferecer Pro/avulso/rascunho.
+        persistCurrentDraft();
+        setSubmitting(false);
+        setMostrandoLoading(false);
+        setFieldError(null);
+        setPetMood("atencao");
+        setPetOverride("Seu documento está pronto. Você só chegou ao limite gratuito deste mês; escolha como prefere concluir.");
+        setShowFreeLimitPaywall(true);
+        return;
+      }
+
       logger.error("CriarView", "falha ao finalizar documento", e, { slug });
       setSubmitting(false);
       setMostrandoLoading(false);
@@ -435,62 +456,89 @@ export function CriarView() {
 
   // === Render: main split-screen ============================================
   return (
-    <CriarLayout
-      step={stepIndex}
-      total={totalEtapas}
-      progressPct={progressPct}
-      pulseProgress={pulseProgress}
-      mobileTab={mobileTab}
-      onMobileTabChange={setMobileTab}
-      onVoltar={handleVoltar}
-      onStepClick={(target) => {
-        // Permite revisar etapas anteriores sem perder o progresso.
-        setStepIndex(Math.max(0, Math.min(target, stepIndex)));
-        setFieldError(null);
-        setPetOverride(null);
-        setPetMood("falando");
-      }}
-      previewSlot={
-        <div className="w-full max-w-[340px] mx-auto">
-          <PreviewA4
-            titulo={modelo.template.titulo}
-            corpo={modelo.template.corpo}
-            respostas={respostasComEndereco}
-            clausulasSelecionadas={clausulasSelecionadas}
-            modelo={modelo}
-            camposOpcionais={camposOpcionais}
+    <>
+      <CriarLayout
+        step={stepIndex}
+        total={totalEtapas}
+        progressPct={progressPct}
+        pulseProgress={pulseProgress}
+        mobileTab={mobileTab}
+        onMobileTabChange={setMobileTab}
+        onVoltar={handleVoltar}
+        onStepClick={(target) => {
+          // Permite revisar etapas anteriores sem perder o progresso.
+          setStepIndex(Math.max(0, Math.min(target, stepIndex)));
+          setFieldError(null);
+          setPetOverride(null);
+          setPetMood("falando");
+        }}
+        previewSlot={
+          <div className="w-full max-w-[340px] mx-auto">
+            <PreviewA4
+              titulo={modelo.template.titulo}
+              corpo={modelo.template.corpo}
+              respostas={respostasComEndereco}
+              clausulasSelecionadas={clausulasSelecionadas}
+              modelo={modelo}
+              camposOpcionais={camposOpcionais}
+            />
+          </div>
+        }
+      >
+        {etapaChat && (
+          <ChatStep
+            key={stepIndex}
+            petText={petText}
+            petMood={petMood}
+            etapa={etapaChat}
+            stepIndex={stepIndex}
+            totalEtapas={totalEtapas}
+            respostas={respostas}
+            onInputChange={handleInputChange}
+            onGrupoFieldChange={handleGrupoFieldChange}
+            onClausulaFieldChange={handleClausulaFieldChange}
+            onAvancar={handleAvancar}
+            isLast={isLast}
+            submitting={submitting}
+            fieldError={fieldError}
+            extrasPorClausula={extrasPorClausula}
           />
-        </div>
-      }
-    >
-      {etapaChat && (
-        <ChatStep
-          key={stepIndex}
-          petText={petText}
-          petMood={petMood}
-          etapa={etapaChat}
-          stepIndex={stepIndex}
-          totalEtapas={totalEtapas}
-          respostas={respostas}
-          onInputChange={handleInputChange}
-          onGrupoFieldChange={handleGrupoFieldChange}
-          onClausulaFieldChange={handleClausulaFieldChange}
-          onAvancar={handleAvancar}
-          isLast={isLast}
-          submitting={submitting}
-          fieldError={fieldError}
-          extrasPorClausula={extrasPorClausula}
+        )}
+        {fieldError && etapaAtual?.tipo === "clausulas" && (
+          <p
+            role="alert"
+            className="mt-3 text-sm text-[var(--coral)] font-medium pl-1 flex items-center gap-1.5"
+          >
+            <span aria-hidden="true">⚠</span>
+            {fieldError}
+          </p>
+        )}
+      </CriarLayout>
+
+      {showFreeLimitPaywall && (
+        <FreeLimitPaywall
+          documentName={modelo.nome}
+          onChoosePro={() => {
+            persistCurrentDraft();
+            navigate("checkout", { plan: "pro", slug });
+          }}
+          onChooseSingle={() => {
+            persistCurrentDraft();
+            navigate("checkout", { plan: "avulso", slug });
+          }}
+          onSaveDraft={() => {
+            persistCurrentDraft();
+            setShowFreeLimitPaywall(false);
+            setPetMood("feliz");
+            setPetOverride("Rascunho salvo neste navegador. Você pode continuar daqui quando quiser.");
+          }}
+          onContinueEditing={() => {
+            setShowFreeLimitPaywall(false);
+            setPetMood("falando");
+            setPetOverride(null);
+          }}
         />
       )}
-      {fieldError && etapaAtual?.tipo === "clausulas" && (
-        <p
-          role="alert"
-          className="mt-3 text-sm text-[var(--coral)] font-medium pl-1 flex items-center gap-1.5"
-        >
-          <span aria-hidden="true">⚠</span>
-          {fieldError}
-        </p>
-      )}
-    </CriarLayout>
+    </>
   );
 }
