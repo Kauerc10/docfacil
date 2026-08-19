@@ -12,7 +12,7 @@ test.describe("Document access product UX", () => {
     ).toHaveCount(3);
 
     for (const modelName of [
-      "Declaração de Residência",
+      "Autodeclaração de Residência",
       "Contrato de Comodato",
       "Contrato de Locação Comercial",
     ]) {
