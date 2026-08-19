@@ -54,16 +54,20 @@ describe("Declaration print layout", () => {
     expect(recipe.dateBottomMargin).toBeGreaterThanOrEqual(26);
   });
 
-  it("reserva uma assinatura larga e uma área branca generosa abaixo do declarante", () => {
+  it("reserva uma assinatura mais larga e uma área branca generosa abaixo do declarante", () => {
     const modelo = getModelo("declaracao-residencia")!;
     const recipe = getPdfVisualRecipe(modelo) as ReturnType<typeof getPdfVisualRecipe> & {
-      signatureLineWidthCm?: number;
+      signatureCharacterSpacing?: number;
       closingBottomMargin?: number;
+    };
+    const ddo = buildDocDefinition(modelo, answers) as {
+      styles: { signature: { characterSpacing?: number } };
     };
     const content = buildContent(modelo, answers, [], []) as Node[];
     const closing = content[content.length - 1];
 
-    expect(recipe.signatureLineWidthCm ?? 0).toBeGreaterThanOrEqual(8.5);
+    expect(recipe.signatureCharacterSpacing ?? 0).toBeGreaterThanOrEqual(0.8);
+    expect(ddo.styles.signature.characterSpacing ?? 0).toBeGreaterThanOrEqual(0.8);
     expect(recipe.closingBottomMargin ?? 0).toBeGreaterThanOrEqual(34);
     expect(closing.margin?.[3] ?? 0).toBeGreaterThanOrEqual(34);
   });
