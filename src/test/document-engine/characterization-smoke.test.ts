@@ -1,13 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import { MODELOS, getModelo } from "@/lib/modelos";
 import { fillDocument, renderDocument } from "@/lib/document-engine";
+import { applyLegalTitleRule } from "@/lib/document-engine/legal-rules";
 
 describe("Fase A: Characterization Smoke Tests (9 Modelos V1)", () => {
   it("renders a valid document for all 9 official platform models", () => {
     expect(MODELOS.length).toBe(9);
 
     const baseAnswers: Record<string, string> = {
-      // Locador / Vendedor / Comodante / Declarante / Outorgante / Pessoa 1
       locador_nome: "Carlos Eduardo Souza",
       locador_nacionalidade: "brasileiro",
       locador_estado_civil: "casado(a)",
@@ -76,7 +76,6 @@ describe("Fase A: Characterization Smoke Tests (9 Modelos V1)", () => {
       endereco_cidade: "Blumenau",
       endereco_uf: "SC",
 
-      // Locatário / Comprador / Comodatário / Residente
       locatario_nome: "Mariana Alves Pereira",
       locatario_nacionalidade: "brasileira",
       locatario_estado_civil: "solteiro(a)",
@@ -106,7 +105,6 @@ describe("Fase A: Characterization Smoke Tests (9 Modelos V1)", () => {
       residente_documento: "RG nº 45.678.910-1 SSP/SC",
       residente_cpf: "999.888.777-66",
 
-      // Imóvel / Venda / Valores
       imovel: "Rua XV de Novembro, nº 500, Apto 302, Centro, Blumenau - SC, CEP 89010-000",
       imovel_cidade: "Blumenau",
       imovel_uf: "SC",
@@ -129,7 +127,7 @@ describe("Fase A: Characterization Smoke Tests (9 Modelos V1)", () => {
       });
 
       expect(linhas.length).toBeGreaterThan(3);
-      expect(linhas[0]).toBe(modelo.template.titulo);
+      expect(linhas[0]).toBe(applyLegalTitleRule(modelo.slug, modelo.template.titulo));
 
       const joined = linhas.join("\n");
       expect(joined).not.toContain("{{locador_nome}}");
