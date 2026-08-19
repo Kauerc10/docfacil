@@ -94,6 +94,7 @@ export function ClausulasPergunta({
           <div
             role="radio"
             aria-checked={semGarantiaSelecionada}
+            aria-label="Sem garantia"
             tabIndex={0}
             onClick={handleSemGarantia}
             onKeyDown={(e) => {
@@ -210,6 +211,7 @@ export function ClausulaCard({
     <div
       role={singleChoice ? "radio" : "checkbox"}
       aria-checked={selecionada}
+      aria-label={singleChoice ? clausula.titulo : undefined}
       tabIndex={0}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
