@@ -1,17 +1,12 @@
 /**
  * styles.ts — Construção do docDefinition do pdfmake.
  *
- * Single source of truth para toda a aparência do PDF: pageSize, margens,
- * defaultStyle, estilos nomeados (docTitle, sectionHeading, body, etc.),
- * header de continuação, footer e background (marca d'água da plataforma).
- *
- * Antes, este objeto era duplicado idêntico em `gerarEBaixarPDF` e
- * `gerarPDFBuffer`. Agora ambas consomem `buildDocDefinition`.
- *
- * Importa `buildContent` + geometria de `./content-builder`.
+ * Single source of truth para pageSize, margens, estilos, identidade e regras
+ * de paginação. O conteúdo textual continua vindo do document-engine.
  */
 import type { Modelo } from "../types";
 import type { GerarPDFOptions } from "./types";
+import { applyLegalTitleRule } from "../document-engine/legal-rules";
 import {
   buildContent,
   extractClausulasSelecionadas,
@@ -38,7 +33,7 @@ const DECLARATION_SLUGS = new Set([
 ]);
 
 const INSTRUMENT_SLUGS = new Set([
-  "declaracao-uniao-estavel",
+  "uniao-estavel",
   "procuracao-simples",
 ]);
 
@@ -92,10 +87,6 @@ function isPdfNode(value: unknown): value is PdfNode {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-/**
- * Marca headings com `headlineLevel` para que o paginator real consiga
- * impedir uma cláusula/título de seção de ficar sozinho no fim da página.
- */
 function annotateHeadline(node: unknown): unknown {
   if (!isPdfNode(node)) return node;
 
@@ -115,11 +106,6 @@ function annotateHeadline(node: unknown): unknown {
   return node;
 }
 
-/**
- * Em declarações curtas, distribui o espaço vertical com intenção editorial:
- * o fecho/assinatura ganha respiro em vez de ficar colado ao corpo. Em
- * contratos, o fechamento continua compacto para não desperdiçar página.
- */
 function applyClosingRhythm(nodes: unknown[], config: PdfLayoutConfig): unknown[] {
   if (nodes.length === 0) return nodes;
 
@@ -137,14 +123,6 @@ function applyClosingRhythm(nodes: unknown[], config: PdfLayoutConfig): unknown[
   return out;
 }
 
-/**
- * buildDocDefinition — monta o objeto docDefinition completo para o pdfmake.
- *
- * @param modelo   modelo do documento (template + etapas)
- * @param respostas respostas preenchidas pelo usuário
- * @param options  nome do arquivo + flag de watermark
- * @returns docDefinition pronto para `pdfmake.createPdf()`
- */
 export function buildDocDefinition(
   modelo: Modelo,
   respostas: Record<string, string>,
@@ -153,6 +131,7 @@ export function buildDocDefinition(
   const clausulasSelecionadas = extractClausulasSelecionadas(respostas);
   const camposOpcionais = computeCamposOpcionais(modelo, clausulasSelecionadas);
   const layout = getLayoutConfig(modelo);
+  const renderedTitle = applyLegalTitleRule(modelo.slug, modelo.template.titulo);
   const contentNodes = applyClosingRhythm(
     buildContent(modelo, respostas, clausulasSelecionadas, camposOpcionais),
     layout
@@ -167,8 +146,6 @@ export function buildDocDefinition(
       lineHeight: layout.bodyLineHeight,
       color: "#0e2340",
     },
-    // Marca d'água discreta para documentos da faixa gratuita.
-    // Comunica apenas a origem do arquivo, sem prometer validade jurídica.
     background: options?.watermark
       ? () => {
           const cx = CONTENT_WIDTH / 2;
@@ -203,7 +180,7 @@ export function buildDocDefinition(
               text: [
                 { text: "DocFácil", color: "#14315c", bold: true },
                 { text: " · ", color: "#64748b" },
-                { text: modelo.template.titulo, color: "#64748b" },
+                { text: renderedTitle, color: "#64748b" },
               ],
               style: "headerContinuation",
             },
@@ -223,7 +200,7 @@ export function buildDocDefinition(
     },
     content: [
       {
-        text: modelo.template.titulo,
+        text: renderedTitle,
         style: "docTitle",
         alignment: "center" as const,
         margin: [0, 0, 0, layout.titleBottomMargin] as [number, number, number, number],
@@ -239,8 +216,6 @@ export function buildDocDefinition(
       },
       ...contentNodes,
     ],
-    // Evita heading órfão. O heading marcado só quebra antes quando nenhum
-    // conteúdo consegue acompanhá-lo na página atual.
     pageBreakBefore: (
       currentNode: { headlineLevel?: number },
       followingNodesOnPage: unknown[]
@@ -282,5 +257,4 @@ export function buildDocDefinition(
   };
 }
 
-/** Re-export para conveniência (callers que precisam de GerarPDFOptions). */
 export type { GerarPDFOptions };
