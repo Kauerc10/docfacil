@@ -96,7 +96,7 @@ export const PDF_VISUAL_RECIPES: Record<string, PdfVisualRecipe> = {
     legalQuoteIndent: 22,
     legalQuoteLineHeight: 1.6,
     dateAlignment: "center",
-    dateTopMargin: 10,
+    dateTopMargin: 15,
     dateBottomMargin: 32,
     clauseHeadingTopMargin: 14,
     clauseHeadingBottomMargin: 6,
