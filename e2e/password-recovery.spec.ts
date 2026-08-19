@@ -43,4 +43,27 @@ test.describe("Password Recovery UX", () => {
 
     await expect(page.getByText(/oobCode|Firebase|apiKey/i)).toHaveCount(0);
   });
+
+  test("cadastro orienta força e confirma a senha sem bloquear colagem", async ({
+    page,
+  }) => {
+    await page.goto("/?view=cadastro");
+
+    await page.getByLabel("Nome completo").fill("Pessoa Teste");
+    await page.getByLabel("E-mail").fill("pessoa@example.com");
+    await page.getByLabel("Senha", { exact: true }).fill("12345678");
+
+    const meter = page.getByRole("meter", { name: "Força da senha" });
+    await expect(meter).toBeVisible();
+    await expect(meter).not.toHaveAttribute("aria-valuetext", "Ainda não analisada", {
+      timeout: 5000,
+    });
+
+    const confirmation = page.getByLabel("Confirmar senha");
+    await confirmation.fill("1234567x");
+    await expect(page.getByText("As senhas não coincidem.")).toBeVisible();
+
+    await confirmation.fill("12345678");
+    await expect(page.getByText("Senhas coincidem.")).toBeVisible();
+  });
 });
