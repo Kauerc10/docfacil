@@ -19,19 +19,16 @@ export function PasswordRecoveryVisual({
         className="relative mx-auto grid h-40 w-40 place-items-center"
         aria-hidden="true"
       >
-        <div className="absolute inset-5 rounded-full bg-[var(--blue-soft)]/65 blur-2xl" />
-        <div className="absolute inset-2 rounded-full border border-dashed border-[var(--blue-royal)]/25 motion-safe:animate-[spin_12s_linear_infinite]" />
-        <div className="absolute inset-2 grid place-items-center overflow-hidden rounded-full">
-          <Image
-            src="/mascotes/coruja-recuperacao-senha.svg"
-            alt=""
-            width={128}
-            height={128}
-            priority
-            unoptimized
-            className={`relative h-32 w-32 object-contain drop-shadow-[0_12px_20px_rgba(37,84,199,0.16)] ${styles.mascotFloat}`}
-          />
-        </div>
+        <div className="absolute inset-6 rounded-full bg-[var(--blue-soft)]/55 blur-3xl" />
+        <Image
+          src="/mascotes/coruja-recuperacao-senha.svg"
+          alt=""
+          width={128}
+          height={128}
+          priority
+          unoptimized
+          className={`relative h-32 w-32 object-contain drop-shadow-[0_12px_20px_rgba(37,84,199,0.16)] ${styles.mascotFloat}`}
+        />
       </div>
     );
   }
@@ -42,17 +39,14 @@ export function PasswordRecoveryVisual({
         className="relative mx-auto grid h-40 w-40 place-items-center"
         aria-hidden="true"
       >
-        <div className="absolute inset-5 rounded-full bg-[var(--green-tint)]/70 blur-2xl" />
-        <div className="absolute inset-2 rounded-full border border-dashed border-[var(--selo-green)]/25 motion-safe:animate-[spin_14s_linear_infinite]" />
-        <div className="absolute inset-2 grid place-items-center overflow-hidden rounded-full">
-          <Image
-            src="/mascotes/coruja-email-enviado.webp"
-            alt=""
-            width={128}
-            height={128}
-            className={`relative h-32 w-32 object-contain drop-shadow-[0_12px_20px_rgba(37,84,199,0.14)] ${styles.mascotFloat}`}
-          />
-        </div>
+        <div className="absolute inset-6 rounded-full bg-[var(--green-tint)]/60 blur-3xl" />
+        <Image
+          src="/mascotes/coruja-email-enviado.webp"
+          alt=""
+          width={128}
+          height={128}
+          className={`relative h-32 w-32 object-contain drop-shadow-[0_12px_20px_rgba(37,84,199,0.14)] ${styles.mascotFloat}`}
+        />
       </div>
     );
   }
