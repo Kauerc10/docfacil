@@ -57,4 +57,21 @@ describe("document access product contract", () => {
     expect(source).toContain("listAccountDrafts()");
     expect(source).not.toContain("Preparando PDF... Abrirá em instantes.");
   });
+
+  it("CriarView hidrata documento ou rascunho e preserva a identidade na finalizacao", async () => {
+    const source = await readSource("src/components/docfacil/views/criar-view.tsx");
+    expect(source).toContain("duplicateDocument(requestedDocumentId)");
+    expect(source).toContain("getAccountDraft(requestedDraftId)");
+    expect(source).toContain("setActiveDocumentId(draft.sourceDocumentId)");
+    expect(source).toContain("createDocumentVersion(activeDocumentId");
+    expect(source).toContain("sourceDocumentId: activeDocumentId");
+  });
+
+  it("checkout demo retoma o draft depois de ativar Pro ou pagar avulso", async () => {
+    const source = await readSource("src/components/docfacil/views/checkout-view.tsx");
+    expect(source).toContain('navigate("criar", { slug, draftId })');
+    expect(source).toContain("getAccountDraft(draftId)");
+    expect(source).toContain("orderId: result.orderId");
+    expect(source).toContain("deleteAccountDraft(draft.id)");
+  });
 });
