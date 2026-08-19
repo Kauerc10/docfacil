@@ -3,7 +3,7 @@
  *
  * Single source of truth para toda a aparência do PDF: pageSize, margens,
  * defaultStyle, estilos nomeados (docTitle, sectionHeading, body, etc.),
- * header de continuação, footer e background (carimbo circular).
+ * header de continuação, footer e background (marca d'água da plataforma).
  *
  * Antes, este objeto era duplicado idêntico em `gerarEBaixarPDF` e
  * `gerarPDFBuffer`. Agora ambas consomem `buildDocDefinition`.
@@ -52,8 +52,8 @@ export function buildDocDefinition(
       lineHeight: 1.6,
       color: "#0e2340",
     },
-    // Selo notarial como marca d'água: carimbo circular (círculos concêntricos
-    // tracejados + texto "DOCFACIL · VALIDADE LEGAL") via background canvas.
+    // Marca d'água discreta para documentos da faixa gratuita.
+    // Comunica apenas a origem do arquivo, sem prometer validade jurídica.
     background: options?.watermark
       ? () => {
           const cx = CONTENT_WIDTH / 2;
@@ -70,7 +70,7 @@ export function buildDocDefinition(
               stack: [
                 { text: "DOCFACIL", fontSize: 28, bold: true, color: "#2554c7", alignment: "center", characterSpacing: 3, opacity: 0.08 },
                 { text: "•", fontSize: 14, color: "#2554c7", alignment: "center", opacity: 0.08, margin: [0, 4, 0, 4] },
-                { text: "VALIDADE LEGAL", fontSize: 11, color: "#2554c7", alignment: "center", characterSpacing: 2, opacity: 0.08 },
+                { text: "DOCUMENTO GERADO", fontSize: 10, color: "#2554c7", alignment: "center", characterSpacing: 1.6, opacity: 0.08 },
               ],
               alignment: "center",
               margin: [cx - 90, cy - 28, 0, 0] as [number, number, number, number],
