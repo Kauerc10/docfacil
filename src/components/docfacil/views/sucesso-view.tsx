@@ -61,7 +61,7 @@ export function SucessoView() {
   const [copied, setCopied] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [showConfetti, setShowConfetti] = useState(true);
-  const [finalizingGuest, setFinalizingGuest] = useState(false);
+  const [finalizingPaidOrder, setFinalizingPaidOrder] = useState(false);
 
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [respostas, setRespostas] = useState<Record<string, string>>({});
@@ -70,41 +70,50 @@ export function SucessoView() {
   const orderId = params.orderId;
 
   useEffect(() => {
-    async function processGuestOrder() {
-      if (!user && orderId && slug && !finalizingGuest) {
+    async function processPaidOrder() {
+      if (orderId && slug && !finalizingPaidOrder) {
         const draft = loadGuestDraft(slug);
         if (!draft) return;
 
-        setFinalizingGuest(true);
+        setFinalizingPaidOrder(true);
         try {
           const result = await finalizeDocument({
             requestId: draft.requestId,
             modeloSlug: draft.modeloSlug || slug,
             respostas: buildGuestFinalizationAnswers(draft),
             clausulasSelecionadas: draft.clausulasSelecionadas,
-            guestContact: draft.guestContact,
+            guestContact: user ? undefined : draft.guestContact,
             orderId,
           });
+
+          clearGuestDraft(slug);
+          clearFinalizationRequestId(slug);
+
+          if (user) {
+            // Usuário grátis que escolheu avulso: o backend consome o pedido
+            // pago, cria o documento da conta e voltamos à mesma tela já com id.
+            setFinalizingPaidOrder(false);
+            navigate("sucesso", { slug, id: result.document.id });
+            return;
+          }
 
           if (!result.document?.guestAccessPath) {
             throw new Error("Magic link guest ausente após finalização.");
           }
 
-          clearGuestDraft(slug);
-          clearFinalizationRequestId(slug);
           if (typeof window !== "undefined") {
             window.location.assign(result.document.guestAccessPath);
           }
         } catch (err) {
-          logger.error("SucessoView", "falha na finalizacao do pedido guest", err);
+          logger.error("SucessoView", "falha na finalizacao do pedido pago", err);
           toast.error("Ocorreu uma instabilidade ao gerar seu documento pago. Tente novamente.");
-          setFinalizingGuest(false);
+          setFinalizingPaidOrder(false);
         }
       }
     }
 
-    processGuestOrder();
-  }, [user, orderId, slug, finalizingGuest]);
+    processPaidOrder();
+  }, [user, orderId, slug, finalizingPaidOrder, navigate]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,32 +155,41 @@ export function SucessoView() {
     return () => clearTimeout(t);
   }, []);
 
-  // Stamp strike — fires on mount (no ScrollTrigger needed, user just landed).
+  // Stamp strike — só registra a timeline quando o root e os targets existem.
   useGSAP(
     () => {
+      if (!root.current || !modelo) return;
+
+      const stamp = root.current.querySelector<HTMLElement>("[data-suc='stamp']");
+      const sheet = root.current.querySelector<HTMLElement>("[data-suc='sheet']");
+      const cta = root.current.querySelector<HTMLElement>("[data-suc='cta']");
+      const secondary = root.current.querySelectorAll<HTMLElement>("[data-suc='secondary']");
+      const upsell = root.current.querySelector<HTMLElement>("[data-suc='upsell']");
+
+      if (!stamp || !sheet || !cta) return;
+
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (reduce || !modelo) {
-        // No animation — just place the stamp in its final state.
-        gsap.set("[data-suc='stamp']", { scale: 1, opacity: 1, rotation: -8 });
+      if (reduce) {
+        gsap.set(stamp, { scale: 1, opacity: 1, rotation: -8 });
         return;
       }
 
       const tl = gsap.timeline();
-      tl.set("[data-suc='stamp']", { scale: 0, opacity: 0, rotation: -18 })
-        .to("[data-suc='stamp']", {
+      tl.set(stamp, { scale: 0, opacity: 0, rotation: -18 })
+        .to(stamp, {
           scale: 1.18,
           opacity: 1,
           rotation: -8,
           duration: 0.34,
           ease: "power3.in",
         })
-        .to("[data-suc='stamp']", {
+        .to(stamp, {
           scale: 1,
           duration: 0.28,
           ease: "back.out(2.2)",
         })
         .to(
-          "[data-suc='sheet']",
+          sheet,
           {
             x: 4,
             y: -2,
@@ -181,15 +199,21 @@ export function SucessoView() {
           },
           "-=0.3"
         )
-        .from("[data-suc='cta']", { y: 16, opacity: 0, duration: 0.5 }, "-=0.1")
-        .from(
-          "[data-suc='secondary']",
+        .from(cta, { y: 16, opacity: 0, duration: 0.5 }, "-=0.1");
+
+      if (secondary.length > 0) {
+        tl.from(
+          secondary,
           { y: 10, opacity: 0, duration: 0.4, stagger: 0.08 },
           "-=0.3"
-        )
-        .from("[data-suc='upsell']", { y: 10, opacity: 0, duration: 0.4 }, "-=0.2");
+        );
+      }
+
+      if (upsell) {
+        tl.from(upsell, { y: 10, opacity: 0, duration: 0.4 }, "-=0.2");
+      }
     },
-    { scope: root, dependencies: [modelo] }
+    { dependencies: [modelo] }
   );
 
   const handleBaixarPDF = async () => {
@@ -262,7 +286,7 @@ export function SucessoView() {
   };
 
   // --- Loading skeleton ---
-  if (finalizingGuest) {
+  if (finalizingPaidOrder) {
     return (
       <PageShell className="bg-[var(--green-tint)]/40 min-h-screen">
         <div className="grid place-items-center min-h-[60vh] px-4">
@@ -272,7 +296,7 @@ export function SucessoView() {
               Gerando seu documento seguro…
             </h2>
             <p className="mt-2 text-sm text-ink/70">
-              Estamos finalizando seu PDF e preparando seu link de acesso permanente.
+              Estamos finalizando seu PDF e preparando seu acesso.
             </p>
           </div>
         </div>
@@ -339,7 +363,7 @@ export function SucessoView() {
       <div ref={root} className="mx-auto max-w-2xl px-4 sm:px-6 py-10 sm:py-14">
         <PageHeader
           eyebrow="Documento pronto"
-          title={`Pronto! Seu ${modelo.nome} está formatado e com validade legal.`}
+          title={`Pronto! Seu ${modelo.nome} está formatado e pronto para baixar e assinar.`}
           align="center"
         />
 
@@ -397,7 +421,7 @@ export function SucessoView() {
                       DOCFACIL
                     </p>
                     <p className="mt-1 text-[0.5rem] font-semibold uppercase tracking-widest opacity-80">
-                      Válido · {new Date().toLocaleDateString("pt-BR")}
+                      Gerado · {new Date().toLocaleDateString("pt-BR")}
                     </p>
                   </div>
                 </div>
