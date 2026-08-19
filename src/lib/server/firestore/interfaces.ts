@@ -92,6 +92,7 @@ export interface IUsersRepository {
   getUserProfile(
     userId: string
   ): Promise<{ plano?: string; email?: string; nome?: string } | null>;
+  setUserPlan(userId: string, plan: "gratis" | "pro"): Promise<void>;
 }
 
 export interface CommitGeneratedArtifactInput {
