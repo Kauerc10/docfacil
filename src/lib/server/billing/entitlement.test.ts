@@ -1,7 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { resolveEntitlement, FREE_MONTHLY_LIMIT } from "./entitlement";
+import { resolveEntitlement } from "./entitlement";
+import { FREE_MONTHLY_LIMIT } from "@/lib/document-access-policy";
 import { BackendError } from "../errors";
 import type { OrderRecord } from "../domain/documents";
+
+const ELIGIBLE_MODEL = "declaracao-residencia";
+const NON_ELIGIBLE_MODEL = "contrato-locacao";
 
 describe("resolveEntitlement", () => {
   it("resolves guest with paid order as single_purchase without watermark", () => {
@@ -17,6 +21,7 @@ describe("resolveEntitlement", () => {
 
     const decision = resolveEntitlement({
       principal: { type: "guest" },
+      modeloSlug: NON_ELIGIBLE_MODEL,
       orderId: "ord_123",
       order,
     });
@@ -32,11 +37,15 @@ describe("resolveEntitlement", () => {
     expect(() =>
       resolveEntitlement({
         principal: { type: "guest" },
+        modeloSlug: ELIGIBLE_MODEL,
       })
     ).toThrow(BackendError);
 
     try {
-      resolveEntitlement({ principal: { type: "guest" } });
+      resolveEntitlement({
+        principal: { type: "guest" },
+        modeloSlug: ELIGIBLE_MODEL,
+      });
     } catch (err: any) {
       expect(err.code).toBe("PAYMENT_REQUIRED");
       expect(err.status).toBe(402);
@@ -57,6 +66,7 @@ describe("resolveEntitlement", () => {
     try {
       resolveEntitlement({
         principal: { type: "guest" },
+        modeloSlug: NON_ELIGIBLE_MODEL,
         orderId: "ord_pending",
         order: pendingOrder,
       });
@@ -82,6 +92,7 @@ describe("resolveEntitlement", () => {
     try {
       resolveEntitlement({
         principal: { type: "guest" },
+        modeloSlug: NON_ELIGIBLE_MODEL,
         orderId: "ord_consumed",
         order: consumedOrder,
       });
@@ -92,9 +103,10 @@ describe("resolveEntitlement", () => {
     }
   });
 
-  it("resolves Pro user as pro without watermark and without checking order or monthly count", () => {
+  it("resolves Pro user as pro without watermark regardless of quota or model", () => {
     const decision = resolveEntitlement({
       principal: { type: "user", userId: "usr_pro" },
+      modeloSlug: NON_ELIGIBLE_MODEL,
       userProfile: { plano: "pro" },
       currentMonthlyCount: 50,
     });
@@ -105,11 +117,12 @@ describe("resolveEntitlement", () => {
     });
   });
 
-  it("resolves Free user below limit as free with watermark", () => {
+  it("resolves Free user below limit only for an eligible model", () => {
     const decision = resolveEntitlement({
       principal: { type: "user", userId: "usr_free" },
+      modeloSlug: ELIGIBLE_MODEL,
       userProfile: { plano: "gratis" },
-      currentMonthlyCount: 1,
+      currentMonthlyCount: 0,
     });
 
     expect(decision).toEqual({
@@ -118,10 +131,26 @@ describe("resolveEntitlement", () => {
     });
   });
 
-  it("throws FREE_LIMIT_REACHED when Free user reaches monthly limit", () => {
+  it("rejects a non-eligible model without consuming the free quota", () => {
     try {
       resolveEntitlement({
         principal: { type: "user", userId: "usr_free" },
+        modeloSlug: NON_ELIGIBLE_MODEL,
+        userProfile: { plano: "gratis" },
+        currentMonthlyCount: 0,
+      });
+      expect(true).toBe(false);
+    } catch (err: any) {
+      expect(err.code).toBe("FREE_MODEL_NOT_ELIGIBLE");
+      expect(err.status).toBe(402);
+    }
+  });
+
+  it("throws FREE_LIMIT_REACHED when Free user reaches monthly limit on eligible model", () => {
+    try {
+      resolveEntitlement({
+        principal: { type: "user", userId: "usr_free" },
+        modeloSlug: ELIGIBLE_MODEL,
         userProfile: { plano: "gratis" },
         currentMonthlyCount: FREE_MONTHLY_LIMIT,
       });
@@ -145,6 +174,7 @@ describe("resolveEntitlement", () => {
 
     const decision = resolveEntitlement({
       principal: { type: "user", userId: "usr_free" },
+      modeloSlug: NON_ELIGIBLE_MODEL,
       userProfile: { plano: "gratis" },
       currentMonthlyCount: FREE_MONTHLY_LIMIT,
       orderId: "ord_user_paid",
@@ -161,6 +191,7 @@ describe("resolveEntitlement", () => {
   it("never treats legacy 'avulso' on user profile as Pro", () => {
     const decision = resolveEntitlement({
       principal: { type: "user", userId: "usr_legacy" },
+      modeloSlug: ELIGIBLE_MODEL,
       userProfile: { plano: "avulso" },
       currentMonthlyCount: 0,
     });
