@@ -14,8 +14,8 @@
  *  - Estrutura: findClosingSectionIndex (detecta bloco de assinaturas),
  *    buildSignatureColumns (colunas de assinaturas), buildContent (orquestra)
  *
- * Importa do `document-engine`: fillDocument, classifyLine,
- * extractClausulasSelecionadas, computeCamposOpcionais.
+ * O ritmo editorial por modelo vem de visual-recipes.ts. Assim o conteúdo
+ * muda de densidade sem criar nove renderers ou poluir o catálogo jurídico.
  */
 import {
   fillDocument,
@@ -24,6 +24,7 @@ import {
   computeCamposOpcionais,
 } from "../document-engine";
 import type { Modelo } from "../types";
+import { getPdfVisualRecipe, type PdfVisualRecipe } from "./visual-recipes";
 
 // === Geometria A4 (compartilhada com styles.ts) ===========================
 
@@ -142,7 +143,12 @@ export function splitStrongSegments(text: string): { text: string; bold?: boolea
  */
 export function textRuns(
   text: string,
-  options?: { indentFirstLine?: boolean; italics?: boolean; strongStyle?: string }
+  options?: {
+    indentFirstLine?: boolean;
+    indentSpaces?: number;
+    italics?: boolean;
+    strongStyle?: string;
+  }
 ) {
   const runs = splitStrongSegments(normalizePdfText(text)).map((segment) => ({
     text: segment.text,
@@ -152,10 +158,10 @@ export function textRuns(
 
   if (!options?.indentFirstLine) return runs;
 
-  // Recuo de primeira linha com NBSP (tipograficamente correto, não colapsa).
+  // NBSP mantém o recuo estável no pdfmake sem depender de espaço colapsável.
   return [
     {
-      text: "\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0",
+      text: "\u00a0".repeat(options.indentSpaces ?? 10),
       preserveLeadingSpaces: true,
     },
     ...runs,
@@ -208,15 +214,15 @@ export function findClosingSectionIndex(linhas: string[]): number {
 
 /**
  * Renderiza uma linha classificada num nó do pdfmake.
- * Ramifica por tipo: heading1 (filete lateral), heading2, signature/witness,
- * paragraph (com sub-casos: data, subtítulo entre parênteses, citação legal,
- * item de lista, label:valor, parágrafo default).
- *
- * Retorna `{ element, nextIndex }` onde nextIndex avança caso a função tenha
- * consumido linhas seguintes (ex.: signature agrupa details adjacentes;
- * bullet agrupa itens consecutivos).
+ * A receita visual só calibra ritmo/posição; a semântica do documento e a
+ * classificação das linhas permanecem as mesmas.
  */
-export function renderLineNode(linha: string, list: string[], index: number): { element: unknown; nextIndex: number } | null {
+export function renderLineNode(
+  linha: string,
+  list: string[],
+  index: number,
+  recipe: PdfVisualRecipe = getPdfVisualRecipe({ slug: "" })
+): { element: unknown; nextIndex: number } | null {
   const classified = classifyLine(linha);
   let nextIndex = index + 1;
 
@@ -228,8 +234,6 @@ export function renderLineNode(linha: string, list: string[], index: number): { 
   }
 
   if (classified.tipo === "heading1") {
-    // Filete lateral curto à esquerda (efeito "sidebar rule") — hierarquia
-    // visual clara: seções principais têm marca lateral azul-marinho.
     return {
       element: {
         columns: [
@@ -262,7 +266,7 @@ export function renderLineNode(linha: string, list: string[], index: number): { 
       element: {
         text: classified.texto,
         style: "clauseHeading",
-        margin: [0, 14, 0, 6],
+        margin: [0, recipe.clauseHeadingTopMargin, 0, recipe.clauseHeadingBottomMargin],
         keepWithNext: true,
         unbreakable: true,
       },
@@ -309,46 +313,50 @@ export function renderLineNode(linha: string, list: string[], index: number): { 
   }
 
   if (classified.tipo === "paragraph") {
-    // Linha de data (alinhada à direita)
-    if (classified.texto.includes("data de assinatura") || classified.texto.includes("Data de assinatura") || /,\s*\d{1,2}\s+de\s+[a-zç]+\s+de\s+\d{4}/i.test(classified.texto)) {
+    if (
+      classified.texto.includes("data de assinatura") ||
+      classified.texto.includes("Data de assinatura") ||
+      /,\s*\d{1,2}\s+de\s+[a-zç]+\s+de\s+\d{4}/i.test(classified.texto)
+    ) {
       return {
         element: {
           text: textRuns(classified.texto),
           style: "body",
-          margin: [0, 14, 0, 14],
-          alignment: "right" as const,
+          margin: [0, recipe.dateTopMargin, 0, recipe.dateBottomMargin],
+          alignment: recipe.dateAlignment,
         },
         nextIndex,
       };
     }
 
-    // Subtítulo entre parênteses (centralizado, itálico)
     if (classified.texto.startsWith("(") && classified.texto.endsWith(")")) {
       return {
         element: {
           text: textRuns(classified.texto, { italics: true }),
           style: "body",
-          margin: [0, 0, 0, 12],
+          margin: [0, 0, 0, recipe.paragraphBottomMargin + 2],
           alignment: "center" as const,
         },
         nextIndex,
       };
     }
 
-    // Citação legal ampliada: regex case-insensitive cobrindo art./lei/
-    // código/CP/CC/CDC/CF/constituição/pena — com ou sem aspas.
     if (isLegalQuote(classified.texto)) {
       return {
         element: {
           text: textRuns(classified.texto, { italics: true }),
           style: "legalQuote",
-          margin: [20, 6, 20, 10] as [number, number, number, number],
+          margin: [
+            recipe.legalQuoteIndent,
+            6,
+            recipe.legalQuoteIndent,
+            recipe.paragraphBottomMargin,
+          ] as [number, number, number, number],
         },
         nextIndex,
       };
     }
 
-    // Item de lista (bullet): linhas começando com -, •, *
     const bulletMatch = classified.texto.match(/^[-•*]\s+(.+)$/);
     if (bulletMatch) {
       const items: unknown[] = [{ text: textRuns(bulletMatch[1]) }];
@@ -367,13 +375,12 @@ export function renderLineNode(linha: string, list: string[], index: number): { 
         element: {
           ul: items,
           style: "body",
-          margin: [16, 0, 0, 10] as [number, number, number, number],
+          margin: [16, 0, 0, recipe.paragraphBottomMargin] as [number, number, number, number],
         },
         nextIndex,
       };
     }
 
-    // Label: valor (ex.: "LOCADOR: João da Silva")
     const colonMatch = classified.texto.match(/^([A-ZÀ-Ú][A-ZÀ-Ú\s/()]+):\s*(.+)$/);
     if (colonMatch && colonMatch[1].length < 40) {
       return {
@@ -382,19 +389,21 @@ export function renderLineNode(linha: string, list: string[], index: number): { 
             { text: colonMatch[1] + ": ", style: "label" },
             ...textRuns(colonMatch[2])
           ],
-          margin: [0, 0, 0, 8],
+          margin: [0, 0, 0, Math.max(7, recipe.paragraphBottomMargin - 2)],
           alignment: "justify" as const,
         },
         nextIndex,
       };
     }
 
-    // Parágrafo default (justificado, com recuo de 1ª linha)
     return {
       element: {
-        text: textRuns(classified.texto, { indentFirstLine: true }),
+        text: textRuns(classified.texto, {
+          indentFirstLine: true,
+          indentSpaces: recipe.firstLineIndentSpaces,
+        }),
         style: "body",
-        margin: [0, 0, 0, 10],
+        margin: [0, 0, 0, recipe.paragraphBottomMargin],
         alignment: "justify" as const,
       },
       nextIndex,
@@ -505,13 +514,6 @@ export function buildSignatureColumns(blocks: SignatureBlock[]): unknown {
 /**
  * Constrói o array de nós de conteúdo (body + closing) a partir do modelo
  * preenchido.
- *
- * Pipeline:
- * 1. fillDocument (motor) preenche {{key}} e {{clausula:id}}
- * 2. Descarta o título (renderizado à parte no topo do content)
- * 3. findClosingSectionIndex separa corpo do fecho (assinaturas)
- * 4. renderLineNode em cada linha do corpo
- * 5. Fecho permanece flexível; linhas/blocos de assinatura ficam atômicos.
  */
 export function buildContent(
   modelo: Modelo,
@@ -519,6 +521,7 @@ export function buildContent(
   clausulasSelecionadas: string[],
   camposOpcionais: string[]
 ): unknown[] {
+  const recipe = getPdfVisualRecipe(modelo);
   const linhasPreenchidas = fillDocument(
     {
       titulo: modelo.template.titulo,
@@ -530,7 +533,6 @@ export function buildContent(
     { camposOpcionais }
   );
 
-  // Descarta o título, renderizado separadamente no topo do content.
   const linhasCorpo = linhasPreenchidas.slice(1);
   const closingIdx = findClosingSectionIndex(linhasCorpo);
 
@@ -539,10 +541,9 @@ export function buildContent(
 
   const content: unknown[] = [];
 
-  // Renderiza o corpo
   let i = 0;
   while (i < bodyLines.length) {
-    const node = renderLineNode(bodyLines[i], bodyLines, i);
+    const node = renderLineNode(bodyLines[i], bodyLines, i, recipe);
     if (node) {
       content.push(node.element);
       i = node.nextIndex;
@@ -590,7 +591,7 @@ export function buildContent(
           closingNodes.push(buildSignatureColumns(sigBlocks));
         }
       } else {
-        const node = renderLineNode(line, closingLines, j);
+        const node = renderLineNode(line, closingLines, j, recipe);
         if (node) {
           closingNodes.push(node.element);
           j = node.nextIndex;
@@ -602,7 +603,7 @@ export function buildContent(
 
     content.push({
       stack: closingNodes,
-      margin: [0, 15, 0, 0] as [number, number, number, number],
+      margin: [0, recipe.closingTopMargin, 0, 0] as [number, number, number, number],
     });
   }
 
