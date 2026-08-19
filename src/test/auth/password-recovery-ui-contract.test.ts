@@ -28,6 +28,13 @@ describe("experiência pública de recuperação de senha", () => {
     expect(visual).toContain('alt=""');
   });
 
+  it("usa o mascote de e-mail enviado no estado de sucesso", () => {
+    const visual = source("src/components/docfacil/auth/password-recovery-visual.tsx");
+
+    expect(visual).toContain('/mascotes/coruja-email-enviado.webp');
+    expect(visual).toContain('variant === "success"');
+  });
+
   it("rota de solicitação usa feedback neutro e volta para o login", () => {
     const form = source("src/app/esqueci-senha/password-recovery-form.tsx");
     const page = source("src/app/esqueci-senha/page.tsx");
