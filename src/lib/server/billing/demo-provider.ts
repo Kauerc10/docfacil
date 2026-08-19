@@ -6,7 +6,7 @@ import { getServerEnv } from "../env";
 import { getRepositories } from "../firestore/repositories";
 
 export interface CreateOrderInput {
-  product: "avulso";
+  product: "avulso" | "pro";
   amountCents: number;
   buyer:
     | { type: "guest"; email?: string; phone?: string }
