@@ -2,15 +2,17 @@ import { describe, expect, it } from "bun:test";
 import { translateAuthError } from "@/lib/auth-context";
 
 describe("Firebase Auth Error Translation", () => {
-  it("translates modern auth/invalid-credential code into a clear message", () => {
-    const msg = translateAuthError({ code: "auth/invalid-credential" });
-    expect(msg).toContain("E-mail ou senha incorretos");
+  it("usa a mesma mensagem para credencial inválida, usuário ausente e senha errada", () => {
+    const expected = "E-mail ou senha incorretos. Verifique a digitação ou entre com o Google.";
+
+    expect(translateAuthError({ code: "auth/invalid-credential" })).toBe(expected);
+    expect(translateAuthError({ code: "auth/wrong-password" })).toBe(expected);
+    expect(translateAuthError({ code: "auth/user-not-found" })).toBe(expected);
   });
 
-  it("translates wrong password and user not found codes", () => {
-    expect(translateAuthError({ code: "auth/wrong-password" })).toContain("Senha incorreta");
-    expect(translateAuthError({ code: "auth/user-not-found" })).toContain("Nenhuma conta");
+  it("mantém validações locais de campos obrigatórios", () => {
     expect(translateAuthError({ code: "auth/missing-password" })).toContain("senha");
+    expect(translateAuthError({ code: "auth/missing-email" })).toContain("e-mail");
   });
 
   it("translates provider and popup conflicts", () => {

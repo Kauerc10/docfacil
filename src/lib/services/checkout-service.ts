@@ -3,8 +3,8 @@
  * Suporta kirvano, perfectpay, stripe. Demo mode simula via /api/checkout/demo.
  * Preços e rótulos vêm de `@/lib/pricing` (fonte única de verdade).
  */
+import { apiFetch } from "@/lib/auth/api-fetch";
 import { PLAN_PRICES, PLAN_LABELS, type PaidPlan } from "@/lib/pricing";
-import { getClientAppCheckToken } from "@/lib/firebase";
 
 export type CheckoutProvider = "kirvano" | "perfectpay" | "stripe";
 export type CheckoutPlan = PaidPlan;
@@ -49,23 +49,15 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
   const amount = PLAN_PRICES[params.plan];
 
   if (provider === "demo" || !IS_PRODUCTION_CONFIGURED) {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    try {
-      const appCheckToken = await getClientAppCheckToken();
-      if (appCheckToken) {
-        headers["X-Firebase-AppCheck"] = appCheckToken;
-      }
-    } catch {
-      // continue
-    }
-
     if (!params.userEmail) {
       throw new Error("Informe seu e-mail para prosseguir com o pagamento.");
     }
 
-    const res = await fetch("/api/checkout/demo", {
+    // apiFetch preserva a identidade quando há usuário autenticado e mantém o
+    // fluxo guest quando não há sessão. App Check também é anexado por ele.
+    const res = await apiFetch("/api/checkout/demo", {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         guestContact: { email: params.userEmail },
         autoPay: true,
@@ -86,14 +78,15 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
     return {
       checkoutUrl: successUrl,
       orderId: data.order.id,
-      provider: "demo" as any,
+      provider: "demo" as CheckoutProvider,
       plan: params.plan,
       amount,
     };
   }
 
-  // Gateway real em produção
-  const res = await fetch("/api/checkout/create", {
+  // Gateway real em produção. O backend deve derivar a identidade do Bearer,
+  // nunca confiar em userId enviado no JSON para decidir quem é o comprador.
+  const res = await apiFetch("/api/checkout/create", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),

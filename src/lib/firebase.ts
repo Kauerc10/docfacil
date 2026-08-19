@@ -12,7 +12,12 @@
  * so initialization happens on the first getClientAppCheckToken() call.
  */
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
+import {
+  browserLocalPersistence,
+  getAuth,
+  setPersistence,
+  type Auth,
+} from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import {
   initializeAppCheck,
@@ -39,12 +44,30 @@ let auth: Auth | null = null;
 let db: Firestore | null = null;
 let appCheck: AppCheck | null = null;
 let appCheckInitializationAttempted = false;
+let authPersistenceReady: Promise<void> = Promise.resolve();
 
 if (IS_FIREBASE_CONFIGURED && typeof window !== "undefined") {
   // Client-side only — Firebase Auth needs window.
   app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-  auth = getAuth(app);
+  const clientAuth = getAuth(app);
+  auth = clientAuth;
   db = getFirestore(app);
+
+  // Torna a política de sessão explícita. Se o navegador impedir o storage,
+  // mantemos o Auth utilizável e registramos o problema; o login não deve ficar
+  // preso por uma preferência de persistência que o próprio ambiente recusou.
+  authPersistenceReady = setPersistence(clientAuth, browserLocalPersistence).catch(
+    (error) => {
+      console.warn(
+        "[Firebase] Não foi possível configurar persistência local da sessão:",
+        error
+      );
+    }
+  );
+}
+
+export async function ensureAuthPersistence(): Promise<void> {
+  await authPersistenceReady;
 }
 
 function isDisposableVercelPreview(): boolean {

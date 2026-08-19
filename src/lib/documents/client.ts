@@ -1,4 +1,4 @@
-import { auth, getClientAppCheckToken } from "../firebase";
+import { apiFetch } from "@/lib/auth/api-fetch";
 import { getOrCreateFinalizationRequestId, clearFinalizationRequestId } from "./idempotency";
 export { getOrCreateFinalizationRequestId, clearFinalizationRequestId };
 
@@ -82,33 +82,7 @@ export function clearGuestDraft(modeloSlug: string): void {
   }
 }
 
-async function getAuthHeaders(): Promise<HeadersInit> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (auth && auth.currentUser) {
-    try {
-      const idToken = await auth.currentUser.getIdToken();
-      if (idToken) {
-        headers["Authorization"] = `Bearer ${idToken}`;
-      }
-    } catch {
-      // Continue without auth header
-    }
-  }
-
-  try {
-    const appCheckToken = await getClientAppCheckToken();
-    if (appCheckToken) {
-      headers["X-Firebase-AppCheck"] = appCheckToken;
-    }
-  } catch {
-    // Continue
-  }
-
-  return headers;
-}
+const JSON_HEADERS = { "Content-Type": "application/json" };
 
 export async function finalizeDocument(input: {
   requestId?: string;
@@ -126,12 +100,11 @@ export async function finalizeDocument(input: {
     guestAccessPath?: string;
   };
 }> {
-  const headers = await getAuthHeaders();
   const requestId = input.requestId || getOrCreateFinalizationRequestId(input.modeloSlug);
 
-  const res = await fetch("/api/documents/finalize", {
+  const res = await apiFetch("/api/documents/finalize", {
     method: "POST",
-    headers,
+    headers: JSON_HEADERS,
     body: JSON.stringify({
       requestId,
       modeloSlug: input.modeloSlug,
@@ -149,8 +122,8 @@ export async function finalizeDocument(input: {
 
     // Se o servidor respondeu, sabemos que a tentativa terminou com erro.
     // Apenas GENERATION_IN_PROGRESS mantém o mesmo requestId para recuperar a
-    // geração que continua rodando. Erros de rede não passam por este bloco e
-    // preservam a intenção, evitando duplicidade caso o servidor tenha concluído.
+    // geração que continua rodando. Erros de rede/autenticação não passam por
+    // este bloco e preservam a intenção, evitando duplicidade em uma repetição.
     if (code !== "GENERATION_IN_PROGRESS") {
       clearFinalizationRequestId(input.modeloSlug);
     }
@@ -178,12 +151,11 @@ export async function createDocumentVersion(
     artifactState: string;
   };
 }> {
-  const headers = await getAuthHeaders();
   const requestId = input.requestId || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "req_" + Date.now());
 
-  const res = await fetch(`/api/documents/${documentId}/versions`, {
+  const res = await apiFetch(`/api/documents/${documentId}/versions`, {
     method: "POST",
-    headers,
+    headers: JSON_HEADERS,
     body: JSON.stringify({
       requestId,
       respostas: input.respostas,
@@ -209,11 +181,9 @@ export async function getDocumentDownloadUrl(
   sha256: string;
   expiresIn: number;
 }> {
-  const headers = await getAuthHeaders();
-
-  const res = await fetch(`/api/documents/${documentId}/download`, {
+  const res = await apiFetch(`/api/documents/${documentId}/download`, {
     method: "POST",
-    headers,
+    headers: JSON_HEADERS,
     body: JSON.stringify({ version }),
   });
 
@@ -231,11 +201,8 @@ export async function shareDocument(documentId: string): Promise<{
   version: number;
   active: boolean;
 }> {
-  const headers = await getAuthHeaders();
-
-  const res = await fetch(`/api/documents/${documentId}/share`, {
+  const res = await apiFetch(`/api/documents/${documentId}/share`, {
     method: "POST",
-    headers,
   });
 
   if (!res.ok) {
@@ -250,11 +217,8 @@ export async function revokeDocumentShare(documentId: string): Promise<{
   success: boolean;
   revokedAt: number;
 }> {
-  const headers = await getAuthHeaders();
-
-  const res = await fetch(`/api/documents/${documentId}/share/revoke`, {
+  const res = await apiFetch(`/api/documents/${documentId}/share/revoke`, {
     method: "POST",
-    headers,
   });
 
   if (!res.ok) {
@@ -269,11 +233,8 @@ export async function deleteDocumentApi(documentId: string): Promise<{
   success: boolean;
   deletedDocumentId: string;
 }> {
-  const headers = await getAuthHeaders();
-
-  const res = await fetch(`/api/documents/${documentId}`, {
+  const res = await apiFetch(`/api/documents/${documentId}`, {
     method: "DELETE",
-    headers,
   });
 
   if (!res.ok) {
@@ -285,10 +246,8 @@ export async function deleteDocumentApi(documentId: string): Promise<{
 }
 
 export async function listDocumentsApi(): Promise<import("./dto").DocumentSummaryDto[]> {
-  const headers = await getAuthHeaders();
-  const res = await fetch("/api/documents", {
+  const res = await apiFetch("/api/documents", {
     method: "GET",
-    headers,
   });
 
   if (!res.ok) {
@@ -301,10 +260,8 @@ export async function listDocumentsApi(): Promise<import("./dto").DocumentSummar
 }
 
 export async function getDocumentApi(documentId: string): Promise<import("./dto").DocumentDetailDto | null> {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`/api/documents/${documentId}`, {
+  const res = await apiFetch(`/api/documents/${documentId}`, {
     method: "GET",
-    headers,
   });
 
   if (res.status === 404) {
@@ -328,10 +285,8 @@ export async function duplicateDocumentApi(documentId: string): Promise<{
     extrasPorClausula: Record<string, Record<string, string>>;
   };
 }> {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`/api/documents/${documentId}/duplicate`, {
+  const res = await apiFetch(`/api/documents/${documentId}/duplicate`, {
     method: "POST",
-    headers,
   });
 
   if (!res.ok) {
