@@ -25,6 +25,17 @@ async function waitForSearchParams(
   );
 }
 
+async function acceptOptionalCookies(page: import("@playwright/test").Page) {
+  const acceptAll = page.getByRole("button", { name: "Aceitar todos", exact: true });
+  const visible = await acceptAll.isVisible({ timeout: 3000 }).catch(() => false);
+  if (!visible) return;
+
+  await acceptAll.click();
+  await expect(
+    page.getByRole("dialog", { name: "Consentimento de cookies" })
+  ).toBeHidden({ timeout: 5000 });
+}
+
 test.describe("Guest Purchase and Download Flow", () => {
   test.setTimeout(120000);
 
@@ -33,6 +44,7 @@ test.describe("Guest Purchase and Download Flow", () => {
   }) => {
     // 1. Abre modelo de criação como guest
     await page.goto("/?view=criar&slug=declaracao-residencia");
+    await acceptOptionalCookies(page);
 
     // Stage 0 — Declarante + Endereço
     const nameInput = page.locator("#g-declarante_nome");
@@ -133,6 +145,7 @@ test.describe("Guest Purchase and Download Flow", () => {
   }) => {
     // 1. Abre modelo com cláusulas dinâmicas
     await page.goto("/?view=criar&slug=contrato-locacao");
+    await acceptOptionalCookies(page);
 
     // Stage 0 — Locador
     const locadorNome = page.locator("#g-locador_nome");
@@ -191,9 +204,10 @@ test.describe("Guest Purchase and Download Flow", () => {
     await page.getByRole("button", { name: /^avançar$/i }).click();
 
     // Stage 4 — Garantia locatícia: escolha única, seleciona Fiador
-    const fiadorCard = page.getByRole("radio", { name: /fiador/i }).first();
+    const fiadorCard = page.getByRole("radio", { name: "Fiador", exact: true });
     await expect(fiadorCard).toBeVisible({ timeout: 10000 });
-    await fiadorCard.click({ force: true });
+    await fiadorCard.click();
+    await expect(fiadorCard).toHaveAttribute("aria-checked", "true", { timeout: 5000 });
 
     // Campos extras do fiador: ID = extra-{clausulaId}-{campo.key}
     // clausulaId = "fiador", campo.key = "fiador_nome"
