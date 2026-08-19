@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { KeyRound, ShieldAlert } from "lucide-react";
+import styles from "./password-recovery-visual.module.css";
 
 export type PasswordRecoveryVisualVariant =
   | "recovery"
@@ -28,7 +29,7 @@ export function PasswordRecoveryVisual({
             height={128}
             priority
             unoptimized
-            className="relative h-32 w-32 object-contain drop-shadow-[0_12px_20px_rgba(37,84,199,0.16)] password-recovery-mascot-float"
+            className={`relative h-32 w-32 object-contain drop-shadow-[0_12px_20px_rgba(37,84,199,0.16)] ${styles.mascotFloat}`}
           />
         </div>
       </div>
@@ -49,7 +50,7 @@ export function PasswordRecoveryVisual({
             alt=""
             width={128}
             height={128}
-            className="relative h-32 w-32 object-contain drop-shadow-[0_12px_20px_rgba(37,84,199,0.14)] password-recovery-mascot-float"
+            className={`relative h-32 w-32 object-contain drop-shadow-[0_12px_20px_rgba(37,84,199,0.14)] ${styles.mascotFloat}`}
           />
         </div>
       </div>
