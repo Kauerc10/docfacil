@@ -3,9 +3,10 @@
  *
  *   1. `aplicarComposicaoModelo` — compõe endereços a partir das etapas
  *   2. `buildClausulaMap` — indexa cláusulas por id
- *   3. `fillTemplate` (em cada linha do corpo) — preenche `{{key}}` e `{{clausula:id}}`
- *   4. `classifyLine` — classifica cada linha em heading1/2/paragraph/...
- *   5. `wrapLines` + `paginate` — quebra por palavra e agrupa em páginas A4
+ *   3. `applyLegalTemplateRule` — aplica regras jurídicas dependentes das respostas
+ *   4. `fillTemplate` (em cada linha do corpo) — preenche `{{key}}` e `{{clausula:id}}`
+ *   5. `classifyLine` — classifica cada linha em heading1/2/paragraph/...
+ *   6. `wrapLines` + `paginate` — quebra por palavra e agrupa em páginas A4
  *
  * Retorna uma lista de `PaginaRenderizada` pronta para ser consumida por
  * qualquer renderer (PreviewA4, DetalhePreview, PDF, e-mail, etc.).
@@ -15,12 +16,21 @@
  */
 import { aplicarComposicaoModelo } from "./compose";
 import { buildClausulaMap, fillTemplate } from "./template";
+import { applyLegalTemplateRule } from "./legal-rules";
 import { classifyLine } from "./classify";
 import { wrapLines, paginate } from "./paginate";
 import type { PaginaRenderizada, RenderInput, RenderOptions } from "./types";
 
 const DEFAULT_LINHAS_POR_PAGINA = 20;
 const DEFAULT_CHARS_POR_LINHA = 78;
+
+function prepareTemplateLine(
+  line: string,
+  modelSlug: string | undefined,
+  answers: Record<string, string>
+): string {
+  return applyLegalTemplateRule(modelSlug, line, answers);
+}
 
 /**
  * Renderiza um documento em páginas A4 paginadas.
@@ -67,13 +77,18 @@ export function renderDocument(
     context
   );
 
-  // 4. Preenche cada linha do corpo + classifica.
+  // 4. Aplica regras do modelo, preenche cada linha do corpo e classifica.
   const linhasClassificadas = [
     // título sempre como heading1 (primeira linha da primeira página)
     { tipo: "heading1" as const, texto: tituloPreenchido },
     ...corpo.map((linha) => {
-      const preenchida = fillTemplate(
+      const linhaPreparada = prepareTemplateLine(
         linha,
+        modelo?.slug,
+        respostasCompostas
+      );
+      const preenchida = fillTemplate(
+        linhaPreparada,
         respostasCompostas,
         clausulaPorId,
         clausulasSelecionadas,
@@ -143,16 +158,21 @@ export function fillDocument(
     context
   );
 
-  const corpoPreenchido = corpo.map((linha) =>
-    fillTemplate(
+  const corpoPreenchido = corpo.map((linha) => {
+    const linhaPreparada = prepareTemplateLine(
       linha,
+      modelo?.slug,
+      respostasCompostas
+    );
+    return fillTemplate(
+      linhaPreparada,
       respostasCompostas,
       clausulaPorId,
       clausulasSelecionadas,
       camposOpcionais,
       context
-    )
-  );
+    );
+  });
 
   // remove linhas vazias (cláusulas não selecionadas cujo corpo era a linha inteira)
   const corpoFiltrado = corpoPreenchido.filter((l) => l.trim());
