@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { getModelo } from "@/lib/modelos";
-import { buildDocDefinition } from "@/lib/pdf/styles";
+import { buildDocDefinition, getPdfLayoutProfile } from "@/lib/pdf/styles";
 import { buildContent } from "@/lib/pdf/content-builder";
 
 const answers: Record<string, string> = {
@@ -43,9 +43,14 @@ describe("PDF Structure & Layout Protection", () => {
     expect(serialized).not.toContain("VALIDADE LEGAL");
   });
 
-  it("usa perfis editoriais diferentes para declaração e contrato", () => {
+  it("usa perfis editoriais diferentes para declaração, instrumento e contrato", () => {
     const locacao = getModelo("contrato-locacao")!;
     const declaracao = getModelo("declaracao-residencia")!;
+    const uniao = getModelo("uniao-estavel")!;
+
+    expect(getPdfLayoutProfile(locacao)).toBe("contract");
+    expect(getPdfLayoutProfile(declaracao)).toBe("declaration");
+    expect(getPdfLayoutProfile(uniao)).toBe("instrument");
 
     const contratoDdo = buildDocDefinition(locacao, answers) as {
       styles: { body: { lineHeight: number }; signature: { lineHeight: number } };
@@ -53,8 +58,14 @@ describe("PDF Structure & Layout Protection", () => {
     const declaracaoDdo = buildDocDefinition(declaracao, {}) as {
       styles: { body: { lineHeight: number }; signature: { lineHeight: number } };
     };
+    const instrumentoDdo = buildDocDefinition(uniao, {}) as {
+      styles: { body: { lineHeight: number } };
+    };
 
     expect(declaracaoDdo.styles.body.lineHeight).toBeGreaterThan(
+      contratoDdo.styles.body.lineHeight
+    );
+    expect(instrumentoDdo.styles.body.lineHeight).toBeGreaterThan(
       contratoDdo.styles.body.lineHeight
     );
     expect(declaracaoDdo.styles.signature.lineHeight).toBeGreaterThanOrEqual(
