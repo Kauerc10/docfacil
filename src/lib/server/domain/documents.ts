@@ -89,7 +89,7 @@ export type OrderStatus =
 export interface OrderRecord {
   id?: string;
   provider: "demo";
-  product: "avulso";
+  product: "avulso" | "pro";
   amountCents: number;
   buyer:
     | { type: "guest"; email?: string; phone?: string }
