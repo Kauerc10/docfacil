@@ -20,6 +20,123 @@ import {
   CONTENT_WIDTH,
 } from "./content-builder";
 
+type PdfLayoutProfile = "declaration" | "contract" | "instrument";
+
+interface PdfLayoutConfig {
+  profile: PdfLayoutProfile;
+  pageMargins: [number, number, number, number];
+  bodyLineHeight: number;
+  signatureLineHeight: number;
+  titleBottomMargin: number;
+  dividerBottomMargin: number;
+  closingTopMargin: number;
+}
+
+const DECLARATION_SLUGS = new Set([
+  "declaracao-residencia",
+  "declaracao-residencia-terceiro",
+]);
+
+const INSTRUMENT_SLUGS = new Set([
+  "declaracao-uniao-estavel",
+  "procuracao-simples",
+]);
+
+export function getPdfLayoutProfile(modelo: Pick<Modelo, "slug">): PdfLayoutProfile {
+  if (DECLARATION_SLUGS.has(modelo.slug)) return "declaration";
+  if (INSTRUMENT_SLUGS.has(modelo.slug)) return "instrument";
+  return "contract";
+}
+
+function getLayoutConfig(modelo: Pick<Modelo, "slug">): PdfLayoutConfig {
+  const profile = getPdfLayoutProfile(modelo);
+
+  if (profile === "declaration") {
+    return {
+      profile,
+      pageMargins: [cm(3.2), cm(4.0), cm(3.2), cm(2.8)],
+      bodyLineHeight: 1.8,
+      signatureLineHeight: 1.12,
+      titleBottomMargin: 8,
+      dividerBottomMargin: 28,
+      closingTopMargin: 34,
+    };
+  }
+
+  if (profile === "instrument") {
+    return {
+      profile,
+      pageMargins: [cm(3.15), cm(3.65), cm(3.15), cm(2.7)],
+      bodyLineHeight: 1.68,
+      signatureLineHeight: 1.06,
+      titleBottomMargin: 6,
+      dividerBottomMargin: 24,
+      closingTopMargin: 22,
+    };
+  }
+
+  return {
+    profile,
+    pageMargins: [cm(3.15), cm(3.45), cm(3.15), cm(2.6)],
+    bodyLineHeight: 1.6,
+    signatureLineHeight: 1,
+    titleBottomMargin: 4,
+    dividerBottomMargin: 20,
+    closingTopMargin: 15,
+  };
+}
+
+type PdfNode = Record<string, unknown>;
+
+function isPdfNode(value: unknown): value is PdfNode {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Marca headings com `headlineLevel` para que o paginator real consiga
+ * impedir uma cláusula/título de seção de ficar sozinho no fim da página.
+ */
+function annotateHeadline(node: unknown): unknown {
+  if (!isPdfNode(node)) return node;
+
+  if (node.style === "clauseHeading") {
+    return { ...node, headlineLevel: 2 };
+  }
+
+  if (Array.isArray(node.columns)) {
+    const hasSectionHeading = node.columns.some(
+      (column) => isPdfNode(column) && column.style === "sectionHeading"
+    );
+    if (hasSectionHeading) {
+      return { ...node, headlineLevel: 1 };
+    }
+  }
+
+  return node;
+}
+
+/**
+ * Em declarações curtas, distribui o espaço vertical com intenção editorial:
+ * o fecho/assinatura ganha respiro em vez de ficar colado ao corpo. Em
+ * contratos, o fechamento continua compacto para não desperdiçar página.
+ */
+function applyClosingRhythm(nodes: unknown[], config: PdfLayoutConfig): unknown[] {
+  if (nodes.length === 0) return nodes;
+
+  const out = nodes.map(annotateHeadline);
+  const lastIndex = out.length - 1;
+  const last = out[lastIndex];
+
+  if (isPdfNode(last) && Array.isArray(last.stack)) {
+    out[lastIndex] = {
+      ...last,
+      margin: [0, config.closingTopMargin, 0, 0] as [number, number, number, number],
+    };
+  }
+
+  return out;
+}
+
 /**
  * buildDocDefinition — monta o objeto docDefinition completo para o pdfmake.
  *
@@ -35,21 +152,19 @@ export function buildDocDefinition(
 ): unknown {
   const clausulasSelecionadas = extractClausulasSelecionadas(respostas);
   const camposOpcionais = computeCamposOpcionais(modelo, clausulasSelecionadas);
-  const contentNodes = buildContent(modelo, respostas, clausulasSelecionadas, camposOpcionais);
-
-  const dataHoje = new Date().toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
+  const layout = getLayoutConfig(modelo);
+  const contentNodes = applyClosingRhythm(
+    buildContent(modelo, respostas, clausulasSelecionadas, camposOpcionais),
+    layout
+  );
 
   return {
     pageSize: "A4" as const,
-    pageMargins: [cm(3.15), cm(3.45), cm(3.15), cm(2.6)] as [number, number, number, number],
+    pageMargins: layout.pageMargins,
     defaultStyle: {
       font: "Roboto",
       fontSize: 12,
-      lineHeight: 1.6,
+      lineHeight: layout.bodyLineHeight,
       color: "#0e2340",
     },
     // Marca d'água discreta para documentos da faixa gratuita.
@@ -68,7 +183,7 @@ export function buildDocDefinition(
             },
             {
               stack: [
-                { text: "DOCFACIL", fontSize: 28, bold: true, color: "#2554c7", alignment: "center", characterSpacing: 3, opacity: 0.08 },
+                { text: "DOCFÁCIL", fontSize: 28, bold: true, color: "#2554c7", alignment: "center", characterSpacing: 3, opacity: 0.08 },
                 { text: "•", fontSize: 14, color: "#2554c7", alignment: "center", opacity: 0.08, margin: [0, 4, 0, 4] },
                 { text: "DOCUMENTO GERADO", fontSize: 10, color: "#2554c7", alignment: "center", characterSpacing: 1.6, opacity: 0.08 },
               ],
@@ -85,18 +200,12 @@ export function buildDocDefinition(
           margin: [cm(3.15), cm(1.2), cm(3.15), 0] as [number, number, number, number],
           stack: [
             {
-              columns: [
-                {
-                  text: [
-                    { text: "DocFacil", color: "#14315c", bold: true },
-                    { text: " · ", color: "#64748b" },
-                    { text: modelo.template.titulo, color: "#64748b" },
-                  ],
-                  style: "headerContinuation",
-                  width: "*",
-                },
-                { text: `Página ${currentPage}`, style: "headerContinuation", width: "auto", alignment: "right" as const },
+              text: [
+                { text: "DocFácil", color: "#14315c", bold: true },
+                { text: " · ", color: "#64748b" },
+                { text: modelo.template.titulo, color: "#64748b" },
               ],
+              style: "headerContinuation",
             },
             {
               canvas: [
@@ -117,7 +226,7 @@ export function buildDocDefinition(
         text: modelo.template.titulo,
         style: "docTitle",
         alignment: "center" as const,
-        margin: [0, 0, 0, 4] as [number, number, number, number],
+        margin: [0, 0, 0, layout.titleBottomMargin] as [number, number, number, number],
       },
       {
         canvas: [
@@ -126,10 +235,20 @@ export function buildDocDefinition(
             lineWidth: 1.2, lineColor: "#14315c",
           },
         ],
-        margin: [0, 0, 0, 20] as [number, number, number, number],
+        margin: [0, 0, 0, layout.dividerBottomMargin] as [number, number, number, number],
       },
       ...contentNodes,
     ],
+    // Evita heading órfão. O heading marcado só quebra antes quando nenhum
+    // conteúdo consegue acompanhá-lo na página atual.
+    pageBreakBefore: (
+      currentNode: { headlineLevel?: number },
+      followingNodesOnPage: unknown[]
+    ) => Boolean(
+      currentNode?.headlineLevel &&
+      Array.isArray(followingNodesOnPage) &&
+      followingNodesOnPage.length === 0
+    ),
     footer: (currentPage: number, pageCount: number) => ({
       margin: [cm(3.15), 0, cm(3.15), cm(1.0)] as [number, number, number, number],
       stack: [
@@ -141,7 +260,7 @@ export function buildDocDefinition(
         },
         {
           columns: [
-            { text: "Gerado por DocFacil · K-HUB", style: "footerText" },
+            { text: "Gerado por DocFácil", style: "footerText" },
             { text: `Página ${currentPage} de ${pageCount}`, style: "footerText", alignment: "right" as const },
           ],
           margin: [0, 4, 0, 0] as [number, number, number, number],
@@ -149,16 +268,13 @@ export function buildDocDefinition(
       ],
     }),
     styles: {
-      // Título: sans-serif bold (hierarquia editorial: serif corpo + sans títulos)
-      docTitle: { font: "Roboto", fontSize: 16, bold: true, color: "#14315c", characterSpacing: 1.5 },
-      // heading1 (seção principal "1. DAS PARTES"): maior, com respiro
+      docTitle: { font: "Roboto", fontSize: layout.profile === "declaration" ? 16.5 : 16, bold: true, color: "#14315c", characterSpacing: 1.5 },
       sectionHeading: { font: "Roboto", fontSize: 13.5, bold: true, color: "#14315c", characterSpacing: 0.5 },
-      // heading2 (cláusula): subordinado visualmente
       clauseHeading: { font: "Roboto", fontSize: 12, bold: true, color: "#14315c" },
-      body: { font: "Roboto", fontSize: 12, color: "#0e2340", lineHeight: 1.6 },
+      body: { font: "Roboto", fontSize: layout.profile === "declaration" ? 12.25 : 12, color: "#0e2340", lineHeight: layout.bodyLineHeight },
       label: { font: "Roboto", fontSize: 12, bold: true, color: "#0e2340" },
-      signature: { font: "Roboto", fontSize: 12, color: "#0e2340", lineHeight: 1 },
-      legalQuote: { font: "Roboto", fontSize: 10.5, italics: true, color: "#5a6b82", lineHeight: 1.5 },
+      signature: { font: "Roboto", fontSize: 12, color: "#0e2340", lineHeight: layout.signatureLineHeight },
+      legalQuote: { font: "Roboto", fontSize: 10.5, italics: true, color: "#5a6b82", lineHeight: layout.profile === "declaration" ? 1.6 : 1.5 },
       witness: { font: "Roboto", fontSize: 9.5, italics: true, color: "#5a6b82" },
       headerContinuation: { font: "Roboto", fontSize: 9, color: "#5a6b82" },
       footerText: { font: "Roboto", fontSize: 8, color: "#5a6b82", characterSpacing: 0.3 },
