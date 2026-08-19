@@ -7,7 +7,9 @@ test.describe("Document access product UX", () => {
     await expect(
       page.getByText("1 geração grátis por mês com uma conta DocFácil")
     ).toBeVisible();
-    await expect(page.getByText("Grátis este mês")).toHaveCount(3);
+    await expect(
+      page.getByText("Grátis este mês", { exact: true })
+    ).toHaveCount(3);
 
     for (const modelName of [
       "Declaração de Residência",
