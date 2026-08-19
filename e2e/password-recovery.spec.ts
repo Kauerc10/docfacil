@@ -44,6 +44,7 @@ test.describe("Password Recovery UX", () => {
     await expect(page.getByText(/oobCode|Firebase|apiKey/i)).toHaveCount(0);
   });
 
+  // Smoke estritamente visual/cliente: não envia o cadastro nem cria usuário real.
   test("cadastro orienta força e confirma a senha sem bloquear colagem", async ({
     page,
   }) => {
