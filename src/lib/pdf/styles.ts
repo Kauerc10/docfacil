@@ -2,7 +2,8 @@
  * styles.ts — Construção do docDefinition do pdfmake.
  *
  * Single source of truth para pageSize, margens, estilos, identidade e regras
- * de paginação. O conteúdo textual continua vindo do document-engine.
+ * de paginação. O conteúdo textual continua vindo do document-engine e a
+ * calibração editorial por modelo vive em visual-recipes.ts.
  */
 import type { Modelo } from "../types";
 import type { GerarPDFOptions } from "./types";
@@ -14,82 +15,14 @@ import {
   cm,
   CONTENT_WIDTH,
 } from "./content-builder";
+import {
+  getPdfLayoutProfile as resolvePdfLayoutProfile,
+  getPdfVisualRecipe,
+  type PdfVisualRecipe,
+} from "./visual-recipes";
 
-type PdfLayoutProfile = "declaration" | "contract" | "instrument";
-
-interface PdfLayoutConfig {
-  profile: PdfLayoutProfile;
-  pageMargins: [number, number, number, number];
-  bodyLineHeight: number;
-  signatureLineHeight: number;
-  titleBottomMargin: number;
-  dividerBottomMargin: number;
-  dividerWidth: number;
-  closingTopMargin: number;
-}
-
-const DECLARATION_SLUGS = new Set([
-  "declaracao-residencia",
-  "declaracao-residencia-terceiro",
-]);
-
-const INSTRUMENT_SLUGS = new Set([
-  "uniao-estavel",
-  "procuracao-simples",
-]);
-
-export function getPdfLayoutProfile(modelo: Pick<Modelo, "slug">): PdfLayoutProfile {
-  if (DECLARATION_SLUGS.has(modelo.slug)) return "declaration";
-  if (INSTRUMENT_SLUGS.has(modelo.slug)) return "instrument";
-  return "contract";
-}
-
-function getLayoutConfig(modelo: Pick<Modelo, "slug">): PdfLayoutConfig {
-  const profile = getPdfLayoutProfile(modelo);
-
-  if (profile === "declaration") {
-    return {
-      profile,
-      pageMargins: [cm(3.2), cm(4.0), cm(3.2), cm(2.8)],
-      bodyLineHeight: modelo.slug === "declaracao-residencia" ? 1.82 : 1.72,
-      signatureLineHeight: 1.12,
-      titleBottomMargin: 8,
-      dividerBottomMargin: 28,
-      dividerWidth: cm(4.8),
-      closingTopMargin: 34,
-    };
-  }
-
-  if (profile === "instrument") {
-    return {
-      profile,
-      pageMargins: [cm(3.15), cm(3.65), cm(3.15), cm(2.7)],
-      bodyLineHeight: modelo.slug === "uniao-estavel" ? 1.72 : 1.62,
-      signatureLineHeight: 1.06,
-      titleBottomMargin: 6,
-      dividerBottomMargin: 24,
-      dividerWidth: CONTENT_WIDTH,
-      closingTopMargin: 22,
-    };
-  }
-
-  const bodyLineHeight =
-    modelo.slug === "contrato-locacao"
-      ? 1.62
-      : modelo.slug === "contrato-locacao-comercial"
-        ? 1.56
-        : 1.6;
-
-  return {
-    profile,
-    pageMargins: [cm(3.15), cm(3.45), cm(3.15), cm(2.6)],
-    bodyLineHeight,
-    signatureLineHeight: 1,
-    titleBottomMargin: 4,
-    dividerBottomMargin: 20,
-    dividerWidth: CONTENT_WIDTH,
-    closingTopMargin: 15,
-  };
+export function getPdfLayoutProfile(modelo: Pick<Modelo, "slug">) {
+  return resolvePdfLayoutProfile(modelo);
 }
 
 type PdfNode = Record<string, unknown>;
@@ -117,7 +50,7 @@ function annotateHeadline(node: unknown): unknown {
   return node;
 }
 
-function applyClosingRhythm(nodes: unknown[], config: PdfLayoutConfig): unknown[] {
+function applyClosingRhythm(nodes: unknown[], recipe: PdfVisualRecipe): unknown[] {
   if (nodes.length === 0) return nodes;
 
   const out = nodes.map(annotateHeadline);
@@ -127,7 +60,7 @@ function applyClosingRhythm(nodes: unknown[], config: PdfLayoutConfig): unknown[
   if (isPdfNode(last) && Array.isArray(last.stack)) {
     out[lastIndex] = {
       ...last,
-      margin: [0, config.closingTopMargin, 0, 0] as [number, number, number, number],
+      margin: [0, recipe.closingTopMargin, 0, 0] as [number, number, number, number],
     };
   }
 
@@ -141,22 +74,24 @@ export function buildDocDefinition(
 ): unknown {
   const clausulasSelecionadas = extractClausulasSelecionadas(respostas);
   const camposOpcionais = computeCamposOpcionais(modelo, clausulasSelecionadas);
-  const layout = getLayoutConfig(modelo);
+  const recipe = getPdfVisualRecipe(modelo);
+  const pageMargins = recipe.pageMarginsCm.map(cm) as [number, number, number, number];
   const renderedTitle = applyLegalTitleRule(modelo.slug, modelo.template.titulo);
   const contentNodes = applyClosingRhythm(
     buildContent(modelo, respostas, clausulasSelecionadas, camposOpcionais),
-    layout
+    recipe
   );
-  const dividerX1 = (CONTENT_WIDTH - layout.dividerWidth) / 2;
-  const dividerX2 = dividerX1 + layout.dividerWidth;
+  const dividerWidth = recipe.dividerWidthCm === null ? CONTENT_WIDTH : cm(recipe.dividerWidthCm);
+  const dividerX1 = (CONTENT_WIDTH - dividerWidth) / 2;
+  const dividerX2 = dividerX1 + dividerWidth;
 
   return {
     pageSize: "A4" as const,
-    pageMargins: layout.pageMargins,
+    pageMargins,
     defaultStyle: {
       font: "Roboto",
-      fontSize: 12,
-      lineHeight: layout.bodyLineHeight,
+      fontSize: recipe.bodyFontSize,
+      lineHeight: recipe.bodyLineHeight,
       color: "#0e2340",
     },
     background: options?.watermark
@@ -187,7 +122,7 @@ export function buildDocDefinition(
     header: (currentPage: number) => {
       if (currentPage > 1) {
         return {
-          margin: [cm(3.15), cm(1.2), cm(3.15), 0] as [number, number, number, number],
+          margin: [pageMargins[0], cm(1.2), pageMargins[2], 0] as [number, number, number, number],
           stack: [
             {
               text: [
@@ -216,7 +151,7 @@ export function buildDocDefinition(
         text: renderedTitle,
         style: "docTitle",
         alignment: "center" as const,
-        margin: [0, 0, 0, layout.titleBottomMargin] as [number, number, number, number],
+        margin: [0, 0, 0, recipe.titleBottomMargin] as [number, number, number, number],
       },
       {
         canvas: [
@@ -225,7 +160,7 @@ export function buildDocDefinition(
             lineWidth: 1.2, lineColor: "#14315c",
           },
         ],
-        margin: [0, 0, 0, layout.dividerBottomMargin] as [number, number, number, number],
+        margin: [0, 0, 0, recipe.dividerBottomMargin] as [number, number, number, number],
       },
       ...contentNodes,
     ],
@@ -238,7 +173,7 @@ export function buildDocDefinition(
       followingNodesOnPage.length === 0
     ),
     footer: (currentPage: number, pageCount: number) => ({
-      margin: [cm(3.15), 0, cm(3.15), cm(1.0)] as [number, number, number, number],
+      margin: [pageMargins[0], 0, pageMargins[2], cm(1.0)] as [number, number, number, number],
       stack: [
         {
           canvas: [{
@@ -256,13 +191,19 @@ export function buildDocDefinition(
       ],
     }),
     styles: {
-      docTitle: { font: "Roboto", fontSize: layout.profile === "declaration" ? 16.5 : 16, bold: true, color: "#14315c", characterSpacing: 1.5 },
+      docTitle: {
+        font: "Roboto",
+        fontSize: recipe.titleFontSize,
+        bold: true,
+        color: "#14315c",
+        characterSpacing: recipe.titleCharacterSpacing,
+      },
       sectionHeading: { font: "Roboto", fontSize: 13.5, bold: true, color: "#14315c", characterSpacing: 0.5 },
       clauseHeading: { font: "Roboto", fontSize: 12, bold: true, color: "#14315c" },
-      body: { font: "Roboto", fontSize: layout.profile === "declaration" ? 12.25 : 12, color: "#0e2340", lineHeight: layout.bodyLineHeight },
+      body: { font: "Roboto", fontSize: recipe.bodyFontSize, color: "#0e2340", lineHeight: recipe.bodyLineHeight },
       label: { font: "Roboto", fontSize: 12, bold: true, color: "#0e2340" },
-      signature: { font: "Roboto", fontSize: 12, color: "#0e2340", lineHeight: layout.signatureLineHeight },
-      legalQuote: { font: "Roboto", fontSize: 10.5, italics: true, color: "#5a6b82", lineHeight: layout.profile === "declaration" ? 1.6 : 1.5 },
+      signature: { font: "Roboto", fontSize: 12, color: "#0e2340", lineHeight: recipe.signatureLineHeight },
+      legalQuote: { font: "Roboto", fontSize: 10.5, italics: true, color: "#5a6b82", lineHeight: recipe.legalQuoteLineHeight },
       witness: { font: "Roboto", fontSize: 9.5, italics: true, color: "#5a6b82" },
       headerContinuation: { font: "Roboto", fontSize: 9, color: "#5a6b82" },
       footerText: { font: "Roboto", fontSize: 8, color: "#5a6b82", characterSpacing: 0.3 },
