@@ -5,6 +5,7 @@ import type { Modelo } from "../../types";
 import { BackendError } from "../errors";
 import { aplicarComposicaoModelo } from "../../document-engine/compose";
 import { computeCamposOpcionais } from "../../document-engine/optional-fields";
+import { DOCUMENT_RENDER_RULES_VERSION } from "../../document-engine/legal-rules";
 
 export type DocumentOwner =
   | { type: "guest"; contact: { email?: string; phone?: string } }
@@ -205,7 +206,6 @@ export function reconstructAndValidateResponses(
   const allowedKeys = new Set<string>();
   const requiredKeys = new Set<{ key: string; label: string }>();
 
-  // Coleta campos principais do modelo
   for (const campo of modelo.campos || []) {
     allowedKeys.add(campo.key);
     if (!optionalSet.has(campo.key) && campo.obrigatorio !== false) {
@@ -213,7 +213,6 @@ export function reconstructAndValidateResponses(
     }
   }
 
-  // Coleta campos virtuais / saídas de endereço configuradas nas etapas
   if (modelo.etapas) {
     for (const etapa of modelo.etapas) {
       if (etapa.tipo === "campo") {
@@ -256,7 +255,6 @@ export function reconstructAndValidateResponses(
 
   allowedKeys.add("cidade_data");
 
-  // Valida campos obrigatórios sobre as respostas compostas
   for (const req of requiredKeys) {
     const val = composed[req.key];
     if (val === undefined || val === null || val.trim() === "") {
@@ -270,14 +268,12 @@ export function reconstructAndValidateResponses(
 
   const sanitized: Record<string, string> = {};
 
-  // Preenche valores sanitizados (apenas chaves permitidas)
   for (const [key, value] of Object.entries(composed)) {
     if (allowedKeys.has(key) && typeof value === "string") {
       sanitized[key] = value.trim();
     }
   }
 
-  // Registra cláusulas selecionadas
   for (const id of clausulasSelecionadas) {
     sanitized[`__clausula_${id}`] = "true";
   }
@@ -333,6 +329,7 @@ export function calculateModelSnapshotHash(modelo: Modelo): string {
       tipo: c.tipo,
       obrigatorio: c.obrigatorio,
     })),
+    renderRulesVersion: DOCUMENT_RENDER_RULES_VERSION,
   };
   const canonical = canonicalizeJson(snapshot);
   return createHash("sha256")
