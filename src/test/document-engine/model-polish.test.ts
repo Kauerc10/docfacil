@@ -30,7 +30,7 @@ describe("lapidação editorial e jurídica dos modelos V1", () => {
     expect(text).not.toContain("portadora da cédula");
     expect(text).not.toContain("inscrita no CPF");
     expect(text).not.toContain("e inscrito no CPF");
-    expect(text).toContain("sob sua responsabilidade");
+    expect(text).toContain("sob minha responsabilidade");
   });
 
   it("posiciona a compra de imóvel como compromisso e elimina alternativa ambígua com barra", () => {
