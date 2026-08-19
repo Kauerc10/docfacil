@@ -24,7 +24,16 @@ import {
   type CheckoutPlan,
 } from "@/lib/services/checkout-service";
 import { TermsConsentModal } from "@/components/docfacil/terms-consent-modal";
-import { loadGuestDraft, saveGuestDraft } from "@/lib/documents/client";
+import {
+  loadGuestDraft,
+  saveGuestDraft,
+  getAccountDraft,
+  deleteAccountDraft,
+  finalizeDocument,
+  getOrCreateFinalizationRequestId,
+  clearFinalizationRequestId,
+} from "@/lib/documents/client";
+import { buildAccountDraftFinalizationAnswers } from "@/lib/documents/account-draft";
 
 export function CheckoutView() {
   const { params, navigate } = useNav();
@@ -47,6 +56,8 @@ export function CheckoutView() {
     setSubmitting(true);
     try {
       const slug = params.slug;
+      const draftId = params.draftId;
+
       if (slug && !user && guestEmail.trim()) {
         const draft = loadGuestDraft(slug);
         if (draft) {
@@ -57,9 +68,14 @@ export function CheckoutView() {
         }
       }
 
-      const successUrl = typeof window !== "undefined"
-        ? `${window.location.origin}/?view=sucesso${slug ? `&slug=${slug}` : ""}`
-        : undefined;
+      let successUrl: string | undefined;
+      if (typeof window !== "undefined") {
+        const success = new URL(window.location.origin);
+        success.searchParams.set("view", "sucesso");
+        if (slug) success.searchParams.set("slug", slug);
+        if (draftId) success.searchParams.set("draftId", draftId);
+        successUrl = success.toString();
+      }
 
       const result = await createCheckout({
         plan,
@@ -75,7 +91,38 @@ export function CheckoutView() {
           description: "Sua conta já está com documentos ilimitados para os testes.",
         });
         setSubmitting(false);
-        navigate("perfil");
+
+        if (slug && draftId) {
+          navigate("criar", { slug, draftId });
+        } else {
+          navigate("perfil");
+        }
+        return;
+      }
+
+      if (result.provider === "demo" && plan === "avulso" && user && draftId) {
+        const draft = await getAccountDraft(draftId);
+        if (!draft) {
+          throw new Error("O rascunho associado ao checkout não foi encontrado.");
+        }
+
+        const requestId = getOrCreateFinalizationRequestId(draft.modeloSlug);
+        const finalized = await finalizeDocument({
+          requestId,
+          modeloSlug: draft.modeloSlug,
+          respostas: buildAccountDraftFinalizationAnswers(draft),
+          clausulasSelecionadas: draft.clausulasSelecionadas,
+          orderId: result.orderId,
+        });
+
+        await deleteAccountDraft(draft.id);
+        clearFinalizationRequestId(draft.modeloSlug);
+        toast.success("Pagamento demo aprovado e documento liberado.");
+        setSubmitting(false);
+        navigate("sucesso", {
+          slug: draft.modeloSlug,
+          id: finalized.document.id,
+        });
         return;
       }
 
@@ -91,10 +138,21 @@ export function CheckoutView() {
       }, 600);
     } catch (e) {
       console.error("[CheckoutView] falha ao criar checkout:", e);
-      toast.error("Não foi possível iniciar o pagamento. Tente novamente.");
+      toast.error("Não foi possível concluir o pagamento. Seu preenchimento continua salvo.");
       setSubmitting(false);
     }
-  }, [plan, userId, userEmail, params.docId, params.slug, user, guestEmail, refreshProfile, navigate]);
+  }, [
+    plan,
+    userId,
+    userEmail,
+    params.docId,
+    params.slug,
+    params.draftId,
+    user,
+    guestEmail,
+    refreshProfile,
+    navigate,
+  ]);
 
   if (plan === "pro" && loading) return <CheckoutSkeleton />;
   if (plan === "pro" && !user) return <ProLoginPrompt />;
@@ -115,7 +173,7 @@ export function CheckoutView() {
   const ctaText = submitting
     ? plan === "pro" && ACTIVE_PROVIDER === "demo"
       ? "Ativando Pro…"
-      : "Redirecionando…"
+      : "Processando…"
     : `Pagar ${formatBRL(price)}`;
 
   return (
