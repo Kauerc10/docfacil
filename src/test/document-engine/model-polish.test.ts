@@ -41,6 +41,15 @@ describe("lapidação editorial e jurídica dos modelos V1", () => {
     expect(text).toContain("art. 1.245");
   });
 
+  it("usa a redação vigente do art. 418 para arras confirmatórias", () => {
+    const text = render("contrato-compra-venda-imovel");
+
+    expect(text).toContain("devolução das arras mais o equivalente");
+    expect(text).toContain("atualização monetária");
+    expect(text).toContain("juros");
+    expect(text).toContain("honorários de advogado");
+  });
+
   it("limita o recibo da compra e venda de bem móvel ao que o pagamento efetivamente declara", () => {
     const text = render("compra-venda");
 
