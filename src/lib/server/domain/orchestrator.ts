@@ -17,6 +17,7 @@ import { getRepositories } from "../firestore/repositories";
 import type { ArtifactStorage } from "../r2/storage";
 import { getArtifactStorage } from "../r2/storage";
 import { logger } from "../../logger";
+import { FREE_MONTHLY_LIMIT } from "../../document-access-policy";
 
 export interface GenerateDocumentDependencies {
   repositories?: Partial<BackendRepositories>;
@@ -99,7 +100,6 @@ export async function generateDocumentArtifact(
     }
   }
 
-  // 1. Idempotência / Trava de requisição
   const { request: genReq, isNew } = await repos.generationRequests.getOrCreateRequest(
     requestId,
     {
@@ -138,14 +138,12 @@ export async function generateDocumentArtifact(
     }
   }
 
-  // 2. Localiza o modelo confiável no catálogo do servidor
   const modelo = MODELOS.find((m) => m.slug === modeloSlug);
   if (!modelo) {
     await repos.generationRequests.markFailed(requestId, "INVALID_REQUEST");
     throw new BackendError("INVALID_REQUEST", 400, `Modelo '${modeloSlug}' não encontrado.`);
   }
 
-  // 3. Resolução de Entitlement e Trava de Documento
   let entitlementDecision: {
     entitlement: "free" | "single_purchase" | "pro";
     watermarked: boolean;
@@ -202,7 +200,6 @@ export async function generateDocumentArtifact(
     }
     entitlementDecision = { entitlement: "pro", watermarked: false };
   } else {
-    // Novo documento
     targetVersion = 1;
 
     if (principal.type === "guest") {
@@ -227,7 +224,12 @@ export async function generateDocumentArtifact(
         requestId,
         principalKey,
       });
-      entitlementDecision = resolveEntitlement({ principal, orderId, order });
+      entitlementDecision = resolveEntitlement({
+        principal,
+        modeloSlug,
+        orderId,
+        order,
+      });
     } else {
       const profile = await repos.users.getUserProfile(principal.userId);
       const startOfMonth = new Date(
@@ -248,6 +250,7 @@ export async function generateDocumentArtifact(
         : undefined;
       entitlementDecision = resolveEntitlement({
         principal,
+        modeloSlug,
         orderId,
         order,
         userProfile: profile,
@@ -258,7 +261,7 @@ export async function generateDocumentArtifact(
           userId: principal.userId,
           startOfMonthTimestamp: startOfMonth,
           initialCount: monthlyCount,
-          limit: 3,
+          limit: FREE_MONTHLY_LIMIT,
         };
       }
     }
@@ -291,7 +294,6 @@ export async function generateDocumentArtifact(
     documentId = newDoc.id!;
   }
 
-  // 4. Valida e reconstrói respostas canônicas
   let sanitizedAnswers: Record<string, string>;
   try {
     sanitizedAnswers = reconstructAndValidateResponses(
@@ -314,7 +316,6 @@ export async function generateDocumentArtifact(
     throw err;
   }
 
-  // 5. Geração de PDF e Persistência Atômica
   let uploadedObjectKey: string | null = null;
   let firestoreCommitSucceeded = false;
   try {
