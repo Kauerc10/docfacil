@@ -44,8 +44,9 @@ export const CONTENT_WIDTH = cm(21) - 2 * cm(3.15);
  * travessões → hífen, colapsa espaços duplos.
  */
 export function normalizePdfText(value: string): string {
-  return String(value || "")
-    .replace(/\u00a0/g, " ")
+  return value
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
     .replace(/[""]/g, '"')
     .replace(/['']/g, "'")
     .replace(/[–—]/g, "-")
@@ -429,6 +430,7 @@ export function buildSignatureColumns(blocks: SignatureBlock[]): unknown {
         })),
       ],
       alignment: "center" as const,
+      unbreakable: true,
       margin: [0, 12, 0, 12],
     };
   }
@@ -449,6 +451,7 @@ export function buildSignatureColumns(blocks: SignatureBlock[]): unknown {
               })),
             ],
             alignment: "center" as const,
+            unbreakable: true,
             width: "*" as const,
           },
           {
@@ -461,10 +464,12 @@ export function buildSignatureColumns(blocks: SignatureBlock[]): unknown {
               })),
             ],
             alignment: "center" as const,
+            unbreakable: true,
             width: "*" as const,
           },
         ],
         columnGap: 24,
+        unbreakable: true,
         margin: [0, 12, 0, 12],
       });
     } else {
@@ -481,10 +486,12 @@ export function buildSignatureColumns(blocks: SignatureBlock[]): unknown {
               })),
             ],
             alignment: "center" as const,
+            unbreakable: true,
             width: "auto" as const,
           },
           { text: "", width: "*" as const },
         ],
+        unbreakable: true,
         margin: [0, 12, 0, 12],
       });
     }

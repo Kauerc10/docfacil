@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 /**
  * Retorna o IP do cliente, lendo headers de proxy/CDN.
  * Usado pelo consent service para registrar IP nas concordâncias de termos.

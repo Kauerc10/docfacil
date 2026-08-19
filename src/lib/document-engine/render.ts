@@ -45,6 +45,7 @@ export function renderDocument(
     linhasPorPagina = DEFAULT_LINHAS_POR_PAGINA,
     charsPorLinha = DEFAULT_CHARS_POR_LINHA,
     camposOpcionais = [],
+    context,
   } = opts;
 
   // 1. Compõe endereços a partir das etapas do modelo (se houver).
@@ -62,7 +63,8 @@ export function renderDocument(
     respostasCompostas,
     clausulaPorId,
     clausulasSelecionadas,
-    camposOpcionais
+    camposOpcionais,
+    context
   );
 
   // 4. Preenche cada linha do corpo + classifica.
@@ -75,7 +77,8 @@ export function renderDocument(
         respostasCompostas,
         clausulaPorId,
         clausulasSelecionadas,
-        camposOpcionais
+        camposOpcionais,
+        context
       );
       return classifyLine(preenchida);
     }),
@@ -123,7 +126,7 @@ export function fillDocument(
   opts: RenderOptions = {}
 ): string[] {
   const { titulo, corpo, respostas, clausulasSelecionadas = [], modelo } = input;
-  const { camposOpcionais = [] } = opts;
+  const { camposOpcionais = [], context } = opts;
 
   const respostasCompostas = modelo
     ? aplicarComposicaoModelo(respostas, modelo)
@@ -136,7 +139,8 @@ export function fillDocument(
     respostasCompostas,
     clausulaPorId,
     clausulasSelecionadas,
-    camposOpcionais
+    camposOpcionais,
+    context
   );
 
   const corpoPreenchido = corpo.map((linha) =>
@@ -145,7 +149,8 @@ export function fillDocument(
       respostasCompostas,
       clausulaPorId,
       clausulasSelecionadas,
-      camposOpcionais
+      camposOpcionais,
+      context
     )
   );
 

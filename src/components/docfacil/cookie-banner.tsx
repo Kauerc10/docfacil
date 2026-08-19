@@ -7,6 +7,7 @@ import {
   saveCookiePreferences,
   type CookiePreferences,
 } from "@/lib/services/consent-service";
+import { refreshAnalytics } from "@/lib/services/analytics-loader";
 import { useNav } from "./nav-context";
 
 /**
@@ -14,14 +15,13 @@ import { useNav } from "./nav-context";
  * cookies do usuário.
  *
  * - Verifica `getCookiePreferences()` no mount; se já houver preferência
- *   salva, o banner não aparece.
+ *   válida para a versão vigente, o banner não aparece.
  * - 3 ações principais:
  *   - **Personalizar**: expande os toggles (Essenciais disabled/true,
  *     Analíticos, Marketing) e mostra o botão "Salvar preferências".
  *   - **Recusar opcionais**: salva com analytics=false, marketing=false.
  *   - **Aceitar todos**: salva com analytics=true, marketing=true.
- * - Animação CSS slide-up/fade (data-state=open). Respeita
- *   prefers-reduced-motion via media query global do globals.css.
+ * - A escolha passa a valer imediatamente para analytics/marketing.
  */
 export function CookieBanner() {
   const { navigate } = useNav();
@@ -30,12 +30,9 @@ export function CookieBanner() {
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
 
-  // Lê o estado salvo ao montar — só mostra se ainda não decidiu.
   useEffect(() => {
     const prefs = getCookiePreferences();
     if (!prefs) {
-      // Pequeno delay para o banner não aparecer "no nariz" do usuário
-      // (deixa a página respirar antes de pedir decisão).
       const t = setTimeout(() => setVisible(true), 600);
       return () => clearTimeout(t);
     }
@@ -43,6 +40,7 @@ export function CookieBanner() {
 
   function persist(prefs: CookiePreferences) {
     saveCookiePreferences(prefs);
+    refreshAnalytics();
     setVisible(false);
     setExpanded(false);
   }
@@ -84,9 +82,7 @@ export function CookieBanner() {
       data-state={visible ? "open" : "closed"}
       className="fixed inset-x-0 bottom-0 z-40 px-3 pb-3 sm:px-5 sm:pb-5 pointer-events-none"
     >
-      <div
-        className="pointer-events-auto mx-auto max-w-3xl rounded-2xl border border-[var(--border)] bg-surface shadow-[0_20px_50px_-12px_rgba(14,35,64,0.35)] overflow-hidden docfacil-cookie-banner"
-      >
+      <div className="pointer-events-auto mx-auto max-w-3xl rounded-2xl border border-[var(--border)] bg-surface shadow-[0_20px_50px_-12px_rgba(14,35,64,0.35)] overflow-hidden docfacil-cookie-banner">
         <div className="p-5 sm:p-6">
           <div className="flex items-start gap-3.5">
             <span
@@ -122,7 +118,6 @@ export function CookieBanner() {
             </button>
           </div>
 
-          {/* Toggles (aparecem quando "Personalizar" é clicado) */}
           {expanded && (
             <div className="mt-4 rounded-xl border border-[var(--border)] bg-paper p-4 space-y-3">
               <CookieToggle
@@ -156,7 +151,6 @@ export function CookieBanner() {
             </div>
           )}
 
-          {/* Ações principais */}
           {!expanded && (
             <div className="mt-4 flex flex-col sm:flex-row gap-2.5">
               <button

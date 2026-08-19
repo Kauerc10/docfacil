@@ -1,93 +1,103 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Eye, EyeOff, Mail, Lock, User, Loader2, AlertCircle } from "lucide-react";
+import { validatePassword } from "firebase/auth";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  User,
+} from "lucide-react";
+import { PasswordStrengthMeter } from "@/components/docfacil/auth/password-strength-meter";
 import { useNav } from "@/components/docfacil/nav-context";
 import { useAuth } from "@/lib/auth-context";
+import { validateSignupPassword } from "@/lib/auth/password-policy";
 import { Logo } from "@/components/docfacil/logo";
-import { TermsConsentModal } from "@/components/docfacil/terms-consent-modal";
+import { recordConsent } from "@/lib/services/consent-service";
+import { auth, IS_FIREBASE_CONFIGURED } from "@/lib/firebase";
 
-/** The standard 4-color Google "G" mark as inline SVG. */
 function GoogleGIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path
-        fill="#4285F4"
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.84 14.09a6.51 6.51 0 0 1 0-4.18V7.07H2.18a10.01 10.01 0 0 0 0 8.86l3.66-2.84z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"
-      />
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+      <path fill="#FBBC05" d="M5.84 14.09a6.51 6.51 0 0 1 0-4.18V7.07H2.18a10.01 10.01 0 0 0 0 8.86l3.66-2.84z" />
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 0 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
     </svg>
   );
 }
 
-/**
- * CadastroView (spec 4.8) — sign-up screen.
- * Wired to the real AuthContext (signUpWithEmail / signInWithGoogle).
- *
- * Fluxo de consentimento (LGPD-aware):
- *  1. Usuário preenche nome + e-mail + senha + checkbox "Aceito os Termos".
- *  2. Validação client-side (nome, e-mail, senha 8+, checkbox marcado).
- *  3. Em vez de chamar signUpWithEmail direto, abre o TermsConsentModal
- *     (flow="cadastro") — modal bloqueante que força o aceite explícito dos
- *     Termos de Uso + Política de Privacidade (e captura opt-in de marketing).
- *     O registro de consentimento é persistido via consent-service (IP,
- *     user-agent, versão dos termos) para fins de auditoria LGPD.
- *  4. Aceitando → signUpWithEmail(nome, email, password) → navigate("dashboard").
- *     Cancelando → volta pro form (sem signup).
- */
 export function CadastroView() {
   const { navigate } = useNav();
-  const { signUpWithEmail, signInWithGoogle, error } = useAuth();
+  const { signUpWithEmail, signInWithGoogle, error, clearError } = useAuth();
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [terms, setTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [consentOpen, setConsentOpen] = useState(false);
+  const [createdAccount, setCreatedAccount] = useState<{ uid: string; email: string } | null>(null);
+
+  function clearErrors() {
+    if (validationError) setValidationError(null);
+    if (error) clearError();
+  }
 
   function validate(): string | null {
     if (!nome.trim()) return "Informe seu nome completo.";
     if (!email.trim()) return "Informe seu e-mail.";
     if (!email.includes("@")) return "E-mail inválido.";
     if (password.length < 8) return "A senha deve ter pelo menos 8 caracteres.";
-    if (!terms) return "Você precisa aceitar os Termos de Uso.";
+    if (!confirmPassword) return "Confirme sua senha.";
+    if (password !== confirmPassword) return "As senhas não coincidem.";
+    if (!terms) return "Você precisa aceitar os Termos de Uso e a Política de Privacidade.";
     return null;
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const v = validate();
-    if (v) {
-      setValidationError(v);
+    const validation = validate();
+    if (validation) {
+      setValidationError(validation);
       return;
     }
-    setValidationError(null);
-    // Abre o modal de consentimento (LGPD). O signup só prossegue depois
-    // do aceite ser persistido pelo consent-service.
-    setConsentOpen(true);
-  }
 
-  // Chamado pelo TermsConsentModal após o registro de consentimento ser
-  // persistido com sucesso (flow="cadastro").
-  async function handleConsentAccepted() {
-    setConsentOpen(false);
+    setValidationError(null);
     setSubmitting(true);
+
     try {
-      await signUpWithEmail(nome.trim(), email.trim(), password);
+      const firebaseAuth = auth;
+      if (!createdAccount && IS_FIREBASE_CONFIGURED && firebaseAuth) {
+        const passwordError = await validateSignupPassword(password, {
+          validateFirebasePassword: () => validatePassword(firebaseAuth, password),
+        });
+
+        if (passwordError) {
+          setValidationError(passwordError);
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      const account =
+        createdAccount || (await signUpWithEmail(nome.trim(), email.trim(), password));
+      setCreatedAccount(account);
+
+      await recordConsent({
+        userId: account.uid,
+        userEmail: account.email,
+        flow: "cadastro",
+        documents: ["termos", "privacidade"],
+      });
+
       navigate("dashboard");
     } catch {
       setSubmitting(false);
@@ -96,9 +106,31 @@ export function CadastroView() {
 
   async function handleGoogle() {
     setValidationError(null);
+    if (!terms) {
+      setValidationError("Você precisa aceitar os Termos de Uso e a Política de Privacidade.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await signInWithGoogle();
+      if (!auth?.currentUser) {
+        await signInWithGoogle();
+      }
+
+      if (IS_FIREBASE_CONFIGURED) {
+        const currentUser = auth?.currentUser;
+        if (!currentUser) {
+          throw new Error("Não foi possível identificar a conta Google criada.");
+        }
+
+        await recordConsent({
+          userId: currentUser.uid,
+          userEmail: currentUser.email || undefined,
+          flow: "cadastro",
+          documents: ["termos", "privacidade"],
+        });
+      }
+
       navigate("dashboard");
     } catch {
       setSubmitting(false);
@@ -106,7 +138,14 @@ export function CadastroView() {
   }
 
   const shownError = validationError || error;
-  const canSubmit = terms && !submitting;
+  const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  const canSubmit =
+    terms &&
+    password.length >= 8 &&
+    confirmPassword.length > 0 &&
+    password === confirmPassword &&
+    !submitting;
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-paper flex items-center justify-center px-4 py-12">
@@ -126,136 +165,163 @@ export function CadastroView() {
           </div>
 
           <form onSubmit={handleSubmit} className="mt-7 space-y-5" noValidate>
-            {/* Nome */}
             <div>
-              <label
-                htmlFor="cad-name"
-                className="block text-sm font-semibold text-ink mb-1.5"
-              >
+              <label htmlFor="cad-name" className="block text-sm font-semibold text-ink mb-1.5">
                 Nome completo
               </label>
               <div className="relative">
-                <User
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40"
-                  aria-hidden="true"
-                />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40" aria-hidden="true" />
                 <input
                   id="cad-name"
                   type="text"
                   autoComplete="name"
                   value={nome}
-                  onChange={(e) => setNome(e.target.value)}
+                  onChange={(e) => {
+                    setNome(e.target.value);
+                    clearErrors();
+                  }}
                   placeholder="Seu nome"
                   className="w-full h-12 pl-11 pr-4 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
                 />
               </div>
             </div>
 
-            {/* E-mail */}
             <div>
-              <label
-                htmlFor="cad-email"
-                className="block text-sm font-semibold text-ink mb-1.5"
-              >
+              <label htmlFor="cad-email" className="block text-sm font-semibold text-ink mb-1.5">
                 E-mail
               </label>
               <div className="relative">
-                <Mail
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40"
-                  aria-hidden="true"
-                />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40" aria-hidden="true" />
                 <input
                   id="cad-email"
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    clearErrors();
+                  }}
                   placeholder="voce@email.com"
                   className="w-full h-12 pl-11 pr-4 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
                 />
               </div>
             </div>
 
-            {/* Senha */}
             <div>
-              <label
-                htmlFor="cad-password"
-                className="block text-sm font-semibold text-ink mb-1.5"
-              >
+              <label htmlFor="cad-password" className="block text-sm font-semibold text-ink mb-1.5">
                 Senha
               </label>
               <div className="relative">
-                <Lock
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40"
-                  aria-hidden="true"
-                />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40" aria-hidden="true" />
                 <input
                   id="cad-password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    clearErrors();
+                  }}
                   minLength={8}
+                  aria-describedby="cad-password-help"
                   placeholder="••••••••"
                   className="w-full h-12 pl-11 pr-12 text-xl rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition placeholder:text-ink/35"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((v) => !v)}
+                  onClick={() => setShowPassword((value) => !value)}
                   aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
                   aria-pressed={showPassword}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-ink/50 hover:text-ink hover:bg-[var(--blue-soft)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)]"
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              <p className="mt-1.5 text-xs text-ink/50">Mínimo 8 caracteres</p>
+              <p id="cad-password-help" className="mt-1.5 text-xs text-ink/50">
+                Mínimo 8 caracteres.
+              </p>
+              <PasswordStrengthMeter password={password} name={nome} email={email} />
             </div>
 
-            {/* Termos */}
-            <label
-              htmlFor="cad-terms"
-              className="flex items-start gap-3 cursor-pointer group"
-            >
+            <div>
+              <label htmlFor="cad-confirm-password" className="block text-sm font-semibold text-ink mb-1.5">
+                Confirmar senha
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink/40" aria-hidden="true" />
+                <input
+                  id="cad-confirm-password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    clearErrors();
+                  }}
+                  aria-invalid={passwordsMismatch}
+                  aria-describedby="cad-confirm-password-help"
+                  placeholder="••••••••"
+                  className={`w-full h-12 pl-11 pr-12 text-xl rounded-lg border bg-paper focus:bg-surface outline-none focus:ring-4 transition placeholder:text-ink/35 ${
+                    passwordsMismatch
+                      ? "border-[var(--coral)]/65 focus:border-[var(--coral)] focus:ring-[var(--coral)]/10"
+                      : passwordsMatch
+                        ? "border-[var(--selo-green)]/55 focus:border-[var(--selo-green)] focus:ring-[var(--green-tint)]"
+                        : "border-[var(--border)] focus:border-[var(--blue-royal)] focus:ring-[var(--blue-soft)]"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((value) => !value)}
+                  aria-label={showConfirmPassword ? "Esconder confirmação da senha" : "Mostrar confirmação da senha"}
+                  aria-pressed={showConfirmPassword}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-ink/50 hover:text-ink hover:bg-[var(--blue-soft)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)]"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <div id="cad-confirm-password-help" className="mt-1.5 min-h-5 text-xs" aria-live="polite">
+                {passwordsMatch && (
+                  <span className="inline-flex items-center gap-1.5 text-[var(--selo-green)]">
+                    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Senhas coincidem.
+                  </span>
+                )}
+                {passwordsMismatch && (
+                  <span className="text-[var(--coral)]">As senhas não coincidem.</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
               <input
                 id="cad-terms"
                 type="checkbox"
                 checked={terms}
-                onChange={(e) => setTerms(e.target.checked)}
+                onChange={(e) => {
+                  setTerms(e.target.checked);
+                  clearErrors();
+                }}
                 className="mt-0.5 w-5 h-5 rounded border-[var(--border)] accent-[var(--blue-royal)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
               />
               <span className="text-sm text-ink/75 leading-relaxed">
-                Aceito os{" "}
-                <span className="text-[var(--blue-royal)] font-medium hover:underline">
+                <label htmlFor="cad-terms" className="cursor-pointer">Aceito os{" "}</label>
+                <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-[var(--blue-royal)] font-medium hover:underline">
                   Termos de Uso
-                </span>{" "}
+                </a>{" "}
                 e a{" "}
-                <span className="text-[var(--blue-royal)] font-medium hover:underline">
+                <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="text-[var(--blue-royal)] font-medium hover:underline">
                   Política de Privacidade
-                </span>
-                .
+                </a>.
               </span>
-            </label>
+            </div>
 
-            {/* Error alert */}
             {shownError && (
-              <div
-                role="alert"
-                className="flex items-start gap-2.5 rounded-lg border border-[var(--coral)]/30 bg-[var(--coral)]/8 px-3.5 py-3 text-sm text-[var(--coral)]"
-              >
-                <AlertCircle
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                  aria-hidden="true"
-                />
+              <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-[var(--coral)]/30 bg-[var(--coral)]/8 px-3.5 py-3 text-sm text-[var(--coral)]">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
                 <span className="leading-relaxed">{shownError}</span>
               </div>
             )}
 
-            {/* Criar conta */}
             <button
               type="submit"
               disabled={!canSubmit}
@@ -272,18 +338,16 @@ export function CadastroView() {
             </button>
           </form>
 
-          {/* Divider */}
           <div className="my-6 flex items-center gap-3" aria-hidden="true">
             <div className="h-px flex-1 bg-[var(--border)]" />
             <span className="text-sm text-ink/50 font-medium">ou</span>
             <div className="h-px flex-1 bg-[var(--border)]" />
           </div>
 
-          {/* Google */}
           <button
             type="button"
             onClick={handleGoogle}
-            disabled={submitting}
+            disabled={!terms || submitting}
             className="w-full h-12 rounded-lg border border-[var(--border)] bg-surface text-ink font-semibold text-lg hover:bg-paper transition inline-flex items-center justify-center gap-3 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <GoogleGIcon className="w-5 h-5" />
@@ -302,18 +366,6 @@ export function CadastroView() {
           </button>
         </p>
       </div>
-
-      {/* TermsConsentModal — fluxo LGPD de cadastro. Bloqueia backdrop/ESC
-          até o usuário decidir entre aceitar ou cancelar via botão. O
-          registro é persistido pelo consent-service antes de onAccept. */}
-      <TermsConsentModal
-        open={consentOpen}
-        onClose={() => setConsentOpen(false)}
-        onAccept={handleConsentAccepted}
-        flow="cadastro"
-        userEmail={email.trim() || undefined}
-        userId={undefined}
-      />
     </div>
   );
 }

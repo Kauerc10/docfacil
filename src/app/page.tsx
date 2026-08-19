@@ -29,6 +29,7 @@ import { PrivacidadeView } from "@/components/docfacil/views/privacidade-view";
 import { CookiesView } from "@/components/docfacil/views/cookies-view";
 import { CheckoutView } from "@/components/docfacil/views/checkout-view";
 import { CookieBanner } from "@/components/docfacil/cookie-banner";
+import { useAnalyticsInit } from "@/hooks/use-analytics-init";
 
 function HomeView() {
   return (
@@ -86,6 +87,8 @@ function CurrentView() {
 }
 
 export default function Home() {
+  useAnalyticsInit();
+
   return (
     <AuthProvider>
       <NavProvider>

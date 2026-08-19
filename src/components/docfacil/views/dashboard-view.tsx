@@ -70,10 +70,14 @@ function DashboardContent() {
 
   useGSAP(
     () => {
+      if (loading || error || filtered.length === 0) return;
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       const ctx = gsap.context(() => {
+        const cards = root.current?.querySelectorAll("[data-doc-card]");
+        if (!cards || cards.length === 0) return;
+
         gsap.fromTo(
-          "[data-doc-card]",
+          cards,
           { opacity: 0, y: 24 },
           {
             opacity: 1,
@@ -91,7 +95,7 @@ function DashboardContent() {
       }, root);
       return () => ctx.revert();
     },
-    { scope: root, dependencies: [tab, filtered.length] }
+    { scope: root, dependencies: [tab, filtered.length, loading, error] }
   );
 
   async function handleDuplicate(id: string) {

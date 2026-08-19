@@ -15,9 +15,10 @@ export function AIBanner() {
 
   useGSAP(
     () => {
+      if (!root.current) return;
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       const tl = gsap.timeline({
-        scrollTrigger: { trigger: "[data-ia='root']", start: "top 75%", once: true },
+        scrollTrigger: { trigger: root.current, start: "top 75%", once: true },
       });
       tl.from("[data-ia='eyebrow']", { y: 18, opacity: 0, duration: 0.5 })
         .from("[data-ia='title']", { y: 24, opacity: 0, duration: 0.6 }, "-=0.3")

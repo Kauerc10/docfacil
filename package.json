@@ -5,14 +5,14 @@
   "description": "Documentos legais prontos como numa conversa. Sem juridiquês, sem fricção. Produto da K-HUB Soluções Digitais.",
   "author": "K-HUB Soluções Digitais <contato@khub.com.br>",
   "license": "UNLICENSED",
-  "homepage": "https://khub.com.br",
+  "homepage": "https://docfacil-indol.vercel.app",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/khub-solucoes/docfacil.git",
+    "url": "git+https://github.com/Kauerc10/docfacil.git",
     "directory": "/"
   },
   "bugs": {
-    "url": "https://github.com/khub-solucoes/docfacil/issues",
+    "url": "https://github.com/Kauerc10/docfacil/issues",
     "email": "contato@khub.com.br"
   },
   "keywords": [
@@ -28,20 +28,30 @@
     "gsap"
   ],
   "scripts": {
-    "dev": "next dev -p 3001",
+    "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "build:ci": "next build",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "bun test src/",
+    "test:coverage": "bun test src/ --coverage",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "seed:models": "bun run scripts/seed-models.ts",
+    "test:rules": "firebase emulators:exec --only firestore \"RUN_FIRESTORE_RULES=true bun test src/test/rules/firestore.rules.test.ts\"",
+    "test:firestore-commit": "firebase emulators:exec --only firestore \"RUN_FIRESTORE_COMMIT_TESTS=true bun test src/test/server/firestore/generation-commit.firestore.test.ts\"",
+    "test:e2e": "firebase emulators:exec --only firestore \"playwright test\"",
     "firestore:rules": "firebase deploy --only firestore:rules"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1110.0",
+    "@aws-sdk/s3-request-presigner": "^3.1110.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -79,12 +89,17 @@
     "@reactuses/core": "^6.0.5",
     "@tanstack/react-query": "^5.82.0",
     "@tanstack/react-table": "^8.21.3",
+    "@zxcvbn-ts/core": "4.1.2",
+    "@zxcvbn-ts/language-common": "4.1.2",
+    "@zxcvbn-ts/language-en": "4.1.1",
+    "@zxcvbn-ts/language-pt-br": "4.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^12.16.0",
+    "firebase-admin": "13.10.0",
     "framer-motion": "^12.23.2",
     "gsap": "^3.15.0",
     "input-otp": "^1.4.2",
@@ -103,6 +118,7 @@
     "react-resizable-panels": "^3.0.3",
     "react-syntax-highlighter": "^15.6.1",
     "recharts": "^2.15.4",
+    "server-only": "^0.0.1",
     "sharp": "^0.34.3",
     "sonner": "^2.0.6",
     "tailwind-merge": "^3.3.1",
@@ -114,12 +130,15 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "bun-types": "^1.3.4",
     "eslint": "^9",
     "eslint-config-next": "^16.1.1",
+    "firebase-tools": "^15.27.0",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.5",
     "typescript": "^5"

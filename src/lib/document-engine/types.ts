@@ -59,4 +59,24 @@ export interface RenderOptions {
   charsPorLinha?: number;
   /** Chaves dos campos opcionais (vazios viram "" em vez de "_____"). */
   camposOpcionais?: string[];
+  /** Contexto de renderização determinístico (datas, locale, timezone). */
+  context?: RenderContext;
+}
+
+export interface RenderContext {
+  documentDate: Date;
+  generatedAt: Date;
+  locale: "pt-BR";
+  timeZone: "America/Sao_Paulo";
+}
+
+export function createRenderContext(overrides?: Partial<RenderContext>): RenderContext {
+  const now = new Date();
+  return {
+    documentDate: overrides?.documentDate ?? now,
+    generatedAt: overrides?.generatedAt ?? now,
+    locale: "pt-BR",
+    timeZone: "America/Sao_Paulo",
+    ...overrides,
+  };
 }
