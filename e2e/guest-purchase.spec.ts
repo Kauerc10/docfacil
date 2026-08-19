@@ -190,12 +190,8 @@ test.describe("Guest Purchase and Download Flow", () => {
     if (await formaInput.isVisible()) await formaInput.fill("PIX");
     await page.getByRole("button", { name: /^avançar$/i }).click();
 
-    // Stage 4 — Garantia locatícia: seleciona Fiador
-    // Cláusulas são renderizadas como cards role="checkbox"
-    const fiadorCard = page
-      .locator("div[role='checkbox']")
-      .filter({ hasText: /fiador/i })
-      .first();
+    // Stage 4 — Garantia locatícia: escolha única, seleciona Fiador
+    const fiadorCard = page.getByRole("radio", { name: /fiador/i }).first();
     await expect(fiadorCard).toBeVisible({ timeout: 10000 });
     await fiadorCard.click({ force: true });
 
