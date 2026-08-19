@@ -24,6 +24,7 @@ interface PdfLayoutConfig {
   signatureLineHeight: number;
   titleBottomMargin: number;
   dividerBottomMargin: number;
+  dividerWidth: number;
   closingTopMargin: number;
 }
 
@@ -50,10 +51,11 @@ function getLayoutConfig(modelo: Pick<Modelo, "slug">): PdfLayoutConfig {
     return {
       profile,
       pageMargins: [cm(3.2), cm(4.0), cm(3.2), cm(2.8)],
-      bodyLineHeight: 1.8,
+      bodyLineHeight: modelo.slug === "declaracao-residencia" ? 1.82 : 1.72,
       signatureLineHeight: 1.12,
       titleBottomMargin: 8,
       dividerBottomMargin: 28,
+      dividerWidth: cm(4.8),
       closingTopMargin: 34,
     };
   }
@@ -62,21 +64,30 @@ function getLayoutConfig(modelo: Pick<Modelo, "slug">): PdfLayoutConfig {
     return {
       profile,
       pageMargins: [cm(3.15), cm(3.65), cm(3.15), cm(2.7)],
-      bodyLineHeight: 1.68,
+      bodyLineHeight: modelo.slug === "uniao-estavel" ? 1.72 : 1.62,
       signatureLineHeight: 1.06,
       titleBottomMargin: 6,
       dividerBottomMargin: 24,
+      dividerWidth: CONTENT_WIDTH,
       closingTopMargin: 22,
     };
   }
 
+  const bodyLineHeight =
+    modelo.slug === "contrato-locacao"
+      ? 1.62
+      : modelo.slug === "contrato-locacao-comercial"
+        ? 1.56
+        : 1.6;
+
   return {
     profile,
     pageMargins: [cm(3.15), cm(3.45), cm(3.15), cm(2.6)],
-    bodyLineHeight: 1.6,
+    bodyLineHeight,
     signatureLineHeight: 1,
     titleBottomMargin: 4,
     dividerBottomMargin: 20,
+    dividerWidth: CONTENT_WIDTH,
     closingTopMargin: 15,
   };
 }
@@ -136,6 +147,8 @@ export function buildDocDefinition(
     buildContent(modelo, respostas, clausulasSelecionadas, camposOpcionais),
     layout
   );
+  const dividerX1 = (CONTENT_WIDTH - layout.dividerWidth) / 2;
+  const dividerX2 = dividerX1 + layout.dividerWidth;
 
   return {
     pageSize: "A4" as const,
@@ -208,7 +221,7 @@ export function buildDocDefinition(
       {
         canvas: [
           {
-            type: "line" as const, x1: 0, y1: 0, x2: CONTENT_WIDTH, y2: 0,
+            type: "line" as const, x1: dividerX1, y1: 0, x2: dividerX2, y2: 0,
             lineWidth: 1.2, lineColor: "#14315c",
           },
         ],
