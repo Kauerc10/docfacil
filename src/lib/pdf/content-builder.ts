@@ -47,8 +47,8 @@ export function normalizePdfText(value: string): string {
   return value
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
-    .replace(/[""]/g, '"')
-    .replace(/['']/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
     .replace(/[–—]/g, "-")
     // Limpeza de resquícios de LaTeX / símbolos matemáticos
     .replace(/\\?R\\\$/g, "R$")
@@ -511,7 +511,7 @@ export function buildSignatureColumns(blocks: SignatureBlock[]): unknown {
  * 2. Descarta o título (renderizado à parte no topo do content)
  * 3. findClosingSectionIndex separa corpo do fecho (assinaturas)
  * 4. renderLineNode em cada linha do corpo
- * 5. Bloco de fecho empacotado como stack (unbreakable se <= 4 nós)
+ * 5. Fecho permanece flexível; linhas/blocos de assinatura ficam atômicos.
  */
 export function buildContent(
   modelo: Modelo,
@@ -551,7 +551,8 @@ export function buildContent(
     }
   }
 
-  // Renderiza o fecho (assinaturas) como stack não-quebrável (se pequeno)
+  // O fecho pode quebrar entre páginas para aproveitar o espaço restante.
+  // Assinaturas continuam protegidas individualmente por buildSignatureColumns.
   if (closingLines.length > 0) {
     const closingNodes: unknown[] = [];
     let j = 0;
@@ -598,13 +599,9 @@ export function buildContent(
         }
       }
     }
-    // Quebra inteligente: unbreakable apenas para closings pequenos (<= 4 nós).
-    // Closings grandes (4+ signatários) podem quebrar entre páginas para
-    // evitar grandes espaços em branco no fim da página anterior.
-    const isLargeClosing = closingNodes.length > 4;
+
     content.push({
       stack: closingNodes,
-      unbreakable: !isLargeClosing,
       margin: [0, 15, 0, 0] as [number, number, number, number],
     });
   }
