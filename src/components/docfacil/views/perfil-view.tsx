@@ -29,6 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { getPerfil, listPagamentos } from "@/lib/services/users-service";
+import { PLAN_BILLING_DESC } from "@/lib/pricing";
 import type { Pagamento, PerfilUsuario } from "@/lib/types";
 
 const PLANO_LABEL: Record<PerfilUsuario["plano"], string> = {
@@ -38,12 +39,11 @@ const PLANO_LABEL: Record<PerfilUsuario["plano"], string> = {
 };
 
 const PLANO_PRICE: Record<PerfilUsuario["plano"], string> = {
-  gratis: "Gratuito",
-  avulso: "R$ 19,90 / documento avulso",
-  pro: "R$ 29,90/mês",
+  gratis: PLAN_BILLING_DESC.gratis,
+  avulso: PLAN_BILLING_DESC.avulso,
+  pro: PLAN_BILLING_DESC.pro,
 };
 
-/** Helper: a single styled text field with leading icon. */
 function Field({
   id,
   label,
@@ -80,7 +80,7 @@ function Field({
           onChange={(e) => onChange(e.target.value)}
           autoComplete={autoComplete}
           disabled={disabled}
-          className="w-full h-12 pl-11 pr-4 text-lg rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus:ring-[var(--blue-soft)] transition disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full h-12 pl-11 pr-4 text-lg rounded-lg border border-[var(--border)] bg-paper focus:bg-surface outline-none focus:border-[var(--blue-royal)] focus:ring-4 focus-visible:ring-[var(--blue-soft)] transition disabled:opacity-60 disabled:cursor-not-allowed"
         />
       </div>
     </div>
@@ -156,7 +156,6 @@ function PerfilContent() {
   }
 
   function handleCancelSubscription() {
-    // No real billing integration yet — show a friendly message.
     const proximaData = new Date();
     proximaData.setMonth(proximaData.getMonth() + 1);
     const fmt = proximaData.toLocaleDateString("pt-BR");
@@ -196,7 +195,6 @@ function PerfilContent() {
   return (
     <PageShell className="bg-paper min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        {/* Voltar */}
         <button
           type="button"
           onClick={() => navigate("dashboard")}
@@ -215,7 +213,6 @@ function PerfilContent() {
         </div>
 
         <div className="mt-10 grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6 lg:gap-8">
-          {/* LEFT — Dados pessoais */}
           <section
             aria-labelledby="perfil-dados-heading"
             className="bg-surface border border-[var(--border)] rounded-2xl p-6 sm:p-8"
@@ -227,7 +224,6 @@ function PerfilContent() {
               Dados pessoais
             </h2>
 
-            {/* Avatar */}
             <div className="mt-5 flex items-center gap-4">
               <div
                 className="w-16 h-16 rounded-full bg-[var(--blue-soft)] text-[var(--blue-royal)] grid place-items-center font-[family-name:var(--font-jakarta)] font-extrabold text-xl select-none"
@@ -268,8 +264,7 @@ function PerfilContent() {
                 disabled
               />
               <p className="-mt-3 text-xs text-ink/50">
-                O e-mail não pode ser alterado aqui. Entre em contato com o
-                suporte se precisar.
+                O e-mail não pode ser alterado aqui. Entre em contato com o suporte se precisar.
               </p>
               <Field
                 id="perfil-phone"
@@ -305,9 +300,7 @@ function PerfilContent() {
             </form>
           </section>
 
-          {/* RIGHT — Plano, histórico, cancelamento */}
           <div className="space-y-6">
-            {/* Plano atual */}
             <section
               aria-labelledby="perfil-plano-heading"
               className="bg-surface border border-[var(--border)] rounded-2xl p-6 sm:p-7"
@@ -350,7 +343,6 @@ function PerfilContent() {
               </button>
             </section>
 
-            {/* Histórico de pagamentos */}
             <section
               aria-labelledby="perfil-historico-heading"
               className="bg-surface border border-[var(--border)] rounded-2xl p-6 sm:p-7"
@@ -376,7 +368,6 @@ function PerfilContent() {
               )}
             </section>
 
-            {/* Cancelamento — claro, sem dark pattern */}
             <section
               aria-labelledby="perfil-cancelar-heading"
               className="bg-surface border border-[var(--border)] rounded-2xl p-6 sm:p-7"
@@ -388,13 +379,12 @@ function PerfilContent() {
                 Cancelar assinatura
               </h2>
               <p className="mt-2 text-sm text-ink/65 leading-relaxed text-pretty">
-                Você manterá acesso até o fim do período já pago. Sem multas,
-                sem burocracia.
+                Você manterá acesso até o fim do período já pago. Sem multas, sem burocracia.
               </p>
 
-              {plano === "gratis" ? (
+              {plano !== "pro" ? (
                 <p className="mt-4 text-sm text-ink/50 italic">
-                  Você está no plano Grátis — nada para cancelar.
+                  Você não tem uma assinatura Pro ativa para cancelar.
                 </p>
               ) : cancelMsg ? (
                 <p className="mt-4 text-sm text-[var(--selo-green)] font-medium">
@@ -412,13 +402,9 @@ function PerfilContent() {
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Cancelar assinatura do Plano {PLANO_LABEL[plano]}?
-                      </AlertDialogTitle>
+                      <AlertDialogTitle>Cancelar assinatura do Plano Pro?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Você continuará com acesso até o fim do período já
-                        pago. Depois disso, sua conta voltará ao plano Grátis
-                        automaticamente. Sem multas, sem burocracia.
+                        Você continuará com acesso até o fim do período já pago. Depois disso, sua conta voltará ao plano Grátis automaticamente. Sem multas, sem burocracia.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
