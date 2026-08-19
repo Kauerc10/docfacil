@@ -95,9 +95,7 @@ export async function generateDocumentArtifact(
   let expectedTargetVersion = 1;
   if (existingDocumentId) {
     const existingDoc = await repos.documents.getDocument(existingDocumentId);
-    if (existingDoc) {
-      expectedTargetVersion = (existingDoc.currentVersion || 0) + 1;
-    }
+    if (existingDoc) expectedTargetVersion = (existingDoc.currentVersion || 0) + 1;
   }
 
   const { request: genReq, isNew } = await repos.generationRequests.getOrCreateRequest(
@@ -237,10 +235,13 @@ export async function generateDocumentArtifact(
         new Date().getMonth(),
         1
       ).getTime();
-      const monthlyCount = await repos.documents.countUserMonthlyDocuments(
-        principal.userId,
-        startOfMonth
-      );
+      const userDocuments = await repos.documents.listUserDocuments(principal.userId);
+      const monthlyCount = userDocuments.filter(
+        (document) =>
+          document.entitlement.type === "free" &&
+          document.createdAt >= startOfMonth &&
+          document.status !== "deleted"
+      ).length;
       const order = orderId
         ? await repos.orders.reservePaidOrder({
             orderId,
