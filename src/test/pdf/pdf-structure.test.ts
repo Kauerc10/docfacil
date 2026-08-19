@@ -15,6 +15,69 @@ const answers: Record<string, string> = {
   forma_pagamento: "PIX",
 };
 
+type InspectablePdfNode = {
+  text?: unknown;
+  style?: string;
+  alignment?: string;
+  margin?: number[];
+  [key: string]: unknown;
+};
+
+function collectPdfNodes(value: unknown, acc: InspectablePdfNode[] = []): InspectablePdfNode[] {
+  if (Array.isArray(value)) {
+    for (const item of value) collectPdfNodes(item, acc);
+    return acc;
+  }
+
+  if (!value || typeof value !== "object") return acc;
+
+  const node = value as InspectablePdfNode;
+  acc.push(node);
+
+  for (const child of Object.values(node)) {
+    if (child && typeof child === "object") collectPdfNodes(child, acc);
+  }
+
+  return acc;
+}
+
+function nodeText(node: InspectablePdfNode): string {
+  if (typeof node.text === "string") return node.text;
+  if (!Array.isArray(node.text)) return "";
+
+  return node.text
+    .map((run) => {
+      if (typeof run === "string") return run;
+      if (run && typeof run === "object" && "text" in run) {
+        return String((run as { text?: unknown }).text ?? "");
+      }
+      return "";
+    })
+    .join("");
+}
+
+function firstBodyParagraph(slug: string): InspectablePdfNode {
+  const modelo = getModelo(slug)!;
+  const nodes = collectPdfNodes(buildContent(modelo, answers, [], []));
+  const paragraph = nodes.find(
+    (node) => node.style === "body" && node.alignment === "justify" && Array.isArray(node.margin)
+  );
+
+  expect(paragraph).toBeDefined();
+  return paragraph!;
+}
+
+function firstClauseHeading(slug: string): InspectablePdfNode {
+  const modelo = getModelo(slug)!;
+  const nodes = collectPdfNodes(buildContent(modelo, answers, [], []));
+  const heading = nodes.find(
+    (node) => node.style === "clauseHeading" && Array.isArray(node.margin)
+  );
+
+  expect(heading).toBeDefined();
+  return heading!;
+}
+
 describe("PDF Structure & Layout Protection", () => {
   it("mantém assinaturas atômicas sem transformar o fechamento inteiro em bloco indivisível", () => {
     const locacao = getModelo("contrato-locacao")!;
@@ -146,5 +209,32 @@ describe("PDF Structure & Layout Protection", () => {
     expect(divider!.x1).toBeGreaterThan(0);
     expect(divider!.x2).toBeLessThan(CONTENT_WIDTH);
     expect(divider!.x2 - divider!.x1).toBeLessThan(CONTENT_WIDTH / 2);
+  });
+
+  it("centraliza a data das declarações com respiro próprio antes da assinatura", () => {
+    const declaracao = getModelo("declaracao-residencia")!;
+    const nodes = collectPdfNodes(buildContent(declaracao, {}, [], []));
+    const dateNode = nodes.find(
+      (node) => node.style === "body" && /,\s*\d{1,2}\s+de\s+[a-zç]+\s+de\s+\d{4}/i.test(nodeText(node))
+    );
+
+    expect(dateNode).toBeDefined();
+    expect(dateNode!.alignment).toBe("center");
+    expect(dateNode!.margin?.[1] ?? 0).toBeGreaterThan(14);
+  });
+
+  it("usa mais espaço entre parágrafos na declaração própria do que na declaração por terceiro", () => {
+    const propria = firstBodyParagraph("declaracao-residencia");
+    const terceiro = firstBodyParagraph("declaracao-residencia-terceiro");
+
+    expect(propria.margin![3]).toBeGreaterThan(terceiro.margin![3]);
+  });
+
+  it("compacta o ritmo de cláusulas da locação comercial sem afetar a residencial", () => {
+    const residencial = firstClauseHeading("contrato-locacao");
+    const comercial = firstClauseHeading("contrato-locacao-comercial");
+
+    expect(residencial.margin![1]).toBeGreaterThan(comercial.margin![1]);
+    expect(residencial.margin![3]).toBeGreaterThan(comercial.margin![3]);
   });
 });
