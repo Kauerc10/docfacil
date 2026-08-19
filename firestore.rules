@@ -6,8 +6,6 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // === Users ===
-    // Cada usuário só lê o próprio perfil.
-    // Pode atualizar dados normais via whitelist explícita de campos seguros.
     match /users/{uid} {
       function onlyEditableProfileFields() {
         return request.resource.data
@@ -27,17 +25,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // === Models (catálogo de documentos) ===
-    // Leitura pública. Escrita somente via Admin SDK.
+    // === Models ===
     match /models/{slug} {
       allow read: if true;
       allow write: if false;
     }
 
-    // === Documents (documentos gerados) ===
-    // Leitura permitida para o proprietário autenticado.
-    // TODAS as mutações (criação, edição, exclusão) são estritamente bloqueadas no client
-    // e coordenadas exclusivamente pelo backend via Firebase Admin SDK.
+    // === Documents ===
     match /documents/{id} {
       allow read: if request.auth != null && (
         (resource.data.owner.type == 'user' && resource.data.owner.userId == request.auth.uid) ||
@@ -54,21 +48,26 @@ service cloud.firestore {
       }
     }
 
-    // === Access Links (tokens de magic link e compartilhamento) ===
-    // Bloqueio total no client. Acesso exclusivamente server-side via hash.
+    // === Account Drafts ===
+    // Rascunhos autenticados passam exclusivamente pelas API routes, que
+    // validam ownership usando Firebase Admin SDK. O client nunca acessa a
+    // coleção diretamente, inclusive para evitar falsificação de ownerUserId.
+    match /drafts/{draftId} {
+      allow read, write: if false;
+    }
+
+    // === Access Links ===
     match /access_links/{tokenHash} {
       allow read, write: if false;
     }
 
-    // === Orders (pedidos de pagamento) ===
-    // Leitura pelo comprador autenticado. Escrita exclusivamente server-side.
+    // === Orders ===
     match /orders/{orderId} {
       allow read: if request.auth != null && resource.data.buyer.userId == request.auth.uid;
       allow write: if false;
     }
 
-    // === Generation Requests (idempotência e travas) ===
-    // Bloqueio total no client.
+    // === Generation Requests ===
     match /generation_requests/{requestId} {
       allow read, write: if false;
     }
@@ -79,10 +78,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // === Consents (aceites de termos e privacidade) ===
-    // O histórico continua legível pelo próprio usuário autenticado, mas toda
-    // escrita é exclusiva do backend via Firebase Admin SDK. Isso impede que
-    // acceptedAt, IP, user-agent, versões ou hashes sejam forjados pelo client.
+    // === Consents ===
     match /consents/{consentId} {
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
       allow create, update, delete: if false;
