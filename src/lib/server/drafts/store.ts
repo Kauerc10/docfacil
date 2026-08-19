@@ -38,6 +38,7 @@ export class InMemoryDraftStore implements DraftStore {
       id,
       ownerUserId: userId,
       modeloSlug: input.modeloSlug,
+      sourceDocumentId: input.sourceDocumentId ?? existing?.sourceDocumentId,
       respostas: { ...input.respostas },
       stepIndex: input.stepIndex,
       clausulasSelecionadas: [...input.clausulasSelecionadas],
@@ -83,6 +84,7 @@ export class FirestoreDraftStore implements DraftStore {
       : this.collection().doc();
     const now = Date.now();
     let createdAt = now;
+    let existingSourceDocumentId: string | undefined;
 
     if (input.draftId) {
       const existingSnap = await ref.get();
@@ -92,12 +94,14 @@ export class FirestoreDraftStore implements DraftStore {
       const existing = existingSnap.data() as AccountDraft;
       assertOwner({ ...existing, id: ref.id }, userId);
       createdAt = existing.createdAt;
+      existingSourceDocumentId = existing.sourceDocumentId;
     }
 
     const draft: AccountDraft = {
       id: ref.id,
       ownerUserId: userId,
       modeloSlug: input.modeloSlug,
+      sourceDocumentId: input.sourceDocumentId ?? existingSourceDocumentId,
       respostas: input.respostas,
       stepIndex: input.stepIndex,
       clausulasSelecionadas: input.clausulasSelecionadas,
