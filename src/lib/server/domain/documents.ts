@@ -135,11 +135,70 @@ export const documentDraftInputSchema = z.object({
 
 export type DocumentDraftInput = z.infer<typeof documentDraftInputSchema>;
 
+const RENTAL_MODEL_SLUGS = new Set([
+  "contrato-locacao",
+  "contrato-locacao-comercial",
+]);
+
+const RENTAL_GUARANTEE_IDS = new Set([
+  "caucao",
+  "fiador",
+  "seguro_fianca",
+  "cessao_fiduciaria",
+]);
+
+/**
+ * Regras de coerência que não cabem em validação de campo isolado.
+ *
+ * O client pode usar uma UX mais simples, mas o servidor continua sendo a
+ * autoridade final antes de persistir/gerar o documento. Essas regras ficam
+ * deliberadamente pequenas e explícitas para a V1, sem criar um AST jurídico.
+ */
+export function validateDocumentSemanticInvariants(
+  modelo: Modelo,
+  rawRespostas: Record<string, string>,
+  clausulasSelecionadas: string[] = []
+): void {
+  if (!RENTAL_MODEL_SLUGS.has(modelo.slug)) return;
+
+  const garantiasSelecionadas = clausulasSelecionadas.filter((id) =>
+    RENTAL_GUARANTEE_IDS.has(id)
+  );
+
+  if (garantiasSelecionadas.length > 1) {
+    throw new BackendError(
+      "INVALID_REQUEST",
+      400,
+      "Escolha apenas uma modalidade de garantia locatícia."
+    );
+  }
+
+  if (garantiasSelecionadas.includes("caucao")) {
+    const mesesRaw = (rawRespostas.caucao_meses ?? "").replace(/\D/g, "");
+    if (mesesRaw) {
+      const meses = Number(mesesRaw);
+      if (Number.isFinite(meses) && meses > 3) {
+        throw new BackendError(
+          "INVALID_REQUEST",
+          400,
+          "A caução em dinheiro não pode ultrapassar três meses de aluguel."
+        );
+      }
+    }
+  }
+}
+
 export function reconstructAndValidateResponses(
   modelo: Modelo,
   rawRespostas: Record<string, string>,
   clausulasSelecionadas: string[] = []
 ): Record<string, string> {
+  validateDocumentSemanticInvariants(
+    modelo,
+    rawRespostas,
+    clausulasSelecionadas
+  );
+
   const composed = aplicarComposicaoModelo(rawRespostas, modelo);
   const optionalSet = new Set(computeCamposOpcionais(modelo, clausulasSelecionadas));
 
