@@ -14,7 +14,7 @@
  * modificar diretamente o template bruto do catálogo. Deve ser incrementada
  * sempre que uma regra abaixo mudar o conteúdo jurídico/editorial final.
  */
-export const DOCUMENT_RENDER_RULES_VERSION = "2026-08-20.2";
+export const DOCUMENT_RENDER_RULES_VERSION = "2026-08-20.3";
 
 const RESIDENTIAL_ART_46_LINE =
   "O prazo de locação é de {{prazo}} meses, com início na data da assinatura, findo o qual o contrato se extinguirá de pleno direito, independentemente de notificação ou aviso, nos termos do art. 46 da Lei nº 8.245/1991.";
@@ -30,6 +30,8 @@ const RESIDENTIAL_FIRE_INSURANCE_HEADING =
   "## CLÁUSULA QUINTA – DO SEGURO CONTRA INCÊNDIO";
 const RESIDENTIAL_FIRE_INSURANCE_LINE =
   "As PARTES definem que o prêmio do seguro contra incêndio do IMÓVEL será suportado pelo {{seguro_incendio_responsavel}}, quando a contratação for exigida por lei, pela convenção condominial ou ajustada entre as PARTES.";
+const RESIDENTIAL_INSPECTION_HEADING =
+  "## CLÁUSULA DÉCIMA SEGUNDA – DA VISTORIA";
 const RESIDENTIAL_INSPECTION_LINE =
   "As PARTES declaram ter vistoriado o IMÓVEL previamente à assinatura deste contrato, encontrando-o em condições adequadas à finalidade a que se destina, conforme Termo de Vistoria com registro fotográfico anexo (Anexo I), que passa a integrar este instrumento para todos os fins.";
 const RESIDENTIAL_PRIVACY_LINE =
@@ -137,8 +139,14 @@ export function applyLegalTemplateRule(
       return "O LOCATÁRIO responderá pelos danos causados por si, seus dependentes, familiares, visitantes ou prepostos e deverá providenciar os reparos que lhes forem imputáveis. Reparos estruturais, vícios ou defeitos anteriores à locação e desgaste natural decorrente do uso regular do IMÓVEL são de responsabilidade do LOCADOR, observadas as obrigações legais de cada parte.";
     }
 
+    const possuiVistoriaAnexa = /^sim/i.test(answers.vistoria_anexa?.trim() ?? "");
+
+    if (line === RESIDENTIAL_INSPECTION_HEADING) {
+      return possuiVistoriaAnexa ? line : "";
+    }
+
     if (line === RESIDENTIAL_INSPECTION_LINE) {
-      return /^sim/i.test(answers.vistoria_anexa?.trim() ?? "")
+      return possuiVistoriaAnexa
         ? "As PARTES declaram ter vistoriado o IMÓVEL previamente à assinatura deste contrato. O Termo de Vistoria e o registro fotográfico informados pelas PARTES integram este instrumento como Anexo I."
         : "";
     }
