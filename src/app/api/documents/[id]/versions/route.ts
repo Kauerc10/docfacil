@@ -23,6 +23,7 @@ const versionInputSchema = z.object({
     z.string().max(10000)
   ),
   clausulasSelecionadas: z.array(z.string().min(1).max(100)).max(50).optional().default([]),
+  orderId: z.string().min(1).max(200).optional(),
 });
 
 export async function POST(
@@ -48,7 +49,7 @@ export async function POST(
       );
     }
 
-    const { requestId, respostas, clausulasSelecionadas } = parseResult.data;
+    const { requestId, respostas, clausulasSelecionadas, orderId } = parseResult.data;
 
     const repos = getRepositories();
     const existingDoc = await repos.documents.getDocument(documentId);
@@ -74,6 +75,7 @@ export async function POST(
       modeloSlug: existingDoc.modeloSlug,
       respostas,
       clausulasSelecionadas,
+      orderId,
       existingDocumentId: documentId,
     });
 
