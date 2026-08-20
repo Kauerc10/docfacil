@@ -67,10 +67,21 @@ describe("document access product contract", () => {
     expect(source).toContain("sourceDocumentId: activeDocumentId");
   });
 
+  it("paywall sempre oferece avulso e mantem acoes secundarias legiveis", async () => {
+    const source = await readSource("src/components/docfacil/views/criar/free-limit-paywall.tsx");
+    expect(source).toContain("Comprar documento avulso");
+    expect(source).toContain("pagar apenas por esta nova versão");
+    expect(source).not.toContain('const allowSingle = reason !== "pro_required"');
+    expect(source).toContain("lg:grid-cols-[1fr_auto]");
+    expect(source).toContain("whitespace-nowrap");
+  });
+
   it("checkout demo retoma o draft depois de ativar Pro ou pagar avulso", async () => {
     const source = await readSource("src/components/docfacil/views/checkout-view.tsx");
     expect(source).toContain('navigate("criar", { slug, draftId })');
     expect(source).toContain("getAccountDraft(draftId)");
+    expect(source).toContain("draft.sourceDocumentId");
+    expect(source).toContain("createDocumentVersion(draft.sourceDocumentId");
     expect(source).toContain("orderId: result.orderId");
     expect(source).toContain("deleteAccountDraft(draft.id)");
   });
