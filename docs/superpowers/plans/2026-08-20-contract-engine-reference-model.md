@@ -4,7 +4,7 @@
 
 **Goal:** Turn the approved residential lease reference into a reusable, legally conditional contract-engine baseline without coupling legal rules to the PDF renderer.
 
-**Architecture:** `contrato-locacao` owns conditional contract content and questions; a small contract-rules helper derives mutually exclusive lease text from answers. The PDF keeps consuming normalized lines, while a `contractProperty` recipe improves family-level composition and signatures.
+**Architecture:** `contrato-locacao` owns contract content and questions; the existing `legal-rules.ts` layer derives mutually exclusive lease text from answers. The PDF keeps consuming normalized lines, while a `contractProperty` recipe improves family-level composition and signatures.
 
 **Tech Stack:** Next.js, TypeScript, Bun tests, pdfmake.
 
@@ -23,18 +23,16 @@
 ### Task 1: Lease legal-text derivation
 
 **Files:**
-- Create: `src/lib/document-engine/contract-rules.ts`
-- Modify: `src/lib/document-engine/index.ts`
-- Modify: `src/lib/document-engine/render.ts`
-- Test: `src/test/document-engine/contract-rules.test.ts`
+- Modify: `src/lib/document-engine/legal-rules.ts`
+- Test: `src/test/document-engine/legal-rules.test.ts`
 
 **Interfaces:**
-- Produces `deriveResidentialLeaseAnswers(respostas, clausulasSelecionadas)`.
-- Returns derived placeholders for the term regime, inspection, privacy, maintenance, signing and optional alienation clauses.
+- Extends `applyLegalTemplateRule(modelSlug, line, answers)` with the reference-model lines.
+- Returns mutually exclusive legal text before placeholders are filled.
 
 - [ ] Write failing tests for a 12-month regime, a 30-month regime, default no-inspection/no-alienation output, and the no-guarantee payment wording.
 - [ ] Run focused test and confirm RED.
-- [ ] Implement only derived placeholders and apply them before template filling.
+- [ ] Implement only the reference-model legal substitutions in the existing shared rule layer.
 - [ ] Run focused test and confirm GREEN.
 
 ### Task 2: Reference-model contract structure
