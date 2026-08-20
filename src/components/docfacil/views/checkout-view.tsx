@@ -87,6 +87,7 @@ export function CheckoutView() {
       });
 
       if (result.provider === "demo" && plan === "pro") {
+        if (slug) clearFinalizationRequestId(slug);
         await refreshProfile();
         toast.success("Plano Pro ativado no modo demonstração.", {
           description: "Sua conta já está com documentos ilimitados para os testes.",
@@ -107,6 +108,7 @@ export function CheckoutView() {
           throw new Error("O rascunho associado ao checkout não foi encontrado.");
         }
 
+        clearFinalizationRequestId(draft.modeloSlug);
         const requestId = getOrCreateFinalizationRequestId(draft.modeloSlug);
         const respostas = buildAccountDraftFinalizationAnswers(draft);
         const finalized = draft.sourceDocumentId
