@@ -8,10 +8,13 @@
 
 export type PdfLayoutProfile = "declaration" | "contract" | "instrument";
 export type PdfDensity = "airy" | "balanced" | "dense";
+export type PdfContractVariant = "standard" | "dense" | "formal" | "property";
 
 export interface PdfVisualRecipe {
   profile: PdfLayoutProfile;
   density: PdfDensity;
+  /** Preset reutilizável da família contract; documentos não contratuais não o definem. */
+  contractVariant?: PdfContractVariant;
   pageMarginsCm: [number, number, number, number];
   /** O footer vive na margem física da folha, independente da caixa do corpo. */
   footerHorizontalInsetCm: number;
@@ -43,6 +46,7 @@ export interface PdfVisualRecipe {
 const DEFAULT_CONTRACT_RECIPE: PdfVisualRecipe = {
   profile: "contract",
   density: "balanced",
+  contractVariant: "standard",
   pageMarginsCm: [3.15, 3.45, 3.15, 2.6],
   footerHorizontalInsetCm: 2,
   footerBottomMarginCm: 0.55,
@@ -66,6 +70,34 @@ const DEFAULT_CONTRACT_RECIPE: PdfVisualRecipe = {
   dateBottomMargin: 14,
   clauseHeadingTopMargin: 13,
   clauseHeadingBottomMargin: 5,
+};
+
+const CONTRACT_DENSE_RECIPE: PdfVisualRecipe = {
+  ...DEFAULT_CONTRACT_RECIPE,
+  contractVariant: "dense",
+  density: "dense",
+  bodyLineHeight: 1.56,
+  paragraphBottomMargin: 8,
+  clauseHeadingTopMargin: 11,
+  clauseHeadingBottomMargin: 4,
+  closingTopMargin: 13,
+};
+
+const CONTRACT_FORMAL_RECIPE: PdfVisualRecipe = {
+  ...CONTRACT_DENSE_RECIPE,
+  contractVariant: "formal",
+  bodyLineHeight: 1.57,
+};
+
+const CONTRACT_PROPERTY_RECIPE: PdfVisualRecipe = {
+  ...DEFAULT_CONTRACT_RECIPE,
+  contractVariant: "property",
+  bodyLineHeight: 1.61,
+  titleBottomMargin: 6,
+  dividerBottomMargin: 22,
+  clauseHeadingTopMargin: 14,
+  clauseHeadingBottomMargin: 6,
+  closingTopMargin: 18,
 };
 
 /**
@@ -134,25 +166,8 @@ export const PDF_VISUAL_RECIPES: Record<string, PdfVisualRecipe> = {
     clauseHeadingTopMargin: 14,
     clauseHeadingBottomMargin: 6,
   },
-  "contrato-locacao-comercial": {
-    ...DEFAULT_CONTRACT_RECIPE,
-    density: "dense",
-    bodyLineHeight: 1.56,
-    paragraphBottomMargin: 8,
-    clauseHeadingTopMargin: 11,
-    clauseHeadingBottomMargin: 4,
-    closingTopMargin: 13,
-  },
-  "contrato-compra-venda-imovel": {
-    ...DEFAULT_CONTRACT_RECIPE,
-    density: "balanced",
-    bodyLineHeight: 1.61,
-    titleBottomMargin: 6,
-    dividerBottomMargin: 22,
-    clauseHeadingTopMargin: 14,
-    clauseHeadingBottomMargin: 6,
-    closingTopMargin: 18,
-  },
+  "contrato-locacao-comercial": CONTRACT_DENSE_RECIPE,
+  "contrato-compra-venda-imovel": CONTRACT_PROPERTY_RECIPE,
   comodato: {
     ...DEFAULT_CONTRACT_RECIPE,
     bodyLineHeight: 1.59,
@@ -160,14 +175,7 @@ export const PDF_VISUAL_RECIPES: Record<string, PdfVisualRecipe> = {
     clauseHeadingTopMargin: 12,
     clauseHeadingBottomMargin: 5,
   },
-  "compra-venda": {
-    ...DEFAULT_CONTRACT_RECIPE,
-    density: "dense",
-    bodyLineHeight: 1.57,
-    paragraphBottomMargin: 8,
-    clauseHeadingTopMargin: 11,
-    clauseHeadingBottomMargin: 4,
-  },
+  "compra-venda": CONTRACT_FORMAL_RECIPE,
   "uniao-estavel": {
     profile: "instrument",
     density: "airy",
