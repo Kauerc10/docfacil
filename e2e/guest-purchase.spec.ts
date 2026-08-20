@@ -227,9 +227,8 @@ test.describe("Guest Purchase and Download Flow", () => {
     await expect(page.getByText("Condições adicionais (opcionais)")).toBeVisible({
       timeout: 10000,
     });
-    await page.getByRole("button", { name: /^avançar$/i }).click();
 
-    // Finaliza → ?view=sucesso (SPA)
+    // A etapa opcional é a última do fluxo.
     await page.getByRole("button", { name: /finalizar/i }).click();
     await waitForSearchParams(page, { view: "sucesso" });
 
