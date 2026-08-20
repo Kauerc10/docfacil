@@ -14,7 +14,7 @@
  * modificar diretamente o template bruto do catálogo. Deve ser incrementada
  * sempre que uma regra abaixo mudar o conteúdo jurídico/editorial final.
  */
-export const DOCUMENT_RENDER_RULES_VERSION = "2026-08-19.1";
+export const DOCUMENT_RENDER_RULES_VERSION = "2026-08-20.1";
 
 const RESIDENTIAL_ART_46_LINE =
   "O prazo de locação é de {{prazo}} meses, com início na data da assinatura, findo o qual o contrato se extinguirá de pleno direito, independentemente de notificação ou aviso, nos termos do art. 46 da Lei nº 8.245/1991.";
@@ -24,6 +24,12 @@ const RESIDENTIAL_CHARGES_LINE =
   "Correrão por conta exclusiva do LOCATÁRIO, durante toda a vigência do contrato: a) as despesas de consumo de água, esgoto, energia elétrica, gás e internet/TV a cabo, se houver; b) as taxas condominiais ordinárias, incluindo fundo de reserva quando exigido pela convenção condominial; c) o Imposto Predial e Territorial Urbano (IPTU) e taxas municipais incidentes sobre o imóvel, salvo estipulação em contrário.";
 const RESIDENTIAL_EXTRAORDINARY_LINE =
   "As despesas condominiais extraordinárias, assim consideradas nos termos do art. 22, § 1º, da Lei nº 8.245/1991, correrão por conta do LOCADOR.";
+const RESIDENTIAL_MAINTENANCE_LINE =
+  "Incumbem ao LOCATÁRIO os reparos decorrentes do uso normal do IMÓVEL e de pequenos consertos de manutenção, enquanto os reparos estruturais e os decorrentes de desgaste natural, deterioração pelo tempo ou vício de construção são de responsabilidade do LOCADOR, nos termos dos arts. 22 e 23 da Lei nº 8.245/1991.";
+const RESIDENTIAL_INSPECTION_LINE =
+  "As PARTES declaram ter vistoriado o IMÓVEL previamente à assinatura deste contrato, encontrando-o em condições adequadas à finalidade a que se destina, conforme Termo de Vistoria com registro fotográfico anexo (Anexo I), que passa a integrar este instrumento para todos os fins.";
+const RESIDENTIAL_PRIVACY_LINE =
+  "As PARTES declaram estar cientes de que os dados pessoais constantes deste instrumento serão tratados exclusivamente para as finalidades relacionadas à execução, fiscalização e eventual cobrança decorrente deste contrato, em conformidade com a Lei nº 13.709/2018 (Lei Geral de Proteção de Dados Pessoais), sendo vedado o uso para finalidade diversa sem consentimento específico.";
 const COMMERCIAL_CHARGES_LINE =
   "Correrão por conta exclusiva do LOCATÁRIO, durante toda a vigência da locação: a) despesas de consumo (água, esgoto, energia elétrica, gás, internet e telefonia); b) despesas condominiais ordinárias e extraordinárias, quando o imóvel integrar condomínio comercial; c) o IPTU, taxas municipais, e eventual Imposto sobre Serviços (ISS) incidente sobre a própria atividade explorada; d) prêmios de seguro contra incêndio e demais riscos exigidos por lei ou pela administração do imóvel/condomínio.";
 
@@ -105,6 +111,20 @@ export function applyLegalTemplateRule(
 
     if (line === RESIDENTIAL_EXTRAORDINARY_LINE) {
       return "As despesas condominiais extraordinárias, incluindo a constituição do fundo de reserva, assim consideradas nos termos do art. 22, § 1º, da Lei nº 8.245/1991, correrão por conta do LOCADOR.";
+    }
+
+    if (line === RESIDENTIAL_MAINTENANCE_LINE) {
+      return "O LOCATÁRIO responderá pelos danos causados por si, seus dependentes, familiares, visitantes ou prepostos e deverá providenciar os reparos que lhes forem imputáveis. Reparos estruturais, vícios ou defeitos anteriores à locação e desgaste natural decorrente do uso regular do IMÓVEL são de responsabilidade do LOCADOR, observadas as obrigações legais de cada parte.";
+    }
+
+    if (line === RESIDENTIAL_INSPECTION_LINE) {
+      return /^sim/i.test(answers.vistoria_anexa?.trim() ?? "")
+        ? "As PARTES declaram ter vistoriado o IMÓVEL previamente à assinatura deste contrato. O Termo de Vistoria e o registro fotográfico informados pelas PARTES integram este instrumento como Anexo I."
+        : "";
+    }
+
+    if (line === RESIDENTIAL_PRIVACY_LINE) {
+      return "Os dados pessoais constantes deste instrumento serão tratados pelas PARTES na medida necessária à execução deste contrato, ao exercício regular de direitos e ao cumprimento de obrigações legais ou regulatórias aplicáveis, observada a Lei nº 13.709/2018.";
     }
   }
 
