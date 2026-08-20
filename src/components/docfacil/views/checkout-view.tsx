@@ -30,6 +30,7 @@ import {
   getAccountDraft,
   deleteAccountDraft,
   finalizeDocument,
+  createDocumentVersion,
   getOrCreateFinalizationRequestId,
   clearFinalizationRequestId,
 } from "@/lib/documents/client";
@@ -107,17 +108,29 @@ export function CheckoutView() {
         }
 
         const requestId = getOrCreateFinalizationRequestId(draft.modeloSlug);
-        const finalized = await finalizeDocument({
-          requestId,
-          modeloSlug: draft.modeloSlug,
-          respostas: buildAccountDraftFinalizationAnswers(draft),
-          clausulasSelecionadas: draft.clausulasSelecionadas,
-          orderId: result.orderId,
-        });
+        const respostas = buildAccountDraftFinalizationAnswers(draft);
+        const finalized = draft.sourceDocumentId
+          ? await createDocumentVersion(draft.sourceDocumentId, {
+              requestId,
+              respostas,
+              clausulasSelecionadas: draft.clausulasSelecionadas,
+              orderId: result.orderId,
+            })
+          : await finalizeDocument({
+              requestId,
+              modeloSlug: draft.modeloSlug,
+              respostas,
+              clausulasSelecionadas: draft.clausulasSelecionadas,
+              orderId: result.orderId,
+            });
 
         await deleteAccountDraft(draft.id);
         clearFinalizationRequestId(draft.modeloSlug);
-        toast.success("Pagamento demo aprovado e documento liberado.");
+        toast.success(
+          draft.sourceDocumentId
+            ? "Pagamento demo aprovado e nova versão liberada."
+            : "Pagamento demo aprovado e documento liberado."
+        );
         setSubmitting(false);
         navigate("sucesso", {
           slug: draft.modeloSlug,
