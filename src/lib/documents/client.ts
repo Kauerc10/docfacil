@@ -150,6 +150,7 @@ export async function createDocumentVersion(
     requestId?: string;
     respostas: Record<string, string>;
     clausulasSelecionadas?: string[];
+    orderId?: string;
   }
 ): Promise<{
   document: { id: string; version: number; artifactState: string };
@@ -162,6 +163,7 @@ export async function createDocumentVersion(
       requestId,
       respostas: input.respostas,
       clausulasSelecionadas: input.clausulasSelecionadas || [],
+      orderId: input.orderId,
     }),
   });
   if (!res.ok) {
