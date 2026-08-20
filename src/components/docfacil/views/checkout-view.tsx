@@ -179,6 +179,13 @@ export function CheckoutView() {
       toast.error("Informe seu e-mail para continuar.");
       return;
     }
+
+    const requiresCheckoutConsent = !user && plan === "avulso";
+    if (!requiresCheckoutConsent) {
+      void handleAcceptConsent();
+      return;
+    }
+
     setConsentOpen(true);
   }
 
