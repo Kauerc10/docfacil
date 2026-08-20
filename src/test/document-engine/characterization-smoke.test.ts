@@ -259,6 +259,7 @@ describe("Contrato de Locação Residencial — estrutura de referência", () =>
     prazo: "12",
     dia_vencimento: "5",
     forma_pagamento: "PIX",
+    seguro_incendio_responsavel: "LOCADOR",
   };
 
   it("gera a estrutura contratual de referência sem afirmar anexos não fornecidos", () => {
@@ -270,6 +271,7 @@ describe("Contrato de Locação Residencial — estrutura de referência", () =>
       modelo,
     }).join("\n");
 
+    expect(document).toContain("CLÁUSULA QUINTA – DO SEGURO CONTRA INCÊNDIO");
     expect(document).toContain("CLÁUSULA NONA – DA MANUTENÇÃO E CONSERVAÇÃO");
     expect(document).toContain("CLÁUSULA DÉCIMA TERCEIRA – DA PROTEÇÃO DE DADOS PESSOAIS");
     expect(document).toContain("CLÁUSULA DÉCIMA QUARTA – DAS COMUNICAÇÕES ENTRE AS PARTES");
