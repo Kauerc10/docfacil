@@ -238,3 +238,42 @@ describe("Fase A: Characterization Smoke Tests (9 Modelos V1)", () => {
     });
   });
 });
+
+describe("Contrato de Locação Residencial — estrutura de referência", () => {
+  const modelo = getModelo("contrato-locacao")!;
+  const answers = {
+    locador_nome: "Carlos Eduardo Souza",
+    locador_nacionalidade: "brasileiro",
+    locador_estado_civil: "casado(a)",
+    locador_profissao: "Engenheiro",
+    locador_cpf: "111.222.333-44",
+    locatario_nome: "Mariana Alves Pereira",
+    locatario_nacionalidade: "brasileira",
+    locatario_estado_civil: "solteira",
+    locatario_profissao: "Advogada",
+    locatario_cpf: "555.666.777-88",
+    imovel: "Rua XV de Novembro, nº 500, Centro, Blumenau - SC",
+    imovel_cidade: "Blumenau",
+    imovel_uf: "SC",
+    valor: "1.500,00",
+    prazo: "12",
+    dia_vencimento: "5",
+    forma_pagamento: "PIX",
+  };
+
+  it("gera a estrutura contratual de referência sem afirmar anexos não fornecidos", () => {
+    const document = fillDocument({
+      titulo: modelo.template.titulo,
+      corpo: modelo.template.corpo,
+      respostas: answers,
+      clausulasSelecionadas: [],
+      modelo,
+    }).join("\n");
+
+    expect(document).toContain("CLÁUSULA NONA – DA MANUTENÇÃO E CONSERVAÇÃO");
+    expect(document).toContain("CLÁUSULA DÉCIMA TERCEIRA – DA PROTEÇÃO DE DADOS PESSOAIS");
+    expect(document).toContain("CLÁUSULA DÉCIMA QUARTA – DAS COMUNICAÇÕES ENTRE AS PARTES");
+    expect(document).not.toContain("Anexo I");
+    expect(document).not.toContain("registro fotográfico anexo");
+  });
+});
