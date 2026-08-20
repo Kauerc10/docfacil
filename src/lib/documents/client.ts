@@ -1,5 +1,9 @@
 import { apiFetch } from "@/lib/auth/api-fetch";
-import { getOrCreateFinalizationRequestId, clearFinalizationRequestId } from "./idempotency";
+import {
+  getOrCreateFinalizationRequestId,
+  clearFinalizationRequestId,
+  shouldPreserveFinalizationRequestId,
+} from "./idempotency";
 export { getOrCreateFinalizationRequestId, clearFinalizationRequestId };
 
 export interface GuestDraftData {
@@ -132,7 +136,7 @@ export async function finalizeDocument(input: {
     const payload = await res.json().catch(() => ({}));
     const code = typeof payload.error?.code === "string" ? payload.error.code : undefined;
     const message = payload.error?.message || "Falha ao gerar documento.";
-    if (code !== "GENERATION_IN_PROGRESS") {
+    if (!shouldPreserveFinalizationRequestId(code)) {
       clearFinalizationRequestId(input.modeloSlug);
     }
     const error = new Error(message) as Error & { code?: string; status?: number };
@@ -148,6 +152,7 @@ export async function createDocumentVersion(
   documentId: string,
   input: {
     requestId?: string;
+    modeloSlug: string;
     respostas: Record<string, string>;
     clausulasSelecionadas?: string[];
     orderId?: string;
@@ -155,7 +160,7 @@ export async function createDocumentVersion(
 ): Promise<{
   document: { id: string; version: number; artifactState: string };
 }> {
-  const requestId = input.requestId || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "req_" + Date.now());
+  const requestId = input.requestId || getOrCreateFinalizationRequestId(input.modeloSlug);
   const res = await apiFetch(`/api/documents/${documentId}/versions`, {
     method: "POST",
     headers: JSON_HEADERS,
@@ -168,8 +173,12 @@ export async function createDocumentVersion(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
+    const code = typeof err.error?.code === "string" ? err.error.code : undefined;
+    if (!shouldPreserveFinalizationRequestId(code)) {
+      clearFinalizationRequestId(input.modeloSlug);
+    }
     const error = new Error(err.error?.message || "Falha ao criar nova versão do documento.") as Error & { code?: string; status?: number };
-    error.code = err.error?.code;
+    error.code = code;
     error.status = res.status;
     throw error;
   }
