@@ -360,6 +360,7 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
             pergunta: "Você possui termo de vistoria com fotos para anexar?",
             tipo: "select",
             opcoes: ["Não", "Sim"],
+            obrigatorio: false,
             microcopy: "Se escolher sim, o contrato indicará a vistoria como Anexo I. Guarde esse anexo junto do PDF.",
           },
           {
