@@ -19,7 +19,7 @@ import {
   clearFinalizationRequestId,
 } from "@/lib/documents/client";
 import { normalizarEstado } from "@/lib/normalizers";
-import { aplicarComposicaoModelo, encodeClausulasSelecionadas } from "@/lib/document-engine";
+import { aplicarComposicaoModelo, hasInvalidMoradoresAutorizados } from "@/lib/document-engine";
 import { logger } from "@/lib/logger";
 import { UX_CONFIG } from "@/lib/constants";
 import type { Modelo, EtapaModelo } from "@/lib/types";
@@ -233,6 +233,12 @@ export function CriarView() {
     if (!etapaAtual) return null;
     if (etapaAtual.tipo === "campo") {
       const v = (answers[etapaAtual.campo.key] ?? "").trim();
+      if (
+        etapaAtual.campo.tipo === "lista_pessoas" &&
+        hasInvalidMoradoresAutorizados(v)
+      ) {
+        return "Informe o nome completo de cada morador adicional.";
+      }
       if (etapaAtual.campo.obrigatorio !== false && !v) {
         return `Preencha: ${etapaAtual.campo.pergunta}`;
       }
@@ -411,7 +417,6 @@ export function CriarView() {
       setPetMood("feliz");
       const respostasFinais: Record<string, string> = {
         ...respostasComEndereco,
-        ...encodeClausulasSelecionadas(clausulasSelecionadas),
       };
       for (const extraMap of Object.values(extrasPorClausula)) {
         for (const [key, value] of Object.entries(extraMap)) respostasFinais[key] = value;

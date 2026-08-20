@@ -67,6 +67,13 @@ describe("document access product contract", () => {
     expect(source).toContain("sourceDocumentId: activeDocumentId");
   });
 
+  it("manda as cláusulas selecionadas separadamente das respostas validadas pela API", async () => {
+    const source = await readSource("src/components/docfacil/views/criar-view.tsx");
+
+    expect(source).toContain("clausulasSelecionadas,");
+    expect(source).not.toContain("...encodeClausulasSelecionadas(clausulasSelecionadas)");
+  });
+
   it("paywall sempre oferece avulso e mantem acoes secundarias legiveis", async () => {
     const source = await readSource("src/components/docfacil/views/criar/free-limit-paywall.tsx");
     expect(source).toContain("Comprar documento avulso");

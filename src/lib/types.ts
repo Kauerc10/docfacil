@@ -5,7 +5,14 @@
 
 export type Categoria = "Locação" | "Família" | "Comercial" | "Pessoal";
 
-export type TipoCampo = "text" | "textarea" | "date" | "number" | "select";
+export type TipoCampo = "text" | "textarea" | "date" | "number" | "select" | "lista_pessoas";
+
+export interface ListaPessoasConfig {
+  /** Rótulo singular usado na interface, como "morador" ou "dependente". */
+  itemLabel: string;
+  /** Limite para preservar uma tela simples e um contrato legível. */
+  maxItens: number;
+}
 
 export interface CampoModelo {
   /** chave usada no template {{key}} */
@@ -16,6 +23,8 @@ export interface CampoModelo {
   tipo?: TipoCampo;
   /** quando tipo === "select", opções disponíveis no dropdown */
   opcoes?: string[];
+  /** Configuração do campo repetível de pessoas. */
+  listaPessoas?: ListaPessoasConfig;
   /** se true, campo obrigatório (default true) */
   obrigatorio?: boolean;
 }

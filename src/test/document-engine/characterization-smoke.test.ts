@@ -259,7 +259,6 @@ describe("Contrato de Locação Residencial — estrutura de referência", () =>
     prazo: "12",
     dia_vencimento: "5",
     forma_pagamento: "PIX",
-    seguro_incendio_responsavel: "LOCADOR",
   };
 
   it("não exige vistoria quando não há anexo a declarar", () => {
@@ -285,11 +284,11 @@ describe("Contrato de Locação Residencial — estrutura de referência", () =>
       modelo,
     }).join("\n");
 
-    expect(document).toContain("CLÁUSULA QUINTA – DO SEGURO CONTRA INCÊNDIO");
-    expect(document).toContain("CLÁUSULA NONA – DA MANUTENÇÃO E CONSERVAÇÃO");
-    expect(document).toContain("CLÁUSULA DÉCIMA TERCEIRA – DA PROTEÇÃO DE DADOS PESSOAIS");
-    expect(document).toContain("CLÁUSULA DÉCIMA QUARTA – DAS COMUNICAÇÕES ENTRE AS PARTES");
-    expect(document).not.toContain("CLÁUSULA DÉCIMA SEGUNDA – DA VISTORIA");
+    expect(document).toContain("CLÁUSULA OITAVA – DA MANUTENÇÃO E CONSERVAÇÃO");
+    expect(document).toContain("CLÁUSULA DÉCIMA SEGUNDA – DA PROTEÇÃO DE DADOS PESSOAIS");
+    expect(document).toContain("CLÁUSULA DÉCIMA TERCEIRA – DAS COMUNICAÇÕES ENTRE AS PARTES");
+    expect(document).not.toContain("SEGURO CONTRA INCÊNDIO");
+    expect(document).not.toContain("CLÁUSULA DÉCIMA PRIMEIRA – DA VISTORIA");
     expect(document).not.toContain("Anexo I");
     expect(document).not.toContain("registro fotográfico anexo");
   });

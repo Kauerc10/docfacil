@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { normalizarEstado } from "@/lib/normalizers";
 import type { CampoPerguntaProps } from "./types";
 import { useCampoValidado } from "./use-campo-validado";
+import { ListaPessoas } from "./lista-pessoas";
 
 gsap.registerPlugin(useGSAP);
 
@@ -112,6 +113,19 @@ export function CampoPergunta({
   const isTextarea = campo.tipo === "textarea";
   const isSelect = campo.tipo === "select" && campo.opcoes && campo.opcoes.length > 0;
   const inputMode = (campo.tipo === "number" || tipo === "moeda") ? "decimal" : "text";
+
+  if (campo.tipo === "lista_pessoas") {
+    return (
+      <ListaPessoas
+        campo={campo}
+        value={value}
+        onChange={onChange}
+        onAvancar={onAvancar}
+        submitting={submitting}
+        erro={erro}
+      />
+    );
+  }
 
   return (
     <div ref={root} className="space-y-2">

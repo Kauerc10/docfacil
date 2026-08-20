@@ -5,6 +5,7 @@ import type { Modelo } from "../../types";
 import { BackendError } from "../errors";
 import { aplicarComposicaoModelo } from "../../document-engine/compose";
 import { computeCamposOpcionais } from "../../document-engine/optional-fields";
+import { hasInvalidMoradoresAutorizados } from "../../document-engine/authorized-residents";
 import { DOCUMENT_RENDER_RULES_VERSION } from "../../document-engine/legal-rules";
 
 export type DocumentOwner =
@@ -161,6 +162,17 @@ export function validateDocumentSemanticInvariants(
   clausulasSelecionadas: string[] = []
 ): void {
   if (!RENTAL_MODEL_SLUGS.has(modelo.slug)) return;
+
+  if (
+    modelo.slug === "contrato-locacao" &&
+    hasInvalidMoradoresAutorizados(rawRespostas.moradores_autorizados)
+  ) {
+    throw new BackendError(
+      "INVALID_REQUEST",
+      400,
+      "Informe o nome completo de cada morador adicional."
+    );
+  }
 
   const garantiasSelecionadas = clausulasSelecionadas.filter((id) =>
     RENTAL_GUARANTEE_IDS.has(id)
@@ -328,6 +340,7 @@ export function calculateModelSnapshotHash(modelo: Modelo): string {
       pergunta: c.pergunta,
       tipo: c.tipo,
       obrigatorio: c.obrigatorio,
+      listaPessoas: c.listaPessoas,
     })),
     renderRulesVersion: DOCUMENT_RENDER_RULES_VERSION,
   };

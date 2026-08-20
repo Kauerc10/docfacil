@@ -58,6 +58,15 @@ export {
 } from "./compose";
 
 export {
+  deserializeMoradoresAutorizados,
+  parseMoradoresAutorizados,
+  serializeMoradoresAutorizados,
+  hasInvalidMoradoresAutorizados,
+  formatMoradoresAutorizadosClause,
+  type MoradorAutorizado,
+} from "./authorized-residents";
+
+export {
   classifyLine,
   classifyLines,
   isTitulo,
@@ -80,4 +89,3 @@ export {
 export {
   computeCamposOpcionais,
 } from "./optional-fields";
-

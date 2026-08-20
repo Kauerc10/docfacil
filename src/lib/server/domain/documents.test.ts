@@ -186,6 +186,7 @@ describe("tokens and hashes", () => {
         pergunta: c.pergunta,
         tipo: c.tipo,
         obrigatorio: c.obrigatorio,
+        listaPessoas: c.listaPessoas,
       })),
       renderRulesVersion: DOCUMENT_RENDER_RULES_VERSION,
     };

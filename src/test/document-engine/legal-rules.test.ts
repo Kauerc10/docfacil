@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { applyLegalTemplateRule } from "@/lib/document-engine/legal-rules";
+import { getModelo } from "@/lib/modelos";
 
 const MAINTENANCE_LINE =
   "Incumbem ao LOCATÁRIO os reparos decorrentes do uso normal do IMÓVEL e de pequenos consertos de manutenção, enquanto os reparos estruturais e os decorrentes de desgaste natural, deterioração pelo tempo ou vício de construção são de responsabilidade do LOCADOR, nos termos dos arts. 22 e 23 da Lei nº 8.245/1991.";
@@ -9,12 +10,6 @@ const INSPECTION_LINE =
 
 const PRIVACY_LINE =
   "As PARTES declaram estar cientes de que os dados pessoais constantes deste instrumento serão tratados exclusivamente para as finalidades relacionadas à execução, fiscalização e eventual cobrança decorrente deste contrato, em conformidade com a Lei nº 13.709/2018 (Lei Geral de Proteção de Dados Pessoais), sendo vedado o uso para finalidade diversa sem consentimento específico.";
-
-
-const FIRE_INSURANCE_HEADING =
-  "## CLÁUSULA QUINTA – DO SEGURO CONTRA INCÊNDIO";
-const FIRE_INSURANCE_LINE =
-  "As PARTES definem que o prêmio do seguro contra incêndio do IMÓVEL será suportado pelo {{seguro_incendio_responsavel}}, quando a contratação for exigida por lei, pela convenção condominial ou ajustada entre as PARTES.";
 
 
 describe("regras jurídicas do contrato residencial de referência", () => {
@@ -40,16 +35,11 @@ describe("regras jurídicas do contrato residencial de referência", () => {
     expect(result).not.toContain("consentimento específico");
   });
 
-  it("inclui o seguro contra incêndio apenas quando a parte responsável é informada", () => {
-    expect(
-      applyLegalTemplateRule("contrato-locacao", FIRE_INSURANCE_HEADING, {}),
-    ).toBe("");
+  it("não mantém regra específica de seguro contra incêndio no modelo residencial", () => {
+    const modelo = getModelo("contrato-locacao")!;
+    const template = modelo.template.corpo.join("\n");
 
-    const line = applyLegalTemplateRule("contrato-locacao", FIRE_INSURANCE_LINE, {
-      seguro_incendio_responsavel: "LOCADOR",
-    });
-
-    expect(line).toContain("LOCADOR");
-    expect(line).toContain("quando a contratação for exigida");
+    expect(template).not.toContain("SEGURO CONTRA INCÊNDIO");
+    expect(template).not.toContain("seguro_incendio_responsavel");
   });
 });
