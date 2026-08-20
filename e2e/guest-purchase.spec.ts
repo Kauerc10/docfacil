@@ -220,6 +220,12 @@ test.describe("Guest Purchase and Download Flow", () => {
       await fiadorCpfInput.fill("056.489.370-84");
     }
 
+    // Stage 5 — Condições adicionais: pode seguir sem selecionar cláusulas opcionais.
+    await expect(page.getByText("Condições adicionais (opcionais)")).toBeVisible({
+      timeout: 10000,
+    });
+    await page.getByRole("button", { name: /^avançar$/i }).click();
+
     // Finaliza → ?view=sucesso (SPA)
     await page.getByRole("button", { name: /finalizar/i }).click();
     await waitForSearchParams(page, { view: "sucesso" });
