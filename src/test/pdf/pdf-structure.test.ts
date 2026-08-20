@@ -113,6 +113,23 @@ function firstClauseHeading(slug: string): InspectablePdfNode {
 }
 
 describe("PDF Structure & Layout Protection", () => {
+  it("alinha as assinaturas das partes em uma mesma linha atômica", () => {
+    const locacao = getModelo("contrato-locacao")!;
+    const nodes = collectPdfNodes(buildContent(locacao, answers, [], []));
+    const signatureRow = nodes.find((node) => {
+      const columns = node.columns;
+      return (
+        Array.isArray(columns) &&
+        columns.length === 2 &&
+        JSON.stringify(columns).includes("LOCADOR(A)") &&
+        JSON.stringify(columns).includes("LOCATÁRIO(A)")
+      );
+    });
+
+    expect(signatureRow).toBeDefined();
+    expect(signatureRow!.unbreakable).toBe(true);
+  });
+
   it("mantém assinaturas atômicas sem transformar o fechamento inteiro em bloco indivisível", () => {
     const locacao = getModelo("contrato-locacao")!;
     const content = buildContent(locacao, answers, [], []);
