@@ -46,9 +46,9 @@ describe("DemoBillingProvider", () => {
     ).rejects.toThrow(BackendError);
   });
 
-  it("allows demo billing in Vercel Preview even though Next runs with NODE_ENV=production", async () => {
+  it("allows demo billing in Vercel Preview without depending on a manual flag", async () => {
     const provider = new DemoBillingProvider(ordersRepo, {
-      allowDemoBilling: true,
+      allowDemoBilling: false,
       nodeEnv: "production",
       vercelEnv: "preview",
     });
