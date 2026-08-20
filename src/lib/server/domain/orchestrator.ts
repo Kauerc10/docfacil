@@ -179,12 +179,35 @@ export async function generateDocumentArtifact(
     }
 
     const profile = await repos.users.getUserProfile(principal.userId);
-    if (profile?.plano !== "pro") {
+
+    if (profile?.plano === "pro") {
+      entitlementDecision = { entitlement: "pro", watermarked: false };
+    } else if (orderId) {
+      try {
+        const order = await repos.orders.reservePaidOrder({
+          orderId,
+          requestId,
+          principalKey,
+        });
+        entitlementDecision = resolveEntitlement({
+          principal,
+          modeloSlug,
+          orderId,
+          order,
+          userProfile: profile,
+        });
+      } catch (err: unknown) {
+        await repos.orders.releaseReservedOrder({ orderId, requestId }).catch(() => {});
+        const errorCode = err instanceof BackendError ? err.code : "GENERATION_FAILED";
+        await repos.generationRequests.markFailed(requestId, errorCode).catch(() => {});
+        throw err;
+      }
+    } else {
       await repos.generationRequests.markFailed(requestId, "PRO_REQUIRED");
       throw new BackendError(
         "PRO_REQUIRED",
         402,
-        "Apenas assinantes Pro podem editar e gerar novas versões deste documento."
+        "Ative o Pro ou compre esta nova versão como documento avulso."
       );
     }
 
@@ -192,11 +215,19 @@ export async function generateDocumentArtifact(
     try {
       targetVersion = await repos.documents.reserveNextVersion(documentId, requestId);
     } catch (err: unknown) {
+      if (
+        entitlementDecision.entitlement === "single_purchase" &&
+        entitlementDecision.orderId
+      ) {
+        await repos.orders.releaseReservedOrder({
+          orderId: entitlementDecision.orderId,
+          requestId,
+        }).catch(() => {});
+      }
       const errorCode = err instanceof BackendError ? err.code : "GENERATION_FAILED";
       await repos.generationRequests.markFailed(requestId, errorCode).catch(() => {});
       throw err;
     }
-    entitlementDecision = { entitlement: "pro", watermarked: false };
   } else {
     targetVersion = 1;
 
