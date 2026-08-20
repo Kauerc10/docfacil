@@ -14,7 +14,7 @@
  * modificar diretamente o template bruto do catálogo. Deve ser incrementada
  * sempre que uma regra abaixo mudar o conteúdo jurídico/editorial final.
  */
-export const DOCUMENT_RENDER_RULES_VERSION = "2026-08-20.1";
+export const DOCUMENT_RENDER_RULES_VERSION = "2026-08-20.2";
 
 const RESIDENTIAL_ART_46_LINE =
   "O prazo de locação é de {{prazo}} meses, com início na data da assinatura, findo o qual o contrato se extinguirá de pleno direito, independentemente de notificação ou aviso, nos termos do art. 46 da Lei nº 8.245/1991.";
@@ -26,6 +26,10 @@ const RESIDENTIAL_EXTRAORDINARY_LINE =
   "As despesas condominiais extraordinárias, assim consideradas nos termos do art. 22, § 1º, da Lei nº 8.245/1991, correrão por conta do LOCADOR.";
 const RESIDENTIAL_MAINTENANCE_LINE =
   "Incumbem ao LOCATÁRIO os reparos decorrentes do uso normal do IMÓVEL e de pequenos consertos de manutenção, enquanto os reparos estruturais e os decorrentes de desgaste natural, deterioração pelo tempo ou vício de construção são de responsabilidade do LOCADOR, nos termos dos arts. 22 e 23 da Lei nº 8.245/1991.";
+const RESIDENTIAL_FIRE_INSURANCE_HEADING =
+  "## CLÁUSULA QUINTA – DO SEGURO CONTRA INCÊNDIO";
+const RESIDENTIAL_FIRE_INSURANCE_LINE =
+  "As PARTES definem que o prêmio do seguro contra incêndio do IMÓVEL será suportado pelo {{seguro_incendio_responsavel}}, quando a contratação for exigida por lei, pela convenção condominial ou ajustada entre as PARTES.";
 const RESIDENTIAL_INSPECTION_LINE =
   "As PARTES declaram ter vistoriado o IMÓVEL previamente à assinatura deste contrato, encontrando-o em condições adequadas à finalidade a que se destina, conforme Termo de Vistoria com registro fotográfico anexo (Anexo I), que passa a integrar este instrumento para todos os fins.";
 const RESIDENTIAL_PRIVACY_LINE =
@@ -111,6 +115,22 @@ export function applyLegalTemplateRule(
 
     if (line === RESIDENTIAL_EXTRAORDINARY_LINE) {
       return "As despesas condominiais extraordinárias, incluindo a constituição do fundo de reserva, assim consideradas nos termos do art. 22, § 1º, da Lei nº 8.245/1991, correrão por conta do LOCADOR.";
+    }
+
+    const seguroIncendioResponsavel =
+      answers.seguro_incendio_responsavel?.trim().toLocaleUpperCase("pt-BR");
+    const possuiSeguroIncendioDefinido =
+      seguroIncendioResponsavel === "LOCADOR" ||
+      seguroIncendioResponsavel === "LOCATÁRIO";
+
+    if (line === RESIDENTIAL_FIRE_INSURANCE_HEADING) {
+      return possuiSeguroIncendioDefinido ? line : "";
+    }
+
+    if (line === RESIDENTIAL_FIRE_INSURANCE_LINE) {
+      return possuiSeguroIncendioDefinido
+        ? `As PARTES definem que o prêmio do seguro contra incêndio do IMÓVEL será suportado pelo ${seguroIncendioResponsavel}, quando a contratação for exigida por lei, pela convenção condominial ou ajustada entre as PARTES.`
+        : "";
     }
 
     if (line === RESIDENTIAL_MAINTENANCE_LINE) {
