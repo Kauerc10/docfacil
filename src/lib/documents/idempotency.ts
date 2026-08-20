@@ -24,6 +24,10 @@ function isReusableIntent(
   return age >= 0 && age < FINALIZATION_INTENT_TTL_MS;
 }
 
+export function shouldPreserveFinalizationRequestId(code?: string): boolean {
+  return code === "GENERATION_IN_PROGRESS";
+}
+
 export function getOrCreateFinalizationRequestId(modeloSlug: string): string {
   const key = getIntentStorageKey(modeloSlug);
 
