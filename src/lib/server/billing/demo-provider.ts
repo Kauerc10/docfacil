@@ -21,6 +21,7 @@ export interface BillingProvider {
 export interface DemoBillingConfig {
   allowDemoBilling: boolean;
   nodeEnv: string;
+  vercelEnv?: string;
 }
 
 export class DemoBillingProvider implements BillingProvider {
@@ -39,12 +40,17 @@ export class DemoBillingProvider implements BillingProvider {
       this.config = {
         allowDemoBilling: env.ALLOW_DEMO_BILLING,
         nodeEnv: env.NODE_ENV,
+        vercelEnv: env.VERCEL_ENV,
       };
     }
   }
 
   private assertAllowed(): void {
-    if (!this.config.allowDemoBilling || this.config.nodeEnv === "production") {
+    const isFinalProduction =
+      this.config.nodeEnv === "production" &&
+      this.config.vercelEnv !== "preview";
+
+    if (!this.config.allowDemoBilling || isFinalProduction) {
       throw new BackendError(
         "INVALID_REQUEST",
         400,
