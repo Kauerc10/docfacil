@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { getModelo } from "@/lib/modelos";
 import { buildDocDefinition, getPdfLayoutProfile } from "@/lib/pdf/styles";
 import { buildContent, CONTENT_WIDTH } from "@/lib/pdf/content-builder";
+import { getPdfVisualRecipe } from "@/lib/pdf/visual-recipes";
 
 const answers: Record<string, string> = {
   locador_nome: "Carlos Eduardo Souza",
@@ -264,6 +265,20 @@ describe("PDF Structure & Layout Protection", () => {
     );
 
     expect(propria.margin![3]).toBeGreaterThan(terceiro.margin![3]);
+  });
+
+
+  it("atribui variantes editoriais reutilizáveis à família de contratos", () => {
+    expect(getPdfVisualRecipe(getModelo("contrato-locacao")!).contractVariant).toBe(
+      "standard"
+    );
+    expect(getPdfVisualRecipe(getModelo("contrato-locacao-comercial")!).contractVariant).toBe(
+      "dense"
+    );
+    expect(getPdfVisualRecipe(getModelo("contrato-compra-venda-imovel")!).contractVariant).toBe(
+      "property"
+    );
+    expect(getPdfVisualRecipe(getModelo("compra-venda")!).contractVariant).toBe("formal");
   });
 
   it("compacta o ritmo de cláusulas da locação comercial sem afetar a residencial", () => {
