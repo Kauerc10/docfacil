@@ -2,6 +2,7 @@ import { apiFetch } from "@/lib/auth/api-fetch";
 import {
   getOrCreateFinalizationRequestId,
   clearFinalizationRequestId,
+  clearFinalizationRequestIdByRequestId,
   shouldPreserveFinalizationRequestId,
 } from "./idempotency";
 export { getOrCreateFinalizationRequestId, clearFinalizationRequestId };
@@ -152,7 +153,6 @@ export async function createDocumentVersion(
   documentId: string,
   input: {
     requestId?: string;
-    modeloSlug: string;
     respostas: Record<string, string>;
     clausulasSelecionadas?: string[];
     orderId?: string;
@@ -160,7 +160,7 @@ export async function createDocumentVersion(
 ): Promise<{
   document: { id: string; version: number; artifactState: string };
 }> {
-  const requestId = input.requestId || getOrCreateFinalizationRequestId(input.modeloSlug);
+  const requestId = input.requestId || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "req_" + Date.now());
   const res = await apiFetch(`/api/documents/${documentId}/versions`, {
     method: "POST",
     headers: JSON_HEADERS,
@@ -175,7 +175,7 @@ export async function createDocumentVersion(
     const err = await res.json().catch(() => ({}));
     const code = typeof err.error?.code === "string" ? err.error.code : undefined;
     if (!shouldPreserveFinalizationRequestId(code)) {
-      clearFinalizationRequestId(input.modeloSlug);
+      clearFinalizationRequestIdByRequestId(requestId);
     }
     const error = new Error(err.error?.message || "Falha ao criar nova versão do documento.") as Error & { code?: string; status?: number };
     error.code = code;
