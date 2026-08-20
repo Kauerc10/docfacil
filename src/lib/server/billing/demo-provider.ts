@@ -46,11 +46,13 @@ export class DemoBillingProvider implements BillingProvider {
   }
 
   private assertAllowed(): void {
+    const isPreview = this.config.vercelEnv === "preview";
     const isFinalProduction =
-      this.config.nodeEnv === "production" &&
-      this.config.vercelEnv !== "preview";
+      this.config.nodeEnv === "production" && !isPreview;
+    const isDemoAllowed =
+      isPreview || (!isFinalProduction && this.config.allowDemoBilling);
 
-    if (!this.config.allowDemoBilling || isFinalProduction) {
+    if (!isDemoAllowed) {
       throw new BackendError(
         "INVALID_REQUEST",
         400,
