@@ -14,7 +14,7 @@
  * modificar diretamente o template bruto do catálogo. Deve ser incrementada
  * sempre que uma regra abaixo mudar o conteúdo jurídico/editorial final.
  */
-export const DOCUMENT_RENDER_RULES_VERSION = "2026-08-20.4";
+export const DOCUMENT_RENDER_RULES_VERSION = "2026-08-20.5";
 
 const RESIDENTIAL_ART_46_LINE =
   "O prazo de locação é de {{prazo}} meses, com início na data da assinatura, findo o qual o contrato se extinguirá de pleno direito, independentemente de notificação ou aviso, nos termos do art. 46 da Lei nº 8.245/1991.";
@@ -32,6 +32,14 @@ const RESIDENTIAL_INSPECTION_LINE =
   "As PARTES declaram ter vistoriado o IMÓVEL previamente à assinatura deste contrato, encontrando-o em condições adequadas à finalidade a que se destina, conforme Termo de Vistoria com registro fotográfico anexo (Anexo I), que passa a integrar este instrumento para todos os fins.";
 const RESIDENTIAL_PRIVACY_LINE =
   "As PARTES declaram estar cientes de que os dados pessoais constantes deste instrumento serão tratados exclusivamente para as finalidades relacionadas à execução, fiscalização e eventual cobrança decorrente deste contrato, em conformidade com a Lei nº 13.709/2018 (Lei Geral de Proteção de Dados Pessoais), sendo vedado o uso para finalidade diversa sem consentimento específico.";
+const RESIDENTIAL_PRIVACY_HEADING =
+  "## CLÁUSULA DÉCIMA SEGUNDA – DA PROTEÇÃO DE DADOS PESSOAIS";
+const RESIDENTIAL_COMMUNICATIONS_HEADING =
+  "## CLÁUSULA DÉCIMA TERCEIRA – DAS COMUNICAÇÕES ENTRE AS PARTES";
+const RESIDENTIAL_GENERAL_HEADING =
+  "## CLÁUSULA DÉCIMA QUARTA – DAS DISPOSIÇÕES GERAIS";
+const RESIDENTIAL_FORUM_HEADING =
+  "## CLÁUSULA DÉCIMA QUINTA – DO FORO";
 const COMMERCIAL_CHARGES_LINE =
   "Correrão por conta exclusiva do LOCATÁRIO, durante toda a vigência da locação: a) despesas de consumo (água, esgoto, energia elétrica, gás, internet e telefonia); b) despesas condominiais ordinárias e extraordinárias, quando o imóvel integrar condomínio comercial; c) o IPTU, taxas municipais, e eventual Imposto sobre Serviços (ISS) incidente sobre a própria atividade explorada; d) prêmios de seguro contra incêndio e demais riscos exigidos por lei ou pela administração do imóvel/condomínio.";
 
@@ -129,6 +137,24 @@ export function applyLegalTemplateRule(
       return possuiVistoriaAnexa
         ? "As PARTES declaram ter vistoriado o IMÓVEL previamente à assinatura deste contrato. O Termo de Vistoria e o registro fotográfico informados pelas PARTES integram este instrumento como Anexo I."
         : "";
+    }
+
+    if (!possuiVistoriaAnexa) {
+      if (line === RESIDENTIAL_PRIVACY_HEADING) {
+        return "## CLÁUSULA DÉCIMA PRIMEIRA – DA PROTEÇÃO DE DADOS PESSOAIS";
+      }
+
+      if (line === RESIDENTIAL_COMMUNICATIONS_HEADING) {
+        return "## CLÁUSULA DÉCIMA SEGUNDA – DAS COMUNICAÇÕES ENTRE AS PARTES";
+      }
+
+      if (line === RESIDENTIAL_GENERAL_HEADING) {
+        return "## CLÁUSULA DÉCIMA TERCEIRA – DAS DISPOSIÇÕES GERAIS";
+      }
+
+      if (line === RESIDENTIAL_FORUM_HEADING) {
+        return "## CLÁUSULA DÉCIMA QUARTA – DO FORO";
+      }
     }
 
     if (line === RESIDENTIAL_PRIVACY_LINE) {

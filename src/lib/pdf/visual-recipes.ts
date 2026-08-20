@@ -41,6 +41,12 @@ export interface PdfVisualRecipe {
   dateBottomMargin: number;
   clauseHeadingTopMargin: number;
   clauseHeadingBottomMargin: number;
+  /** Tom principal do corpo; declarações preservam seu azul atual. */
+  bodyColor?: string;
+  /** Cabeçalho editorial; o padrão mantém o comportamento histórico. */
+  headerStyle?: "standard" | "formal";
+  /** Alguns documentos formais usam somente o filete do cabeçalho. */
+  showTitleDivider?: boolean;
 }
 
 const DEFAULT_CONTRACT_RECIPE: PdfVisualRecipe = {
@@ -84,9 +90,27 @@ const CONTRACT_DENSE_RECIPE: PdfVisualRecipe = {
 };
 
 const CONTRACT_FORMAL_RECIPE: PdfVisualRecipe = {
-  ...CONTRACT_DENSE_RECIPE,
+  ...DEFAULT_CONTRACT_RECIPE,
   contractVariant: "formal",
-  bodyLineHeight: 1.57,
+  density: "dense",
+  pageMarginsCm: [2.35, 2.25, 2.35, 2.15],
+  footerHorizontalInsetCm: 2.35,
+  bodyFontSize: 10.5,
+  bodyLineHeight: 1.26,
+  titleFontSize: 15,
+  titleCharacterSpacing: 0.2,
+  titleBottomMargin: 3,
+  dividerBottomMargin: 8,
+  paragraphBottomMargin: 6,
+  firstLineIndentSpaces: 0,
+  legalQuoteIndent: 0,
+  legalQuoteLineHeight: 1.26,
+  clauseHeadingTopMargin: 10,
+  clauseHeadingBottomMargin: 4,
+  closingTopMargin: 12,
+  bodyColor: "#181818",
+  headerStyle: "formal",
+  showTitleDivider: false,
 };
 
 const CONTRACT_PROPERTY_RECIPE: PdfVisualRecipe = {
@@ -161,10 +185,7 @@ export const PDF_VISUAL_RECIPES: Record<string, PdfVisualRecipe> = {
     clauseHeadingBottomMargin: 5,
   },
   "contrato-locacao": {
-    ...DEFAULT_CONTRACT_RECIPE,
-    bodyLineHeight: 1.62,
-    clauseHeadingTopMargin: 14,
-    clauseHeadingBottomMargin: 6,
+    ...CONTRACT_FORMAL_RECIPE,
   },
   "contrato-locacao-comercial": CONTRACT_DENSE_RECIPE,
   "contrato-compra-venda-imovel": CONTRACT_PROPERTY_RECIPE,

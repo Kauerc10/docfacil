@@ -341,7 +341,7 @@ export function renderLineNode(
       };
     }
 
-    if (isLegalQuote(classified.texto)) {
+    if (recipe.profile !== "contract" && isLegalQuote(classified.texto)) {
       return {
         element: {
           text: textRuns(classified.texto, { italics: true }),

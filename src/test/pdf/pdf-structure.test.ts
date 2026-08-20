@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { getModelo } from "@/lib/modelos";
 import { buildDocDefinition, getPdfLayoutProfile } from "@/lib/pdf/styles";
-import { buildContent, CONTENT_WIDTH } from "@/lib/pdf/content-builder";
+import { buildContent, CONTENT_WIDTH, renderLineNode } from "@/lib/pdf/content-builder";
 import { getPdfVisualRecipe } from "@/lib/pdf/visual-recipes";
 
 const answers: Record<string, string> = {
@@ -214,7 +214,7 @@ describe("PDF Structure & Layout Protection", () => {
     );
   });
 
-  it("usa composição mais densa na locação comercial do que na residencial", () => {
+  it("usa composição formal mais compacta na locação residencial", () => {
     const residencial = getModelo("contrato-locacao")!;
     const comercial = getModelo("contrato-locacao-comercial")!;
 
@@ -225,7 +225,7 @@ describe("PDF Structure & Layout Protection", () => {
       styles: { body: { lineHeight: number } };
     };
 
-    expect(residencialDdo.styles.body.lineHeight).toBeGreaterThan(
+    expect(residencialDdo.styles.body.lineHeight).toBeLessThan(
       comercialDdo.styles.body.lineHeight
     );
   });
@@ -287,7 +287,7 @@ describe("PDF Structure & Layout Protection", () => {
 
   it("atribui variantes editoriais reutilizáveis à família de contratos", () => {
     expect(getPdfVisualRecipe(getModelo("contrato-locacao")!).contractVariant).toBe(
-      "standard"
+      "formal"
     );
     expect(getPdfVisualRecipe(getModelo("contrato-locacao-comercial")!).contractVariant).toBe(
       "dense"
@@ -302,7 +302,38 @@ describe("PDF Structure & Layout Protection", () => {
     const residencial = firstClauseHeading("contrato-locacao");
     const comercial = firstClauseHeading("contrato-locacao-comercial");
 
-    expect(residencial.margin![1]).toBeGreaterThan(comercial.margin![1]);
-    expect(residencial.margin![3]).toBeGreaterThan(comercial.margin![3]);
+    expect(residencial.margin![1]).toBeLessThan(comercial.margin![1]);
+    expect(residencial.margin![3]).toBeLessThanOrEqual(comercial.margin![3]);
+  });
+
+  it("aplica o preset formal compacto à locação residencial", () => {
+    const residencial = getPdfVisualRecipe(getModelo("contrato-locacao")!);
+
+    expect(residencial.pageMarginsCm[0]).toBeLessThan(3);
+    expect(residencial.firstLineIndentSpaces).toBe(0);
+    expect(residencial.bodyFontSize).toBeLessThan(11);
+    expect(residencial.bodyLineHeight).toBeLessThan(1.4);
+  });
+
+  it("usa o cabeçalho editorial do contrato já na primeira página", () => {
+    const locacao = getModelo("contrato-locacao")!;
+    const ddo = buildDocDefinition(locacao, answers) as {
+      header?: (currentPage: number) => unknown;
+    };
+
+    expect(ddo.header?.(1)).toBeDefined();
+    expect(JSON.stringify(ddo.header?.(1))).toContain("Documentos jurídicos simplificados");
+  });
+
+  it("mantém cláusula com referência legal como corpo normal", () => {
+    const recipe = getPdfVisualRecipe(getModelo("contrato-locacao")!);
+    const rendered = renderLineNode(
+      "A locação observará o art. 47 da Lei nº 8.245/1991.",
+      [],
+      0,
+      recipe
+    );
+
+    expect(rendered?.element).toMatchObject({ style: "body", alignment: "justify" });
   });
 });

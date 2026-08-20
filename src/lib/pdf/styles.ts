@@ -91,6 +91,18 @@ export function buildDocDefinition(
   const dividerX2 = dividerX1 + dividerWidth;
   const footerHorizontalInset = cm(recipe.footerHorizontalInsetCm);
   const footerWidth = cm(21) - 2 * footerHorizontalInset;
+  const isFormalContract = recipe.profile === "contract" && recipe.headerStyle === "formal";
+  const headingColor = "#14315c";
+  const bodyColor = recipe.bodyColor ?? "#0e2340";
+  const titleDivider = {
+    canvas: [
+      {
+        type: "line" as const, x1: dividerX1, y1: 0, x2: dividerX2, y2: 0,
+        lineWidth: 1.2, lineColor: headingColor,
+      },
+    ],
+    margin: [0, 0, 0, recipe.dividerBottomMargin] as [number, number, number, number],
+  };
 
   return {
     pageSize: "A4" as const,
@@ -99,7 +111,7 @@ export function buildDocDefinition(
       font: "Roboto",
       fontSize: recipe.bodyFontSize,
       lineHeight: recipe.bodyLineHeight,
-      color: "#0e2340",
+      color: bodyColor,
     },
     background: options?.watermark
       ? () => {
@@ -127,6 +139,40 @@ export function buildDocDefinition(
         }
       : undefined,
     header: (currentPage: number) => {
+      if (isFormalContract) {
+        return {
+          margin: [pageMargins[0], cm(0.65), pageMargins[2], 0] as [number, number, number, number],
+          stack: [
+            {
+              columns: [
+                {
+                  text: [
+                    { text: "DocFácil", color: headingColor, bold: true },
+                    { text: "  |", color: "#8993a4" },
+                  ],
+                  style: "headerContinuation",
+                },
+                {
+                  text: "Documentos jurídicos simplificados",
+                  color: "#64748b",
+                  style: "headerContinuation",
+                  alignment: "right" as const,
+                },
+              ],
+            },
+            {
+              canvas: [
+                {
+                  type: "line" as const, x1: 0, y1: 5, x2: CONTENT_WIDTH, y2: 5,
+                  lineWidth: 0.7, lineColor: "#b9853d",
+                },
+              ],
+              margin: [0, 2, 0, 0] as [number, number, number, number],
+            },
+          ],
+        };
+      }
+
       if (currentPage > 1) {
         return {
           margin: [pageMargins[0], cm(1.2), pageMargins[2], 0] as [number, number, number, number],
@@ -160,15 +206,7 @@ export function buildDocDefinition(
         alignment: "center" as const,
         margin: [0, 0, 0, recipe.titleBottomMargin] as [number, number, number, number],
       },
-      {
-        canvas: [
-          {
-            type: "line" as const, x1: dividerX1, y1: 0, x2: dividerX2, y2: 0,
-            lineWidth: 1.2, lineColor: "#14315c",
-          },
-        ],
-        margin: [0, 0, 0, recipe.dividerBottomMargin] as [number, number, number, number],
-      },
+      ...(recipe.showTitleDivider === false ? [] : [titleDivider]),
       ...contentNodes,
     ],
     pageBreakBefore: (
@@ -209,17 +247,17 @@ export function buildDocDefinition(
         font: "Roboto",
         fontSize: recipe.titleFontSize,
         bold: true,
-        color: "#14315c",
+        color: headingColor,
         characterSpacing: recipe.titleCharacterSpacing,
       },
-      sectionHeading: { font: "Roboto", fontSize: 13.5, bold: true, color: "#14315c", characterSpacing: 0.5 },
-      clauseHeading: { font: "Roboto", fontSize: 12, bold: true, color: "#14315c" },
-      body: { font: "Roboto", fontSize: recipe.bodyFontSize, color: "#0e2340", lineHeight: recipe.bodyLineHeight },
-      label: { font: "Roboto", fontSize: 12, bold: true, color: "#0e2340" },
+      sectionHeading: { font: "Roboto", fontSize: 13.5, bold: true, color: headingColor, characterSpacing: 0.5 },
+      clauseHeading: { font: "Roboto", fontSize: isFormalContract ? 10.75 : 12, bold: true, color: headingColor },
+      body: { font: "Roboto", fontSize: recipe.bodyFontSize, color: bodyColor, lineHeight: recipe.bodyLineHeight },
+      label: { font: "Roboto", fontSize: isFormalContract ? 10.5 : 12, bold: true, color: bodyColor },
       signature: {
         font: "Roboto",
         fontSize: 12,
-        color: "#0e2340",
+        color: bodyColor,
         lineHeight: recipe.signatureLineHeight,
         characterSpacing: recipe.signatureCharacterSpacing,
       },
