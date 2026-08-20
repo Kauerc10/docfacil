@@ -262,6 +262,20 @@ describe("Contrato de Locação Residencial — estrutura de referência", () =>
     seguro_incendio_responsavel: "LOCADOR",
   };
 
+  it("não exige vistoria quando não há anexo a declarar", () => {
+    const etapaValores = modelo.etapas.find(
+      (etapa) =>
+        etapa.tipo === "campo_grupo" &&
+        etapa.campos.some((campo) => campo.key === "vistoria_anexa")
+    );
+
+    expect(etapaValores).toBeDefined();
+    if (!etapaValores || etapaValores.tipo !== "campo_grupo") return;
+
+    const vistoria = etapaValores.campos.find((campo) => campo.key === "vistoria_anexa");
+    expect(vistoria?.obrigatorio).toBe(false);
+  });
+
   it("gera a estrutura contratual de referência sem afirmar anexos não fornecidos", () => {
     const document = fillDocument({
       titulo: modelo.template.titulo,
