@@ -263,7 +263,7 @@ describe("Contrato de Locação Residencial — estrutura de referência", () =>
   };
 
   it("não exige vistoria quando não há anexo a declarar", () => {
-    const etapaValores = modelo.etapas.find(
+    const etapaValores = (modelo.etapas ?? []).find(
       (etapa) =>
         etapa.tipo === "campo_grupo" &&
         etapa.campos.some((campo) => campo.key === "vistoria_anexa")
