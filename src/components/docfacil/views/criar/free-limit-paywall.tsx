@@ -27,10 +27,10 @@ function getCopy(reason: AccessPaywallReason, documentName: string) {
   }
   if (reason === "pro_required") {
     return {
-      eyebrow: "Recurso do Plano Pro",
-      title: "Editar e gerar uma nova versão de documento salvo é um recurso Pro.",
+      eyebrow: "Escolha como liberar esta nova versão",
+      title: "Suas alterações estão prontas para gerar uma nova versão.",
       description:
-        "Suas alterações continuam preenchidas. Você pode ativar o Pro, salvar como rascunho ou continuar revisando antes de decidir.",
+        "Você pode ativar o Pro para editar documentos à vontade ou pagar apenas por esta nova versão como documento avulso. Seu preenchimento continua salvo.",
     };
   }
   return {
@@ -50,7 +50,6 @@ export function FreeLimitPaywall({
   onContinueEditing,
 }: FreeLimitPaywallProps) {
   const copy = getCopy(reason, documentName);
-  const allowSingle = reason !== "pro_required";
 
   return (
     <div
@@ -99,7 +98,7 @@ export function FreeLimitPaywall({
           </div>
         </div>
 
-        <div className={`grid gap-4 p-6 sm:p-8 ${allowSingle ? "sm:grid-cols-2" : "max-w-xl mx-auto"}`}>
+        <div className="grid gap-4 p-6 sm:grid-cols-2 sm:p-8">
           <article className="relative rounded-2xl border-2 border-[var(--blue-royal)] bg-[var(--blue-soft)]/35 p-5">
             <span className="absolute right-4 top-4 rounded-full bg-[var(--blue-royal)] px-2.5 py-1 text-[0.7rem] font-bold uppercase tracking-wide text-white">
               Mais liberdade
@@ -113,50 +112,52 @@ export function FreeLimitPaywall({
             <button
               type="button"
               onClick={onChoosePro}
-              className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--blue-royal)] px-4 font-bold text-white transition-all hover:bg-[#1e44a8] active:scale-[0.99]"
+              className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[var(--blue-royal)] px-4 py-2.5 font-bold text-white transition-all hover:bg-[#1e44a8] active:scale-[0.99]"
             >
               Assinar Pro
             </button>
           </article>
 
-          {allowSingle && (
-            <article className="rounded-2xl border border-[var(--border)] bg-[var(--paper)]/55 p-5">
-              <p className="text-sm font-bold text-ink/55">Documento avulso</p>
-              <h3 className="mt-5 text-xl font-bold text-ink">Só preciso deste agora</h3>
-              <p className="mt-2 text-sm leading-relaxed text-ink/60">
-                Libere este documento sem mudar seu plano mensal e sem assinatura recorrente.
-              </p>
-              <p className="mt-5 text-lg font-extrabold text-ink">{PLAN_BILLING_DESC.avulso}</p>
-              <button
-                type="button"
-                onClick={onChooseSingle}
-                className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-xl border border-[var(--blue-royal)]/35 bg-surface px-4 font-bold text-[var(--blue-royal)] transition-colors hover:bg-[var(--blue-soft)]"
-              >
-                Comprar documento avulso
-              </button>
-            </article>
-          )}
+          <article className="rounded-2xl border border-[var(--border)] bg-[var(--paper)]/55 p-5">
+            <p className="text-sm font-bold text-ink/55">Documento avulso</p>
+            <h3 className="mt-5 text-xl font-bold text-ink">
+              {reason === "pro_required" ? "Só preciso desta nova versão" : "Só preciso deste agora"}
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-ink/60">
+              {reason === "pro_required"
+                ? "Pague apenas por esta nova versão, sem mudar seu plano e sem assinatura recorrente."
+                : "Libere este documento sem mudar seu plano mensal e sem assinatura recorrente."}
+            </p>
+            <p className="mt-5 text-lg font-extrabold text-ink">{PLAN_BILLING_DESC.avulso}</p>
+            <button
+              type="button"
+              onClick={onChooseSingle}
+              className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-[var(--blue-royal)]/35 bg-surface px-4 py-2.5 font-bold text-[var(--blue-royal)] transition-colors hover:bg-[var(--blue-soft)]"
+            >
+              Comprar documento avulso
+            </button>
+          </article>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-[var(--border)] bg-[var(--paper)]/45 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <div>
+        <div className="grid gap-4 border-t border-[var(--border)] bg-[var(--paper)]/45 px-6 py-5 sm:px-8 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-ink">Quer decidir depois?</p>
-            <p className="mt-0.5 text-xs text-ink/55">
+            <p className="mt-0.5 text-xs leading-relaxed text-ink/55">
               Salve o preenchimento na sua conta e retome em Meus Documentos.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:justify-end">
             <button
               type="button"
               onClick={onContinueEditing}
-              className="h-10 rounded-xl px-4 text-sm font-semibold text-ink/65 transition-colors hover:bg-surface hover:text-ink"
+              className="min-h-11 h-auto whitespace-nowrap rounded-xl px-5 py-2.5 text-sm font-semibold text-ink/65 transition-colors hover:bg-surface hover:text-ink"
             >
               Continuar editando
             </button>
             <button
               type="button"
               onClick={onSaveDraft}
-              className="h-10 rounded-xl border border-[var(--border)] bg-surface px-4 text-sm font-bold text-ink transition-colors hover:bg-[var(--blue-soft)]"
+              className="min-h-11 h-auto whitespace-nowrap rounded-xl border border-[var(--border)] bg-surface px-5 py-2.5 text-sm font-bold text-ink transition-colors hover:bg-[var(--blue-soft)]"
             >
               Salvar como rascunho
             </button>
