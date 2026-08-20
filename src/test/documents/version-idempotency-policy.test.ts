@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
+  clearFinalizationRequestId,
+  clearFinalizationRequestIdByRequestId,
+  getOrCreateFinalizationRequestId,
   shouldPreserveFinalizationRequestId,
 } from "@/lib/documents/idempotency";
 
@@ -14,11 +17,22 @@ describe("version finalization idempotency policy", () => {
     expect(shouldPreserveFinalizationRequestId(undefined)).toBe(false);
   });
 
-  it("aplica a rotação também ao fluxo de nova versão", async () => {
+  it("descarta uma intenção terminal pelo próprio requestId", () => {
+    const slug = "declaracao-residencia-terceiro";
+    clearFinalizationRequestId(slug);
+
+    const failedRequestId = getOrCreateFinalizationRequestId(slug);
+    clearFinalizationRequestIdByRequestId(failedRequestId);
+    const freshRequestId = getOrCreateFinalizationRequestId(slug);
+
+    expect(freshRequestId).not.toBe(failedRequestId);
+    clearFinalizationRequestId(slug);
+  });
+
+  it("aplica a rotação também ao client de nova versão", async () => {
     const source = await Bun.file(CLIENT_PATH).text();
 
-    expect(source).toContain("modeloSlug: string");
     expect(source).toContain("shouldPreserveFinalizationRequestId(code)");
-    expect(source).toContain("clearFinalizationRequestId(input.modeloSlug)");
+    expect(source).toContain("clearFinalizationRequestIdByRequestId(requestId)");
   });
 });
