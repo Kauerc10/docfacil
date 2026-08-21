@@ -17,12 +17,16 @@ import { getDocument } from "@/lib/services/documents-service";
 import {
   finalizeDocument,
   loadGuestDraft,
+  saveGuestDraft,
   clearGuestDraft,
   clearFinalizationRequestId,
+  getOrCreateFinalizationRequestId,
   getDocumentApi,
   getDocumentDownloadUrl,
   shareDocument,
 } from "@/lib/documents/client";
+import { shouldPreserveFinalizationRequestId } from "@/lib/documents/idempotency";
+import { shouldStartPaidOrderFinalization } from "@/lib/documents/paid-order-finalization";
 import { buildGuestFinalizationAnswers } from "@/lib/documents/guest-draft";
 import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf/generator";
 import { logger } from "@/lib/logger";
@@ -33,6 +37,12 @@ import { PageShell, PageHeader } from "./page-shell";
 
 gsap.registerPlugin(useGSAP);
 
+function getFinalizationErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== "object" || !("code" in error)) return undefined;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
+
 export function SucessoView() {
   const { params, navigate } = useNav();
   const slug = params.slug ?? "";
@@ -40,6 +50,7 @@ export function SucessoView() {
   const { user } = useAuth();
 
   const root = useRef<HTMLDivElement | null>(null);
+  const attemptedPaidOrderId = useRef<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [showConfetti, setShowConfetti] = useState(true);
@@ -56,47 +67,71 @@ export function SucessoView() {
 
   useEffect(() => {
     async function processPaidOrder() {
-      if (orderId && slug && !finalizingPaidOrder) {
-        const draft = loadGuestDraft(slug);
-        if (!draft) return;
+      if (
+        !shouldStartPaidOrderFinalization({
+          orderId,
+          slug,
+          attemptedOrderId: attemptedPaidOrderId.current,
+        })
+      ) {
+        return;
+      }
 
-        setFinalizingPaidOrder(true);
-        try {
-          const result = await finalizeDocument({
-            requestId: draft.requestId,
-            modeloSlug: draft.modeloSlug || slug,
-            respostas: buildGuestFinalizationAnswers(draft),
-            clausulasSelecionadas: draft.clausulasSelecionadas,
-            guestContact: user ? undefined : draft.guestContact,
-            orderId,
-          });
+      const draft = loadGuestDraft(slug);
+      if (!draft || !orderId) return;
 
-          clearGuestDraft(slug);
-          clearFinalizationRequestId(slug);
+      attemptedPaidOrderId.current = orderId;
+      setFinalizingPaidOrder(true);
 
-          if (user) {
-            setFinalizingPaidOrder(false);
-            navigate("sucesso", { slug, id: result.document.id });
-            return;
-          }
+      try {
+        const result = await finalizeDocument({
+          requestId: draft.requestId,
+          modeloSlug: draft.modeloSlug || slug,
+          respostas: buildGuestFinalizationAnswers(draft),
+          clausulasSelecionadas: draft.clausulasSelecionadas,
+          guestContact: user ? undefined : draft.guestContact,
+          orderId,
+        });
 
-          if (!result.document?.guestAccessPath) {
-            throw new Error("Magic link guest ausente após finalização.");
-          }
+        clearGuestDraft(slug);
+        clearFinalizationRequestId(slug);
 
-          if (typeof window !== "undefined") {
-            window.location.assign(result.document.guestAccessPath);
-          }
-        } catch (err) {
-          logger.error("SucessoView", "falha na finalizacao do pedido pago", err);
-          toast.error("Ocorreu uma instabilidade ao gerar seu documento pago. Tente novamente.");
+        if (user) {
           setFinalizingPaidOrder(false);
+          navigate("sucesso", { slug, id: result.document.id });
+          return;
         }
+
+        if (!result.document?.guestAccessPath) {
+          throw new Error("Magic link guest ausente após finalização.");
+        }
+
+        if (typeof window !== "undefined") {
+          window.location.assign(result.document.guestAccessPath);
+        }
+      } catch (err) {
+        const errorCode = getFinalizationErrorCode(err);
+
+        if (
+          !user &&
+          errorCode &&
+          !shouldPreserveFinalizationRequestId(errorCode)
+        ) {
+          const nextRequestId = getOrCreateFinalizationRequestId(slug);
+          saveGuestDraft(slug, {
+            ...draft,
+            requestId: nextRequestId,
+          });
+        }
+
+        logger.error("SucessoView", "falha na finalizacao do pedido pago", err);
+        toast.error("Ocorreu uma instabilidade ao gerar seu documento pago. Tente novamente.");
+        setFinalizingPaidOrder(false);
       }
     }
 
-    processPaidOrder();
-  }, [user, orderId, slug, finalizingPaidOrder, navigate]);
+    void processPaidOrder();
+  }, [user, orderId, slug, navigate]);
 
   const load = useCallback(async () => {
     setLoading(true);
