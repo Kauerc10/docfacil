@@ -29,7 +29,7 @@ describe("Order Double Spending and Concurrent Conflict Tests", () => {
 
   const validAnswers = {
     declarante_nome: "Carlos Eduardo",
-    declarante_cpf: "123.456.789-00",
+    declarante_cpf: "111.444.777-35",
     declarante_nacionalidade: "Brasileiro",
     declarante_estado_civil: "Solteiro",
     declarante_profissao: "Engenheiro",

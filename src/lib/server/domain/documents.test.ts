@@ -23,7 +23,7 @@ describe("documentDraftInputSchema", () => {
       modeloSlug: "declaracao-residencia",
       respostas: {
         declarante_nome: "Maria Silva",
-        declarante_cpf: "123.456.789-00",
+        declarante_cpf: "111.444.777-35",
       },
       clausulasSelecionadas: ["garantia"],
       guestContact: {
@@ -78,7 +78,7 @@ describe("reconstructAndValidateResponses", () => {
   it("validates required fields and reconstructs clean responses", () => {
     const rawRespostas = {
       declarante_nome: "  Carlos Souza  ",
-      declarante_cpf: "123.456.789-00",
+      declarante_cpf: "111.444.777-35",
       declarante_nacionalidade: "Brasileiro",
       declarante_estado_civil: "Solteiro",
       declarante_profissao: "Desenvolvedor",
@@ -108,7 +108,7 @@ describe("reconstructAndValidateResponses", () => {
       modelo,
       {
         declarante_nome: "Carlos Souza",
-        declarante_cpf: "123.456.789-00",
+        declarante_cpf: "111.444.777-35",
         declarante_nacionalidade: "Brasileiro",
         declarante_estado_civil: "di",
         declarante_profissao: "Desenvolvedor",
@@ -203,7 +203,7 @@ describe("reconstructAndValidateResponses", () => {
     vendedor_nacionalidade: "Brasileira",
     vendedor_estado_civil: "Solteira",
     vendedor_profissao: "Arquiteta",
-    vendedor_cpf: "111.222.333-44",
+    vendedor_cpf: "111.444.777-35",
     vendedor_cep: "89010-000",
     vendedor_rua: "Rua das Flores",
     vendedor_numero: "100",
@@ -214,7 +214,7 @@ describe("reconstructAndValidateResponses", () => {
     comprador_nacionalidade: "Brasileiro",
     comprador_estado_civil: "Solteiro",
     comprador_profissao: "Professor",
-    comprador_cpf: "555.666.777-88",
+    comprador_cpf: "529.982.247-25",
     comprador_cep: "01310-100",
     comprador_rua: "Avenida Paulista",
     comprador_numero: "1000",

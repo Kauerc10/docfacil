@@ -37,7 +37,7 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
 
   const validGuestAnswers = {
     declarante_nome: "Maria Silva",
-    declarante_cpf: "123.456.789-00",
+    declarante_cpf: "111.444.777-35",
     declarante_nacionalidade: "Brasileira",
     declarante_estado_civil: "Solteira",
     declarante_profissao: "Autônoma",

@@ -28,7 +28,7 @@ describe("Idempotency and Concurrency of Generation Requests", () => {
 
   const validAnswers = {
     declarante_nome: "Ana Beatriz",
-    declarante_cpf: "123.456.789-00",
+    declarante_cpf: "111.444.777-35",
     declarante_nacionalidade: "Brasileira",
     declarante_estado_civil: "Solteira",
     declarante_profissao: "Arquiteta",
@@ -63,7 +63,6 @@ describe("Idempotency and Concurrency of Generation Requests", () => {
       storage,
     };
 
-    // First request
     const res1 = await generateDocumentArtifact({
       requestId,
       principal: { type: "user", userId, email: userEmail },
@@ -73,7 +72,6 @@ describe("Idempotency and Concurrency of Generation Requests", () => {
       deps,
     });
 
-    // Replay with identical requestId
     const res2 = await generateDocumentArtifact({
       requestId,
       principal: { type: "user", userId, email: userEmail },
@@ -86,7 +84,6 @@ describe("Idempotency and Concurrency of Generation Requests", () => {
     expect(res1.documentId).toBe(res2.documentId);
     expect(res1.version).toBe(res2.version);
 
-    // Only one document should exist in the repository
     const userDocs = await docsRepo.listUserDocuments(userId);
     expect(userDocs.length).toBe(1);
   });

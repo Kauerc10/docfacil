@@ -51,7 +51,6 @@ describe("Document & Cryptographic Invariants (Property-style tests)", () => {
     const original = MODELOS.find((m) => m.slug === "contrato-locacao")!;
     const hashOriginal = calculateModelSnapshotHash(original);
 
-    // 1. Modifica o template
     const modifiedTemplate = {
       ...original,
       template: {
@@ -61,7 +60,6 @@ describe("Document & Cryptographic Invariants (Property-style tests)", () => {
     };
     expect(calculateModelSnapshotHash(modifiedTemplate)).not.toBe(hashOriginal);
 
-    // 2. Modifica uma cláusula interna nas etapas
     const modifiedClause = {
       ...original,
       etapas: (original.etapas ?? []).map((e) =>
@@ -84,7 +82,7 @@ describe("Document & Cryptographic Invariants (Property-style tests)", () => {
 
     const validAnswers: Record<string, string> = {
       declarante_nome: "Maria Teste",
-      declarante_cpf: "123.456.789-00",
+      declarante_cpf: "111.444.777-35",
       declarante_nacionalidade: "Brasileira",
       declarante_estado_civil: "Solteira",
       declarante_profissao: "Engenheira",
@@ -96,7 +94,6 @@ describe("Document & Cryptographic Invariants (Property-style tests)", () => {
       declarante_uf: "SP",
       finalidade: "Comprovante",
       cidade_data: "São Paulo, 14 de agosto de 2026",
-      // Extraneous malicious / unwanted properties
       __malicious_payload: "drop table users",
       unknown_field_xyz: "should be discarded",
     };
@@ -105,6 +102,6 @@ describe("Document & Cryptographic Invariants (Property-style tests)", () => {
     expect(sanitized.__malicious_payload).toBeUndefined();
     expect(sanitized.unknown_field_xyz).toBeUndefined();
     expect(sanitized.declarante_nome).toBe("Maria Teste");
-    expect(sanitized.declarante_cpf).toBe("123.456.789-00");
+    expect(sanitized.declarante_cpf).toBe("111.444.777-35");
   });
 });

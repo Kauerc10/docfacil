@@ -40,7 +40,7 @@ describe("End-to-End Guest Purchase & Magic Link Flow", () => {
 
   const validGuestAnswers = {
     declarante_nome: "Maria Oliveira",
-    declarante_cpf: "123.456.789-00",
+    declarante_cpf: "111.444.777-35",
     declarante_nacionalidade: "Brasileira",
     declarante_estado_civil: "Solteira",
     declarante_profissao: "Desenvolvedora",
@@ -55,7 +55,6 @@ describe("End-to-End Guest Purchase & Magic Link Flow", () => {
   };
 
   it("completes full guest purchase flow: paid order -> finalize -> permanent magic link -> download", async () => {
-    // 1. Guest creates order
     const order = await ordersRepo.createOrder({
       provider: "demo",
       product: "avulso",
@@ -67,7 +66,6 @@ describe("End-to-End Guest Purchase & Magic Link Flow", () => {
 
     const requestId = crypto.randomUUID();
 
-    // 2. Finalize document
     const finalizeReq = new Request("http://localhost:3000/api/documents/finalize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -91,7 +89,6 @@ describe("End-to-End Guest Purchase & Magic Link Flow", () => {
 
     const token = finalizeData.document.guestAccessToken;
 
-    // 3. Download via access API with permanent token
     const downloadReq = new Request("http://localhost:3000/api/access/download", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -104,7 +101,6 @@ describe("End-to-End Guest Purchase & Magic Link Flow", () => {
     expect(downloadData.downloadUrl).toBeDefined();
     expect(downloadData.filename).toBe("declaracao-residencia.pdf");
 
-    // 4. Order must be marked consumed
     const updatedOrder = await ordersRepo.getOrder(order.id!);
     expect(updatedOrder?.status).toBe("consumed");
     expect(updatedOrder?.documentId).toBe(finalizeData.document.id);
@@ -129,7 +125,6 @@ describe("End-to-End Guest Purchase & Magic Link Flow", () => {
         respostas: validGuestAnswers,
         clausulasSelecionadas: [],
         orderId: order.id,
-        // no guestContact
       }),
     });
 
