@@ -113,7 +113,6 @@ export function SucessoView() {
         const errorCode = getFinalizationErrorCode(err);
 
         if (
-          !user &&
           errorCode &&
           !shouldPreserveFinalizationRequestId(errorCode)
         ) {
