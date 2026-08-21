@@ -17,6 +17,8 @@ export interface PdfVisualRecipe {
   /** Preset reutilizável da família contract; documentos não contratuais não o definem. */
   contractVariant?: PdfContractVariant;
   pageMarginsCm: [number, number, number, number];
+  /** Recuo adicional do miolo, sem deslocar header/footer da moldura institucional. */
+  bodyHorizontalInsetCm: number;
   /** O footer vive na margem física da folha, independente da caixa do corpo. */
   footerHorizontalInsetCm: number;
   footerBottomMarginCm: number;
@@ -64,6 +66,7 @@ type PdfVisualBaseRecipe = Omit<
  */
 const DOCUMENT_FORMAL_BASE_RECIPE: PdfVisualBaseRecipe = {
   pageMarginsCm: [2, 2.3, 2, 2],
+  bodyHorizontalInsetCm: 0,
   footerHorizontalInsetCm: 2,
   footerBottomMarginCm: 0.55,
   bodyFontSize: 10.5,
@@ -97,36 +100,40 @@ const DECLARATION_AIRY_RECIPE: PdfVisualRecipe = {
   ...DOCUMENT_FORMAL_BASE_RECIPE,
   profile: "declaration",
   density: "airy",
-  bodyFontSize: 11.25,
-  bodyLineHeight: 1.55,
+  pageMarginsCm: [2, 2.6, 2, 2],
+  bodyHorizontalInsetCm: 0.4,
+  bodyFontSize: 11.75,
+  bodyLineHeight: 1.6,
   signatureLineHeight: 1.08,
-  titleBottomMargin: 8,
-  closingTopMargin: 15,
+  titleBottomMargin: 12,
+  closingTopMargin: 18,
   closingBottomMargin: 24,
-  paragraphBottomMargin: 10,
+  paragraphBottomMargin: 12,
   firstLineIndentSpaces: 8,
-  legalQuoteLineHeight: 1.45,
+  legalQuoteLineHeight: 1.5,
   dateAlignment: "center",
-  dateTopMargin: 16,
-  dateBottomMargin: 26,
+  dateTopMargin: 24,
+  dateBottomMargin: 34,
 };
 
 const DECLARATION_BALANCED_RECIPE: PdfVisualRecipe = {
   ...DOCUMENT_FORMAL_BASE_RECIPE,
   profile: "declaration",
   density: "balanced",
-  bodyFontSize: 11.1,
-  bodyLineHeight: 1.48,
+  pageMarginsCm: [2, 2.55, 2, 2],
+  bodyHorizontalInsetCm: 0.35,
+  bodyFontSize: 11.6,
+  bodyLineHeight: 1.55,
   signatureLineHeight: 1.06,
-  titleBottomMargin: 8,
-  closingTopMargin: 14,
+  titleBottomMargin: 11,
+  closingTopMargin: 17,
   closingBottomMargin: 18,
-  paragraphBottomMargin: 8,
+  paragraphBottomMargin: 10,
   firstLineIndentSpaces: 8,
-  legalQuoteLineHeight: 1.42,
+  legalQuoteLineHeight: 1.48,
   dateAlignment: "center",
-  dateTopMargin: 14,
-  dateBottomMargin: 22,
+  dateTopMargin: 22,
+  dateBottomMargin: 30,
 };
 
 /**
@@ -182,30 +189,36 @@ const INSTRUMENT_AIRY_RECIPE: PdfVisualRecipe = {
   ...DOCUMENT_FORMAL_BASE_RECIPE,
   profile: "instrument",
   density: "airy",
-  bodyFontSize: 11.25,
-  bodyLineHeight: 1.5,
+  pageMarginsCm: [2, 2.55, 2, 2],
+  bodyHorizontalInsetCm: 0.35,
+  bodyFontSize: 11.6,
+  bodyLineHeight: 1.55,
   signatureLineHeight: 1.06,
-  closingTopMargin: 20,
-  paragraphBottomMargin: 9,
-  legalQuoteLineHeight: 1.44,
+  titleBottomMargin: 10,
+  closingTopMargin: 22,
+  paragraphBottomMargin: 10,
+  legalQuoteLineHeight: 1.48,
   dateAlignment: "right",
-  dateTopMargin: 18,
-  dateBottomMargin: 16,
+  dateTopMargin: 20,
+  dateBottomMargin: 18,
 };
 
 const INSTRUMENT_BALANCED_RECIPE: PdfVisualRecipe = {
   ...DOCUMENT_FORMAL_BASE_RECIPE,
   profile: "instrument",
   density: "balanced",
-  bodyFontSize: 11.1,
-  bodyLineHeight: 1.42,
+  pageMarginsCm: [2, 2.5, 2, 2],
+  bodyHorizontalInsetCm: 0.3,
+  bodyFontSize: 11.5,
+  bodyLineHeight: 1.5,
   signatureLineHeight: 1.04,
-  closingTopMargin: 17,
-  paragraphBottomMargin: 8,
-  legalQuoteLineHeight: 1.4,
+  titleBottomMargin: 10,
+  closingTopMargin: 18,
+  paragraphBottomMargin: 9,
+  legalQuoteLineHeight: 1.44,
   dateAlignment: "right",
-  dateTopMargin: 16,
-  dateBottomMargin: 14,
+  dateTopMargin: 18,
+  dateBottomMargin: 16,
 };
 
 /**
