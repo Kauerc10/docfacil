@@ -61,6 +61,17 @@ describe("documentDraftInputSchema", () => {
 
 describe("reconstructAndValidateResponses", () => {
   const modelo = MODELOS.find((m) => m.slug === "declaracao-residencia") || MODELOS[0];
+  const modeloComEstadoCivilHistorico: Modelo = {
+    ...modelo,
+    campos: [
+      {
+        key: "estado_civil",
+        pergunta: "Estado civil",
+        tipo: "text",
+      },
+    ],
+    etapas: [],
+  };
 
   it("validates required fields and reconstructs clean responses", () => {
     const rawRespostas = {
@@ -83,6 +94,46 @@ describe("reconstructAndValidateResponses", () => {
     const cleaned = reconstructAndValidateResponses(modelo, rawRespostas, []);
     expect(cleaned.declarante_nome).toBe("Carlos Souza");
     expect((cleaned as any).unwanted_extra_key).toBeUndefined();
+  });
+
+  it("normaliza aliases de estado civil antes de sanitizar", () => {
+    const historico = reconstructAndValidateResponses(
+      modeloComEstadoCivilHistorico,
+      { estado_civil: " DI " },
+      []
+    );
+    const porParte = reconstructAndValidateResponses(
+      modelo,
+      {
+        declarante_nome: "Carlos Souza",
+        declarante_cpf: "123.456.789-00",
+        declarante_nacionalidade: "Brasileiro",
+        declarante_estado_civil: "di",
+        declarante_profissao: "Desenvolvedor",
+        declarante_cep: "01310-100",
+        declarante_rua: "Av. Paulista",
+        declarante_numero: "1000",
+        declarante_bairro: "Bela Vista",
+        declarante_cidade: "São Paulo",
+        declarante_uf: "SP",
+        finalidade: "Comprovação bancária",
+        cidade_data: "São Paulo, 14 de agosto de 2026",
+      },
+      []
+    );
+
+    expect(historico.estado_civil).toBe("divorciado(a)");
+    expect(porParte.declarante_estado_civil).toBe("divorciado(a)");
+  });
+
+  it("rejeita estado civil desconhecido", () => {
+    expect(() =>
+      reconstructAndValidateResponses(
+        modeloComEstadoCivilHistorico,
+        { estado_civil: "casadinho" },
+        []
+      )
+    ).toThrow("Estado civil inválido.");
   });
 
   it("throws BackendError(INVALID_REQUEST) when required field is missing", () => {

@@ -4,6 +4,7 @@ import { randomBytes, createHash } from "crypto";
 import type { Modelo } from "../../types";
 import { BackendError } from "../errors";
 import { aplicarComposicaoModelo } from "../../document-engine/compose";
+import { normalizeCivilStatus } from "../../document-engine/civil-status";
 import { computeCamposOpcionais } from "../../document-engine/optional-fields";
 import { hasInvalidMoradoresAutorizados } from "../../document-engine/authorized-residents";
 import { DOCUMENT_RENDER_RULES_VERSION } from "../../document-engine/legal-rules";
@@ -206,13 +207,34 @@ export function reconstructAndValidateResponses(
   rawRespostas: Record<string, string>,
   clausulasSelecionadas: string[] = []
 ): Record<string, string> {
+  const normalizedRawRespostas = Object.fromEntries(
+    Object.entries(rawRespostas).map(([key, value]) => {
+      if (key !== "estado_civil" && !key.endsWith("_estado_civil")) {
+        return [key, value];
+      }
+
+      if (value.trim() === "") return [key, value];
+
+      const normalized = normalizeCivilStatus(value);
+      if (normalized === null) {
+        throw new BackendError(
+          "INVALID_REQUEST",
+          400,
+          "Estado civil inválido."
+        );
+      }
+
+      return [key, normalized];
+    })
+  );
+
   validateDocumentSemanticInvariants(
     modelo,
-    rawRespostas,
+    normalizedRawRespostas,
     clausulasSelecionadas
   );
 
-  const composed = aplicarComposicaoModelo(rawRespostas, modelo);
+  const composed = aplicarComposicaoModelo(normalizedRawRespostas, modelo);
   const optionalSet = new Set(computeCamposOpcionais(modelo, clausulasSelecionadas));
 
   const allowedKeys = new Set<string>();

@@ -8,6 +8,7 @@
 import type { ClausulaDinamica, EtapaModelo } from "../types";
 import { type RenderContext, createRenderContext } from "./types";
 import { converterValorMoedaParaExtenso } from "./money";
+import { normalizeCivilStatus } from "./civil-status";
 
 const PLACEHOLDER = "______________________";
 
@@ -52,15 +53,8 @@ export function fillTemplate(
 
     let valor = respostas[k];
     if (valor && valor.trim()) {
-      if (k.endsWith("_estado_civil")) {
-        const v = valor.trim().toUpperCase();
-        if (v === "SO" || v === "SOLTEIRO" || v === "SOLTEIRA") valor = "solteiro(a)";
-        else if (v === "CA" || v === "CASADO" || v === "CASADA") valor = "casado(a)";
-        else if (v === "DIV" || v === "DIVORCIADO" || v === "DIVORCIADA") valor = "divorciado(a)";
-        else if (v === "VI" || v === "VIUVO" || v === "VIUVA") valor = "viúvo(a)";
-        else if (v === "UE" || v === "UNIAO ESTAVEL" || v === "UNIÃO ESTÁVEL") valor = "em união estável";
-        else if (v === "SEPARADO" || v === "SEPARADA") valor = "separado(a) judicialmente";
-        else valor = valor.toLowerCase();
+      if (k === "estado_civil" || k.endsWith("_estado_civil")) {
+        return normalizeCivilStatus(valor) ?? "";
       }
 
       // O label "(padrão)" pertence à ajuda da interface, não ao contrato.
