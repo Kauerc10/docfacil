@@ -12,9 +12,9 @@ import {
   buildContent,
   extractClausulasSelecionadas,
   computeCamposOpcionais,
+  cm,
+  CONTENT_WIDTH,
 } from "./content-builder";
-import { A4_WIDTH, cm, getPdfLayoutGeometry } from "./layout-geometry";
-import { buildContractContentForModel } from "./contract-composer";
 import {
   getPdfLayoutProfile as resolvePdfLayoutProfile,
   getPdfVisualRecipe,
@@ -80,20 +80,17 @@ export function buildDocDefinition(
   const clausulasSelecionadas = extractClausulasSelecionadas(respostas);
   const camposOpcionais = computeCamposOpcionais(modelo, clausulasSelecionadas);
   const recipe = getPdfVisualRecipe(modelo);
-  const geometry = getPdfLayoutGeometry(recipe);
-  const { pageMargins } = geometry;
+  const pageMargins = recipe.pageMarginsCm.map(cm) as [number, number, number, number];
   const renderedTitle = applyLegalTitleRule(modelo.slug, modelo.template.titulo);
-  const contentNodes = recipe.profile === "contract"
-    ? buildContractContentForModel(modelo, respostas, clausulasSelecionadas, camposOpcionais)
-    : applyClosingRhythm(
-        buildContent(modelo, respostas, clausulasSelecionadas, camposOpcionais),
-        recipe
-      );
-  const dividerWidth = recipe.dividerWidthCm === null ? geometry.contentWidth : cm(recipe.dividerWidthCm);
-  const dividerX1 = (geometry.contentWidth - dividerWidth) / 2;
+  const contentNodes = applyClosingRhythm(
+    buildContent(modelo, respostas, clausulasSelecionadas, camposOpcionais),
+    recipe
+  );
+  const dividerWidth = recipe.dividerWidthCm === null ? CONTENT_WIDTH : cm(recipe.dividerWidthCm);
+  const dividerX1 = (CONTENT_WIDTH - dividerWidth) / 2;
   const dividerX2 = dividerX1 + dividerWidth;
   const footerHorizontalInset = cm(recipe.footerHorizontalInsetCm);
-  const footerWidth = A4_WIDTH - 2 * footerHorizontalInset;
+  const footerWidth = cm(21) - 2 * footerHorizontalInset;
   const isFormalContract = recipe.profile === "contract" && recipe.headerStyle === "formal";
   const headingColor = "#14315c";
   const bodyColor = recipe.bodyColor ?? "#0e2340";
@@ -118,7 +115,7 @@ export function buildDocDefinition(
     },
     background: options?.watermark
       ? () => {
-          const cx = geometry.contentWidth / 2;
+          const cx = CONTENT_WIDTH / 2;
           const cy = 350;
           return [
             {
@@ -166,7 +163,7 @@ export function buildDocDefinition(
             {
               canvas: [
                 {
-                  type: "line" as const, x1: 0, y1: 5, x2: geometry.frameWidth, y2: 5,
+                  type: "line" as const, x1: 0, y1: 5, x2: CONTENT_WIDTH, y2: 5,
                   lineWidth: 0.7, lineColor: "#b9853d",
                 },
               ],
@@ -191,7 +188,7 @@ export function buildDocDefinition(
             {
               canvas: [
                 {
-                  type: "line" as const, x1: 0, y1: 4, x2: geometry.contentWidth, y2: 4,
+                  type: "line" as const, x1: 0, y1: 4, x2: CONTENT_WIDTH, y2: 4,
                   lineWidth: 0.8, lineColor: "#cbd5e1",
                 },
               ],

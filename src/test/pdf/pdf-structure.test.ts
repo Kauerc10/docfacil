@@ -1,9 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { getModelo } from "@/lib/modelos";
 import { buildDocDefinition, getPdfLayoutProfile } from "@/lib/pdf/styles";
-import { buildContent, cm, CONTENT_WIDTH, renderLineNode } from "@/lib/pdf/content-builder";
+import { buildContent, CONTENT_WIDTH, renderLineNode } from "@/lib/pdf/content-builder";
 import { getPdfVisualRecipe } from "@/lib/pdf/visual-recipes";
-import { getPdfLayoutGeometry } from "@/lib/pdf/layout-geometry";
 
 const answers: Record<string, string> = {
   locador_nome: "Carlos Eduardo Souza",
@@ -131,24 +130,18 @@ describe("PDF Structure & Layout Protection", () => {
     expect(signatureRow!.unbreakable).toBe(true);
   });
 
-  it("mantém o fechamento contratual comum inteiro quando cabe em uma página", () => {
+  it("mantém assinaturas atômicas sem transformar o fechamento inteiro em bloco indivisível", () => {
     const locacao = getModelo("contrato-locacao")!;
-    const ddo = buildDocDefinition(locacao, answers) as {
-      content: Array<{
-        id?: string;
-        stack?: unknown[];
-        unbreakable?: boolean;
-      }>;
-    };
-    const closingStack = ddo.content.find((node) => node.id === "contract-closing") as {
+    const content = buildContent(locacao, answers, [], []);
+    const closingStack = content[content.length - 1] as {
       stack: unknown[];
       unbreakable?: boolean;
     };
 
     expect(closingStack).toBeDefined();
     expect(closingStack.stack).toBeDefined();
-    expect(closingStack.unbreakable).toBe(true);
-    expect(JSON.stringify(closingStack)).toContain('"dontBreakRows":true');
+    expect(closingStack.unbreakable).not.toBe(true);
+    expect(JSON.stringify(closingStack)).toContain('"unbreakable":true');
   });
 
   it("não promete validade legal na marca d'água do DocFácil", () => {
@@ -320,15 +313,6 @@ describe("PDF Structure & Layout Protection", () => {
     expect(residencial.firstLineIndentSpaces).toBe(0);
     expect(residencial.bodyFontSize).toBeLessThan(11);
     expect(residencial.bodyLineHeight).toBeLessThan(1.4);
-  });
-
-  it("deriva a largura editorial formal das margens efetivamente usadas", () => {
-    const formal = getPdfVisualRecipe(getModelo("contrato-locacao")!);
-    const geometry = getPdfLayoutGeometry(formal);
-
-    expect(formal.pageMarginsCm[0]).toBe(2);
-    expect(formal.pageMarginsCm[2]).toBe(2);
-    expect(geometry.contentWidth).toBeCloseTo(cm(21) - 2 * cm(2), 2);
   });
 
   it("usa o cabeçalho editorial do contrato já na primeira página", () => {
