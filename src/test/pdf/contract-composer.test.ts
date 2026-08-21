@@ -73,17 +73,47 @@ describe("contract composer", () => {
     expect(JSON.stringify(closing)).toContain('"dontBreakRows":true');
   });
 
+  it("protege apenas a sentença de fechamento com a data e a primeira testemunha", () => {
+    const closing = buildContractContent(contractLines, denseRecipe).at(-1) as {
+      unbreakable?: boolean;
+      stack: Array<{
+        unbreakable?: boolean;
+        text?: unknown;
+        stack?: Array<{ text?: unknown; table?: unknown }>;
+      }>;
+    };
+    const introGroup = closing.stack.find(
+      (node) => node.stack && JSON.stringify(node).includes("E, por estarem assim justos")
+    );
+    const witnessGrid = closing.stack.find(
+      (node) => node.stack && JSON.stringify(node).includes("TESTEMUNHAS:")
+    );
+    const witnessHead = witnessGrid?.stack?.[0];
+
+    expect(closing.unbreakable).not.toBe(true);
+    expect(introGroup).toMatchObject({ unbreakable: true });
+    expect(JSON.stringify(introGroup)).toContain("20 de agosto de 2026");
+    expect(witnessHead).toMatchObject({ unbreakable: true });
+    expect(JSON.stringify(witnessHead)).toContain("TESTEMUNHAS:");
+    expect(JSON.stringify(witnessHead)).toContain('"dontBreakRows":true');
+  });
+
   it("calcula as grades de fechamento pela largura útil da receita", () => {
     const closing = buildContractContent(contractLines, denseRecipe).at(-1) as {
       stack: Array<{
         table?: { widths?: number[]; body?: unknown[] };
-        stack?: Array<{ table?: { widths?: number[]; body?: unknown[] } }>;
+        stack?: Array<{
+          table?: { widths?: number[]; body?: unknown[] };
+          stack?: Array<{ table?: { widths?: number[]; body?: unknown[] } }>;
+        }>;
       }>;
     };
     const geometry = getPdfLayoutGeometry(denseRecipe);
     const tables = closing.stack.filter((node) => node.table);
-    const witnessGrid = closing.stack.find((node) => node.stack);
-    const witnessTable = witnessGrid?.stack?.find((node) => node.table)?.table;
+    const witnessGrid = closing.stack.find(
+      (node) => node.stack && JSON.stringify(node).includes("TESTEMUNHAS:")
+    );
+    const witnessTable = witnessGrid?.stack?.[0]?.stack?.find((node) => node.table)?.table;
 
     expect(tables[0]?.table?.widths).toEqual([geometry.contentWidth / 2, geometry.contentWidth / 2]);
     expect(witnessTable?.widths?.reduce((sum, width) => sum + width, 0)).toBeCloseTo(
@@ -101,8 +131,16 @@ describe("contract composer", () => {
         "Blumenau/SC 20 de agosto de 2026.",
       ],
       formalRecipe
-    ).at(-1) as { stack: Array<{ alignment?: string; text?: unknown }> };
-    const date = closing.stack.find((node) => JSON.stringify(node.text).includes("20 de agosto de 2026"));
+    ).at(-1) as {
+      stack: Array<{
+        alignment?: string;
+        text?: unknown;
+        stack?: Array<{ alignment?: string; text?: unknown }>;
+      }>;
+    };
+    const date = closing.stack
+      .flatMap((node) => node.stack ?? [node])
+      .find((node) => JSON.stringify(node.text ?? "").includes("20 de agosto de 2026"));
 
     expect(date).toMatchObject({ alignment: "center" });
   });

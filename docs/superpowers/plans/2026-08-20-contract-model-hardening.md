@@ -107,6 +107,8 @@ Run: `bun test src/test/pdf/contract-composer.test.ts src/test/pdf/pdf-structure
 Commit only composer/tests with `fix(pdf): estabiliza fechamento de contratos`.
 
 > Evidência da Task 2 (2026-08-20): RED observado com 4 falhas esperadas no compositor: fechamento comum marcado como `unbreakable`, grade de assinatura sem largura calculada, grade testemunhal fixa e data sem vírgula não centralizada. RED adicional observado para as colunas `Nome:`/`CPF:` em receita dense (31,19pt, menor que os 43pt necessários). GREEN: `npm exec --yes bun -- test src/test/pdf/contract-composer.test.ts src/test/pdf/pdf-structure.test.ts` com 26 testes e 79 asserções, 0 falhas; `npm run typecheck` sem erros. Auditoria visual atualizada para residencial, comercial, imóvel, comodato e bem móvel em `tmp/model-audit/rendered-task2-final` com `pdftoppm -png -r 150`; os artefatos não são versionados.
+>
+> Fix round 1 (2026-08-20): RED estrutural observou que a sentença de fechamento+data e o título de testemunhas+primeira linha não formavam grupos seguros. GREEN: 27 testes PDF e 85 asserções, 0 falhas, mais `npm run typecheck` sem erros. As páginas finais foram renderizadas novamente em `tmp/model-audit/rendered-task2-fix-round`; a sentença não fica órfã (inclusive no imóvel), a data a acompanha e o título de testemunhas fica com a primeira linha, sem tornar o fechamento inteiro indivisível.
 
 ### Task 3: Auditoria visual de contratos
 

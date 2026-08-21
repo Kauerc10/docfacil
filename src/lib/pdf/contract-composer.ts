@@ -145,25 +145,33 @@ function buildWitnessGrid(rows: string[], contentWidth: number): PdfNode | null 
   );
   const lineWidth = (columnIndex: number) => Math.max(0, widths[columnIndex] - 2);
 
+  const witnessRows = rows.map((line, index) => ({
+    table: {
+      widths,
+      dontBreakRows: true,
+      body: [[
+        { text: `${line.match(/^(\d+)\)/)?.[1] ?? index + 1})`, style: "body" },
+        { canvas: [{ type: "line", x1: 0, y1: 8, x2: lineWidth(1), y2: 8, lineWidth: 0.55, lineColor: "#334155" }] },
+        { text: "Nome:", style: "body", alignment: "right" },
+        { canvas: [{ type: "line", x1: 0, y1: 8, x2: lineWidth(3), y2: 8, lineWidth: 0.55, lineColor: "#334155" }] },
+        { text: "CPF:", style: "body", alignment: "right" },
+        { canvas: [{ type: "line", x1: 0, y1: 8, x2: lineWidth(5), y2: 8, lineWidth: 0.55, lineColor: "#334155" }] },
+      ]],
+    },
+    layout: gridLayout,
+    margin: [0, 0, 0, 8],
+  }));
+
   return {
     stack: [
-      { text: "TESTEMUNHAS:", style: "body", bold: true, margin: [0, 2, 0, 5] },
-      ...rows.map((line, index) => ({
-        table: {
-          widths,
-          dontBreakRows: true,
-          body: [[
-            { text: `${line.match(/^(\d+)\)/)?.[1] ?? index + 1})`, style: "body" },
-            { canvas: [{ type: "line", x1: 0, y1: 8, x2: lineWidth(1), y2: 8, lineWidth: 0.55, lineColor: "#334155" }] },
-            { text: "Nome:", style: "body", alignment: "right" },
-            { canvas: [{ type: "line", x1: 0, y1: 8, x2: lineWidth(3), y2: 8, lineWidth: 0.55, lineColor: "#334155" }] },
-            { text: "CPF:", style: "body", alignment: "right" },
-            { canvas: [{ type: "line", x1: 0, y1: 8, x2: lineWidth(5), y2: 8, lineWidth: 0.55, lineColor: "#334155" }] },
-          ]],
-        },
-        layout: gridLayout,
-        margin: [0, 0, 0, 8],
-      })),
+      {
+        stack: [
+          { text: "TESTEMUNHAS:", style: "body", bold: true, margin: [0, 2, 0, 5] },
+          witnessRows[0],
+        ],
+        unbreakable: true,
+      },
+      ...witnessRows.slice(1),
     ],
   };
 }
@@ -241,10 +249,15 @@ function buildClosing(lines: string[], recipe: PdfVisualRecipe): PdfNode {
   const { contentWidth } = getPdfLayoutGeometry(recipe);
   const signatureGrid = buildSignatureGrid(signatures, contentWidth);
   const witnessGrid = buildWitnessGrid(witnesses, contentWidth);
+  const protectedIntro = intro.length > 0 ? { stack: intro, unbreakable: true } : null;
 
   return {
     id: "contract-closing",
-    stack: [...intro, ...(signatureGrid ? [signatureGrid] : []), ...(witnessGrid ? [witnessGrid] : [])],
+    stack: [
+      ...(protectedIntro ? [protectedIntro] : []),
+      ...(signatureGrid ? [signatureGrid] : []),
+      ...(witnessGrid ? [witnessGrid] : []),
+    ],
     margin: [0, recipe.closingTopMargin, 0, recipe.closingBottomMargin],
   };
 }
