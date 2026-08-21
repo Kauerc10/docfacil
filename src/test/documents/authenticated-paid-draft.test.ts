@@ -17,4 +17,14 @@ describe("authenticated paid draft continuation", () => {
     expect(sucesso).toContain("orderId,");
     expect(sucesso).toContain('navigate("sucesso", { slug, id: result.document.id })');
   });
+
+  it("rotaciona também a tentativa terminal do usuário autenticado", () => {
+    const sucesso = source("src/components/docfacil/views/sucesso-view.tsx");
+
+    expect(sucesso).not.toContain("!user &&\n          errorCode");
+    expect(sucesso).toContain(
+      "errorCode &&\n          !shouldPreserveFinalizationRequestId(errorCode)"
+    );
+    expect(sucesso).toContain("saveGuestDraft(slug");
+  });
 });
