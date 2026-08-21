@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { getModelo } from "@/lib/modelos";
+import { buildDocDefinition } from "@/lib/pdf/styles";
+import { cm } from "@/lib/pdf/layout-geometry";
 import { getPdfVisualRecipe } from "@/lib/pdf/visual-recipes";
 
 const shortFormSlugs = [
@@ -8,6 +10,11 @@ const shortFormSlugs = [
   "uniao-estavel",
   "procuracao-simples",
 ] as const;
+
+type PdfNode = {
+  margin?: number[];
+  [key: string]: unknown;
+};
 
 describe("ritmo editorial dos documentos curtos", () => {
   it("estreita o miolo sem deslocar a moldura institucional da folha", () => {
@@ -19,7 +26,15 @@ describe("ritmo editorial dos documentos curtos", () => {
       expect(recipe.profile).not.toBe("contract");
       expect(recipe.pageMarginsCm[0]).toBe(2);
       expect(recipe.pageMarginsCm[2]).toBe(2);
-      expect(recipe.bodyHorizontalInsetCm ?? 0).toBeGreaterThanOrEqual(0.3);
+      expect(recipe.bodyHorizontalInsetCm).toBeGreaterThanOrEqual(0.3);
+
+      const ddo = buildDocDefinition(modelo!, {}) as { content: PdfNode[] };
+      const firstBodyBlock = ddo.content[1];
+      const expectedInset = cm(recipe.bodyHorizontalInsetCm);
+
+      expect(firstBodyBlock).toBeDefined();
+      expect(firstBodyBlock.margin?.[0] ?? 0).toBeGreaterThanOrEqual(expectedInset);
+      expect(firstBodyBlock.margin?.[2] ?? 0).toBeGreaterThanOrEqual(expectedInset);
     }
   });
 
