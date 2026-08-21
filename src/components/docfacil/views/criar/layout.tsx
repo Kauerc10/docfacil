@@ -14,6 +14,8 @@ export interface CriarLayoutProps {
   pulseProgress?: boolean;
   /** callback do botão Voltar */
   onVoltar: () => void;
+  /** Mantido por compatibilidade; a navegação visual segmentada foi removida. */
+  onStepClick?: (targetStep: number) => void;
   children: React.ReactNode;
 }
 
