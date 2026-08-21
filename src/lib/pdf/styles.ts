@@ -74,6 +74,39 @@ function applyClosingRhythm(nodes: unknown[], recipe: PdfVisualRecipe): unknown[
   return out;
 }
 
+/**
+ * Peças curtas precisam de uma medida de leitura mais estreita para não
+ * condensar todo o texto no topo da A4. O inset atua somente no conteúdo,
+ * preservando título, header, filete e footer na moldura institucional de 2 cm.
+ */
+function applyBodyHorizontalInset(
+  nodes: unknown[],
+  recipe: PdfVisualRecipe
+): unknown[] {
+  const inset = cm(recipe.bodyHorizontalInsetCm);
+  if (inset <= 0) return nodes;
+
+  return nodes.map((node) => {
+    if (!isPdfNode(node)) return node;
+
+    const margin = Array.isArray(node.margin) ? node.margin : [];
+    const left = typeof margin[0] === "number" ? margin[0] : 0;
+    const top = typeof margin[1] === "number" ? margin[1] : 0;
+    const right = typeof margin[2] === "number" ? margin[2] : 0;
+    const bottom = typeof margin[3] === "number" ? margin[3] : 0;
+
+    return {
+      ...node,
+      margin: [left + inset, top, right + inset, bottom] as [
+        number,
+        number,
+        number,
+        number,
+      ],
+    };
+  });
+}
+
 export function buildDocDefinition(
   modelo: Modelo,
   respostas: Record<string, string>,
@@ -96,9 +129,10 @@ export function buildDocDefinition(
         buildContent(modelo, respostasCompativeis, clausulasSelecionadas, camposOpcionais),
         recipe
       );
-  const contentNodes = recipe.profile === "declaration"
+  const refinedContentNodes = recipe.profile === "declaration"
     ? refineDeclarationContent(baseContentNodes, recipe)
     : baseContentNodes;
+  const contentNodes = applyBodyHorizontalInset(refinedContentNodes, recipe);
   const dividerWidth = recipe.dividerWidthCm === null ? geometry.contentWidth : cm(recipe.dividerWidthCm);
   const dividerX1 = (geometry.contentWidth - dividerWidth) / 2;
   const dividerX2 = dividerX1 + dividerWidth;
