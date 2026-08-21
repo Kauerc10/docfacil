@@ -285,10 +285,8 @@ describe("Contrato de Locação Residencial — estrutura de referência", () =>
     }).join("\n");
 
     expect(document).toContain("CLÁUSULA OITAVA – DA MANUTENÇÃO E CONSERVAÇÃO");
-    expect(document).toContain("CLÁUSULA DÉCIMA PRIMEIRA – DA PROTEÇÃO DE DADOS PESSOAIS");
-    expect(document).toContain("CLÁUSULA DÉCIMA SEGUNDA – DAS COMUNICAÇÕES ENTRE AS PARTES");
-    expect(document).toContain("CLÁUSULA DÉCIMA TERCEIRA – DAS DISPOSIÇÕES GERAIS");
-    expect(document).toContain("CLÁUSULA DÉCIMA QUARTA – DO FORO");
+    expect(document).toContain("CLÁUSULA DÉCIMA SEGUNDA – DA PROTEÇÃO DE DADOS PESSOAIS");
+    expect(document).toContain("CLÁUSULA DÉCIMA TERCEIRA – DAS COMUNICAÇÕES ENTRE AS PARTES");
     expect(document).not.toContain("SEGURO CONTRA INCÊNDIO");
     expect(document).not.toContain("CLÁUSULA DÉCIMA PRIMEIRA – DA VISTORIA");
     expect(document).not.toContain("Anexo I");

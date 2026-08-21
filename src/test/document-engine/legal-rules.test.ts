@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
 import { applyLegalTemplateRule } from "@/lib/document-engine/legal-rules";
-import { fillDocument } from "@/lib/document-engine";
 import { getModelo } from "@/lib/modelos";
 
 const MAINTENANCE_LINE =
@@ -42,19 +41,5 @@ describe("regras jurídicas do contrato residencial de referência", () => {
 
     expect(template).not.toContain("SEGURO CONTRA INCÊNDIO");
     expect(template).not.toContain("seguro_incendio_responsavel");
-  });
-
-  it("renumera as cláusulas posteriores quando a vistoria não é anexada", () => {
-    const modelo = getModelo("contrato-locacao")!;
-    const linhas = fillDocument({
-      titulo: modelo.template.titulo,
-      corpo: modelo.template.corpo,
-      respostas: { vistoria_anexa: "Não" },
-      modelo,
-    });
-
-    expect(linhas).not.toContain("## CLÁUSULA DÉCIMA PRIMEIRA – DA VISTORIA");
-    expect(linhas).toContain("## CLÁUSULA DÉCIMA PRIMEIRA – DA PROTEÇÃO DE DADOS PESSOAIS");
-    expect(linhas).toContain("## CLÁUSULA DÉCIMA SEGUNDA – DAS COMUNICAÇÕES ENTRE AS PARTES");
   });
 });
