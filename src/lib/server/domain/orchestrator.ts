@@ -18,6 +18,7 @@ import type { ArtifactStorage } from "../r2/storage";
 import { getArtifactStorage } from "../r2/storage";
 import { logger } from "../../logger";
 import { FREE_MONTHLY_LIMIT } from "../../document-access-policy";
+import { resolveDocumentWatermark } from "./preview-render-policy";
 
 export interface GenerateDocumentDependencies {
   repositories?: Partial<BackendRepositories>;
@@ -181,7 +182,10 @@ export async function generateDocumentArtifact(
     const profile = await repos.users.getUserProfile(principal.userId);
 
     if (profile?.plano === "pro") {
-      entitlementDecision = { entitlement: "pro", watermarked: false };
+      entitlementDecision = {
+        entitlement: "pro",
+        watermarked: resolveDocumentWatermark("pro"),
+      };
     } else if (orderId) {
       try {
         const order = await repos.orders.reservePaidOrder({
@@ -196,6 +200,9 @@ export async function generateDocumentArtifact(
           order,
           userProfile: profile,
         });
+        entitlementDecision.watermarked = resolveDocumentWatermark(
+          entitlementDecision.entitlement
+        );
       } catch (err: unknown) {
         await repos.orders.releaseReservedOrder({ orderId, requestId }).catch(() => {});
         const errorCode = err instanceof BackendError ? err.code : "GENERATION_FAILED";
@@ -259,6 +266,9 @@ export async function generateDocumentArtifact(
         orderId,
         order,
       });
+      entitlementDecision.watermarked = resolveDocumentWatermark(
+        entitlementDecision.entitlement
+      );
     } else {
       const profile = await repos.users.getUserProfile(principal.userId);
       const startOfMonth = new Date(
@@ -288,6 +298,9 @@ export async function generateDocumentArtifact(
         userProfile: profile,
         currentMonthlyCount: monthlyCount,
       });
+      entitlementDecision.watermarked = resolveDocumentWatermark(
+        entitlementDecision.entitlement
+      );
       if (entitlementDecision.entitlement === "free") {
         freeQuota = {
           userId: principal.userId,
