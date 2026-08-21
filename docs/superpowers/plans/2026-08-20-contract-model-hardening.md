@@ -19,7 +19,7 @@
 
 ---
 
-### Task 1: Coerência jurídica e decisões de baixo atrito
+### Task 1: Coerência jurídica e decisões de baixo atrito ✅
 
 **Files:**
 - Modify: `src/lib/modelos.ts`
