@@ -1,5 +1,8 @@
 import type { Modelo } from "../types";
 
+/** Metadado interno, derivado somente da ausência do campo em registros antigos. */
+export const SINAL_LEGADO_SEM_FORMA_KEY = "__sinal_legado_sem_forma";
+
 /**
  * Normaliza apenas respostas legadas cujo significado é mecânico e seguro.
  *
@@ -24,7 +27,12 @@ export function normalizarRespostasLegadasDeContrato(
     modelo.slug === "contrato-compra-venda-imovel" &&
     !Object.hasOwn(normalized, "possui_sinal")
   ) {
-    normalized.possui_sinal = normalized.sinal?.trim() ? "Sim" : "Não";
+    const possuiSinalLegado = Boolean(normalized.sinal?.trim());
+    normalized.possui_sinal = possuiSinalLegado ? "Sim" : "Não";
+
+    if (possuiSinalLegado && !normalized.forma_pagamento_sinal?.trim()) {
+      normalized[SINAL_LEGADO_SEM_FORMA_KEY] = "true";
+    }
   }
 
   return normalized;

@@ -92,4 +92,5 @@ export {
 
 export {
   normalizarRespostasLegadasDeContrato,
+  SINAL_LEGADO_SEM_FORMA_KEY,
 } from "./legacy-contract-answers";

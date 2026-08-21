@@ -8,7 +8,10 @@ import { normalizeCivilStatus } from "../../document-engine/civil-status";
 import { computeCamposOpcionais } from "../../document-engine/optional-fields";
 import { hasInvalidMoradoresAutorizados } from "../../document-engine/authorized-residents";
 import { DOCUMENT_RENDER_RULES_VERSION } from "../../document-engine/legal-rules";
-import { normalizarRespostasLegadasDeContrato } from "../../document-engine/legacy-contract-answers";
+import {
+  normalizarRespostasLegadasDeContrato,
+  SINAL_LEGADO_SEM_FORMA_KEY,
+} from "../../document-engine/legacy-contract-answers";
 
 export type DocumentOwner =
   | { type: "guest"; contact: { email?: string; phone?: string } }
@@ -434,10 +437,9 @@ export function reconstructDuplicateDraft(
     }
   }
 
-  Object.assign(
-    respostas,
-    normalizarRespostasLegadasDeContrato(modelo, respostas)
-  );
+  const respostasCompativeis = normalizarRespostasLegadasDeContrato(modelo, respostas);
+  delete respostasCompativeis[SINAL_LEGADO_SEM_FORMA_KEY];
+  Object.assign(respostas, respostasCompativeis);
 
   for (const etapa of modelo.etapas || []) {
     if (etapa.tipo !== "clausulas") continue;

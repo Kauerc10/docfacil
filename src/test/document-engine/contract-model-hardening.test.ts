@@ -125,4 +125,19 @@ describe("robustez dos contratos auditados", () => {
     expect(imovelLegado).toMatch(/matriculado sob o nº _+/);
     expect(imovelLegado).not.toContain("matriculado sob o nº 0");
   });
+
+  it("mantém a redação segura do sinal em imóveis salvos antes do campo de forma", () => {
+    const imovelLegado = render("contrato-compra-venda-imovel", {
+      valor: "350.000,00",
+      sinal: "35.000,00",
+      saldo_pagamento: "À vista na escritura",
+    });
+    const linhaDoSinal = imovelLegado
+      .split("\n")
+      .find((linha) => linha.includes("Sinal e princípio de pagamento"));
+
+    expect(linhaDoSinal).toContain("pago nesta data");
+    expect(linhaDoSinal).not.toContain("pago mediante");
+    expect(linhaDoSinal).not.toContain("________________");
+  });
 });

@@ -301,6 +301,7 @@ describe("reconstructAndValidateResponses", () => {
 
     expect(withoutDeposit.respostas.possui_sinal).toBe("Não");
     expect(withDeposit.respostas.possui_sinal).toBe("Sim");
+    expect(withDeposit.respostas).not.toHaveProperty("__sinal_legado_sem_forma");
     expect(legacyComodato.respostas.periodo_emprestimo).toBe("seis meses");
   });
 

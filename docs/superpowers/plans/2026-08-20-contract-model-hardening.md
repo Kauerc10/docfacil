@@ -68,6 +68,8 @@ Commit only relevant files with `fix(contracts): endurece regras e qualificaçõ
 > Fix round 1 (2026-08-20): RED adicional observado para a visibilidade declarativa de sinal e para placeholders/cláusulas resolvidos por regras de renderização. GREEN: `bun run typecheck` e 76 testes focados (criação, engine, integridade/snapshots e domínio), 0 falhas. Compatibilidade legada cobre `prazo` do comodato, inferência de sinal imobiliário e bem móvel sem cidade/UF inventadas.
 >
 > Fix round 2 (2026-08-20): RED observado para renderização de respostas legadas salvas e para sinal obrigatório após a transição `Não` → `Sim` no PDF. GREEN: `bun run typecheck` e 40 testes focados (criação, engine, PDF, integridade e domínio), 0 falhas. A normalização mecânica foi extraída para o engine e é aplicada antes das composições de preview/PDF, sem sintetizar matrícula, Registro de Imóveis, cidade ou UF.
+>
+> Fix round 3 (2026-08-20): RED observado para imóvel pré-mudança com `sinal` e sem forma de pagamento, que antes renderizava placeholder de método. GREEN: `bun run typecheck` e 32 testes focados, 0 falhas. Esse formato legado rende `pago nesta data`; respostas novas com `possui_sinal=Sim` continuam exigindo a forma de pagamento.
 
 ### Task 2: Fechamento responsivo à receita
 
