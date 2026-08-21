@@ -27,7 +27,11 @@ export function validateModel(modelo: Modelo): ModelValidationError[] {
   const errors: ModelValidationError[] = [];
   const slug = modelo.slug || "unknown";
 
-  if (!modelo.template || !Array.isArray(modelo.template.corpo) || modelo.template.corpo.length === 0) {
+  if (
+    !modelo.template ||
+    !Array.isArray(modelo.template.corpo) ||
+    modelo.template.corpo.length === 0
+  ) {
     errors.push({
       code: "EMPTY_TEMPLATE",
       message: `O modelo '${slug}' não possui template ou corpo de template definido.`,
@@ -36,11 +40,15 @@ export function validateModel(modelo: Modelo): ModelValidationError[] {
     return errors;
   }
 
-  // 1. Coleta todas as chaves de campos válidas e checa duplicatas
   const declaredKeys = new Set<string>();
   const clauseIds = new Set<string>();
-  const renderPlaceholders = new Set(modelo.template.placeholdersDeRenderizacao ?? []);
-  const renderClauseIds = new Set(modelo.template.clausulasDeRenderizacao ?? []);
+  const clauseBodies: string[] = [];
+  const renderPlaceholders = new Set(
+    modelo.template.placeholdersDeRenderizacao ?? []
+  );
+  const renderClauseIds = new Set(
+    modelo.template.clausulasDeRenderizacao ?? []
+  );
 
   for (const campo of modelo.campos || []) {
     if (declaredKeys.has(campo.key)) {
@@ -84,6 +92,7 @@ export function validateModel(modelo: Modelo): ModelValidationError[] {
           });
         }
         clauseIds.add(cl.id);
+        clauseBodies.push(cl.corpo);
         for (const extra of cl.camposExtras || []) {
           declaredKeys.add(extra.key);
           if (extra.key.endsWith("_rg") || extra.key === "rg") {
@@ -94,12 +103,19 @@ export function validateModel(modelo: Modelo): ModelValidationError[] {
     }
   }
 
-  // 2. Varre o template (título + corpo) buscando tags
-  const allLines = [modelo.template.titulo, ...modelo.template.corpo];
+  // O CI precisa validar tanto o esqueleto principal quanto o texto que só
+  // entra quando uma cláusula é selecionada. Caso contrário, um typo dentro
+  // de `clausula.corpo` só apareceria no PDF em runtime.
+  const allLines = [
+    modelo.template.titulo,
+    ...modelo.template.corpo,
+    ...clauseBodies,
+  ];
 
   for (const line of allLines) {
-    // Checa {{clausula:id}}
-    const clauseMatches = line.matchAll(/\{\{\s*clausula:([a-zA-Z0-9_-]+)\s*\}\}/g);
+    const clauseMatches = line.matchAll(
+      /\{\{\s*clausula:([a-zA-Z0-9_-]+)\s*\}\}/g
+    );
     for (const match of clauseMatches) {
       const cid = match[1];
       if (!clauseIds.has(cid) && !renderClauseIds.has(cid)) {
@@ -112,7 +128,6 @@ export function validateModel(modelo: Modelo): ModelValidationError[] {
       }
     }
 
-    // Checa {{key}} (ignora cláusulas e helpers conhecidos)
     const varMatches = line.matchAll(/\{\{\s*([^}:][^}]*?)\s*\}\}/g);
     for (const match of varMatches) {
       const rawKey = match[1].trim();
