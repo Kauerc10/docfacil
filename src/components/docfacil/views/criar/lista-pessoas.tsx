@@ -19,6 +19,11 @@ interface ListaPessoasProps {
   erro?: string | null;
 }
 
+/** A key must not contain editable data, otherwise React remounts the input on each keystroke. */
+export function getMoradorRowKey(index: number): string {
+  return `morador-${index}`;
+}
+
 export function ListaPessoas({
   campo,
   value,
@@ -88,7 +93,7 @@ export function ListaPessoas({
     <div className="space-y-4">
       {moradores.map((morador, index) => (
         <section
-          key={`${index}-${morador.nome}`}
+          key={getMoradorRowKey(index)}
           className="rounded-2xl border border-[var(--border)] bg-surface p-4 space-y-3"
           aria-label={`${itemLabel} ${index + 1}`}
         >

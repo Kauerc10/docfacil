@@ -41,6 +41,7 @@ import { LoadingDocumento } from "../loading-documento";
 import { getProgressLine, getErrorLine } from "./criar/pet-lines";
 import { classifyFinalizationError } from "./criar/finalization-error";
 import { canLoadCreateSession } from "@/lib/documents/create-session-policy";
+import { getCreateFinalizationGuard } from "@/lib/documents/create-finalization-guard";
 import {
   FreeLimitPaywall,
   type AccessPaywallReason,
@@ -370,7 +371,7 @@ export function CriarView() {
   };
 
   const handleAvancar = () => {
-    if (!etapaAtual || submitting) return;
+    if (!etapaAtual || !modelo || submitting) return;
     const erro = validarEtapaAtual();
     if (erro) {
       setFieldError(erro);
@@ -386,6 +387,15 @@ export function CriarView() {
     setTimeout(() => setPulseProgress(false), UX_CONFIG.PROGRESS_PULSE_DURATION);
 
     if (isLast) {
+      const guard = getCreateFinalizationGuard(modelo, answers);
+      if (guard) {
+        setStepIndex(guard.stepIndex);
+        setFieldError(guard.message);
+        setPetMood("atencao");
+        setPetOverride(guard.message);
+        return;
+      }
+
       setPetMood("feliz");
       const respostasFinais: Record<string, string> = {
         ...respostasComEndereco,
