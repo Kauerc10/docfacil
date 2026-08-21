@@ -16,6 +16,10 @@ interface PdfDocumentPreviewProps {
   className?: string;
 }
 
+const EMPTY_ANSWERS: Record<string, string> = {};
+const EMPTY_CLAUSES: string[] = [];
+const EMPTY_EXTRAS: Record<string, Record<string, string>> = {};
+
 function buildPreviewAnswers(
   respostas: Record<string, string>,
   clausulasSelecionadas: string[],
@@ -35,9 +39,9 @@ function buildPreviewAnswers(
 
 export function PdfDocumentPreview({
   modelo,
-  respostas = {},
-  clausulasSelecionadas = [],
-  extrasPorClausula = {},
+  respostas = EMPTY_ANSWERS,
+  clausulasSelecionadas = EMPTY_CLAUSES,
+  extrasPorClausula = EMPTY_EXTRAS,
   watermark = false,
   className,
 }: PdfDocumentPreviewProps) {
