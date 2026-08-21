@@ -53,6 +53,15 @@ function buildDeclaration(slug: string): PdfNode[] {
   return ddo.content;
 }
 
+function expectJustifiedIndentedBody(node: PdfNode | undefined) {
+  expect(node).toBeDefined();
+  expect(node?.style).toBe("body");
+  expect(node?.alignment).toBe("justify");
+
+  const runs = Array.isArray(node?.text) ? node.text as Record<string, unknown>[] : [];
+  expect(runs[0]?.preserveLeadingSpaces).toBe(true);
+}
+
 describe("tipografia formal das declarações", () => {
   it("remove o subtítulo jurídico redundante da autodeclaração no PDF final", () => {
     const content = buildDeclaration("declaracao-residencia");
@@ -75,16 +84,18 @@ describe("tipografia formal das declarações", () => {
     expect(terceiro.firstLineIndentSpaces).toBeGreaterThanOrEqual(8);
   });
 
+  it("mantém a Lei 7.115/1983 dentro do corpo justificado da autodeclaração", () => {
+    const content = buildDeclaration("declaracao-residencia");
+    const node = findStyledNode(content, "Lei nº 7.115/1983");
+
+    expectJustifiedIndentedBody(node);
+  });
+
   it("mantém menção ao art. 299 como parágrafo normal justificado e recuado", () => {
     const content = buildDeclaration("declaracao-residencia-terceiro");
     const node = findStyledNode(content, "falsidade da presente declaração");
 
-    expect(node).toBeDefined();
-    expect(node?.style).toBe("body");
-    expect(node?.alignment).toBe("justify");
-
-    const runs = Array.isArray(node?.text) ? node.text as Record<string, unknown>[] : [];
-    expect(runs[0]?.preserveLeadingSpaces).toBe(true);
+    expectJustifiedIndentedBody(node);
   });
 
   it("reserva o estilo de citação para a transcrição literal da lei e também a justifica", () => {
