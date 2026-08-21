@@ -36,6 +36,22 @@ async function acceptOptionalCookies(page: import("@playwright/test").Page) {
   ).toBeHidden({ timeout: 5000 });
 }
 
+async function waitForCepLookupToSettle(page: import("@playwright/test").Page) {
+  const found = page.getByText("endereço encontrado").first();
+  const failed = page.getByText(/Não encontramos esse CEP automaticamente/i).first();
+
+  await expect
+    .poll(
+      async () => {
+        if (await found.isVisible().catch(() => false)) return "done";
+        if (await failed.isVisible().catch(() => false)) return "done";
+        return "waiting";
+      },
+      { timeout: 12000 }
+    )
+    .toBe("done");
+}
+
 test.describe("Guest Purchase and Download Flow", () => {
   test.setTimeout(120000);
 
@@ -64,9 +80,13 @@ test.describe("Guest Purchase and Download Flow", () => {
     if (await cpfInput.isVisible()) await cpfInput.fill("111.444.777-35");
 
     const cepInput = page.locator("#g-declarante_cep");
-    if (await cepInput.isVisible()) await cepInput.fill("01310-100");
-
     const ruaInput = page.locator("#g-declarante_rua");
+    if (await cepInput.isVisible()) {
+      await cepInput.fill("01310-100");
+      await ruaInput.focus();
+      await waitForCepLookupToSettle(page);
+    }
+
     if (await ruaInput.isVisible()) await ruaInput.fill("Av. Paulista");
 
     const numInput = page.locator("#g-declarante_numero");
@@ -80,6 +100,9 @@ test.describe("Guest Purchase and Download Flow", () => {
 
     const ufInput = page.locator("#g-declarante_uf");
     if (await ufInput.isVisible()) await ufInput.fill("SP");
+
+    await expect(numInput).toHaveValue("1500");
+    await expect(cidadeInput).toHaveValue("São Paulo");
 
     // Stage 1 — Finalidade
     await page.getByRole("button", { name: /^avançar$/i }).click();
@@ -175,11 +198,18 @@ test.describe("Guest Purchase and Download Flow", () => {
     if (await locatarioCpf.isVisible()) await locatarioCpf.fill("529.982.247-25");
     await page.getByRole("button", { name: /^avançar$/i }).click();
 
-    // Stage 2 — Imóvel
+    // Stage 2 — Imóvel. Espera a busca de CEP terminar antes de reescrever os
+    // campos canônicos; isso evita que o foco assíncrono da busca roube a
+    // digitação do próximo campo no runner do Playwright.
     const imovelRua = page.locator("#g-imovel_rua");
     await expect(imovelRua).toBeVisible({ timeout: 10000 });
     const imovelCep = page.locator("#g-imovel_cep");
-    if (await imovelCep.isVisible()) await imovelCep.fill("04538-133");
+    if (await imovelCep.isVisible()) {
+      await imovelCep.fill("04538-133");
+      await imovelRua.focus();
+      await waitForCepLookupToSettle(page);
+    }
+
     await imovelRua.fill("Rua Funchal");
     const imovelNum = page.locator("#g-imovel_numero");
     if (await imovelNum.isVisible()) await imovelNum.fill("200");
@@ -189,18 +219,35 @@ test.describe("Guest Purchase and Download Flow", () => {
     if (await imovelCidade.isVisible()) await imovelCidade.fill("São Paulo");
     const imovelUf = page.locator("#g-imovel_uf");
     if (await imovelUf.isVisible()) await imovelUf.fill("SP");
+
+    await expect(imovelNum).toHaveValue("200");
+    await expect(imovelCidade).toHaveValue("São Paulo");
+    await expect(imovelUf).toHaveValue("SP");
     await page.getByRole("button", { name: /^avançar$/i }).click();
 
     // Stage 3 — Valores e prazo
     const valorInput = page.locator("#g-valor");
     await expect(valorInput).toBeVisible({ timeout: 10000 });
     await valorInput.fill("3500,00");
+    await expect(valorInput).toHaveValue("3.500,00");
+
     const prazoInput = page.locator("#g-prazo");
-    if (await prazoInput.isVisible()) await prazoInput.fill("30");
+    if (await prazoInput.isVisible()) {
+      await prazoInput.fill("30");
+      await expect(prazoInput).toHaveValue("30");
+    }
+
     const vencInput = page.locator("#g-dia_vencimento");
-    if (await vencInput.isVisible()) await vencInput.fill("10");
+    if (await vencInput.isVisible()) {
+      await vencInput.fill("10");
+      await expect(vencInput).toHaveValue("10");
+    }
+
     const formaInput = page.locator("#g-forma_pagamento");
-    if (await formaInput.isVisible()) await formaInput.fill("PIX");
+    if (await formaInput.isVisible()) {
+      await formaInput.fill("PIX");
+      await expect(formaInput).toHaveValue("PIX");
+    }
     await page.getByRole("button", { name: /^avançar$/i }).click();
 
     // Stage 4 — Moradores autorizados: segue com apenas o locatário.
@@ -225,7 +272,8 @@ test.describe("Guest Purchase and Download Flow", () => {
 
     const fiadorCpfInput = page.locator("#extra-fiador-fiador_cpf");
     if (await fiadorCpfInput.isVisible()) {
-      await fiadorCpfInput.fill("056.489.370-84");
+      await fiadorCpfInput.fill("935.411.347-80");
+      await expect(fiadorCpfInput).toHaveValue("935.411.347-80");
     }
 
     // Stage 5 concluída: segue para as condições adicionais.
