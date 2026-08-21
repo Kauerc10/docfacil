@@ -1,31 +1,37 @@
 import { describe, expect, it } from "bun:test";
-import { fillDocument } from "@/lib/document-engine";
 import { getModelo } from "@/lib/modelos";
-import { renderLineNode } from "@/lib/pdf/content-builder";
+import { buildDocDefinition } from "@/lib/pdf/styles";
 import { getPdfVisualRecipe } from "@/lib/pdf/visual-recipes";
 
-function renderDeclaration(slug: string) {
+type PdfNode = {
+  text?: unknown;
+  style?: string;
+  alignment?: string;
+  [key: string]: unknown;
+};
+
+function plainText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(plainText).join("");
+  if (value && typeof value === "object") {
+    const node = value as Record<string, unknown>;
+    if ("text" in node) return plainText(node.text);
+  }
+  return "";
+}
+
+function buildDeclaration(slug: string): PdfNode[] {
   const modelo = getModelo(slug);
   if (!modelo) throw new Error(`Modelo não encontrado: ${slug}`);
 
-  return fillDocument({
-    titulo: modelo.template.titulo,
-    corpo: modelo.template.corpo,
-    respostas: {},
-    clausulasSelecionadas: [],
-    modelo,
-  }).join("\n");
+  const ddo = buildDocDefinition(modelo, {}) as { content: PdfNode[] };
+  return ddo.content;
 }
 
-type RenderedNode = {
-  style?: string;
-  alignment?: string;
-  text?: unknown;
-};
-
 describe("tipografia formal das declarações", () => {
-  it("remove o subtítulo jurídico redundante da autodeclaração renderizada", () => {
-    const text = renderDeclaration("declaracao-residencia");
+  it("remove o subtítulo jurídico redundante da autodeclaração no PDF final", () => {
+    const content = buildDeclaration("declaracao-residencia");
+    const text = content.map(plainText).join("\n");
 
     expect(text).not.toContain("Declaração de residência nos termos da Lei nº 7.115/1983");
     expect(text).not.toContain("Declaração firmada sob as penas da lei");
@@ -39,23 +45,24 @@ describe("tipografia formal das declarações", () => {
     expect(terceiro.firstLineIndentSpaces).toBeGreaterThanOrEqual(8);
   });
 
-  it("mantém menção ao art. 299 como parágrafo normal justificado", () => {
-    const recipe = getPdfVisualRecipe({ slug: "declaracao-residencia-terceiro" });
-    const line = "Declaro ainda ter ciência de que a falsidade da presente declaração pode implicar na sanção penal prevista no art. 299 do Código Penal, transcrita abaixo:";
-    const rendered = renderLineNode(line, [line], 0, recipe);
-    const node = rendered?.element as RenderedNode;
+  it("mantém menção ao art. 299 como parágrafo normal justificado e recuado", () => {
+    const content = buildDeclaration("declaracao-residencia-terceiro");
+    const node = content.find((item) => plainText(item).includes("falsidade da presente declaração"));
 
-    expect(node.style).toBe("body");
-    expect(node.alignment).toBe("justify");
+    expect(node).toBeDefined();
+    expect(node?.style).toBe("body");
+    expect(node?.alignment).toBe("justify");
+
+    const runs = Array.isArray(node?.text) ? node.text as Record<string, unknown>[] : [];
+    expect(runs[0]?.preserveLeadingSpaces).toBe(true);
   });
 
   it("reserva o estilo de citação para a transcrição literal da lei e também a justifica", () => {
-    const recipe = getPdfVisualRecipe({ slug: "declaracao-residencia-terceiro" });
-    const line = '"Art. 299 - Omitir, em documento público ou particular, declaração que dele devia constar."';
-    const rendered = renderLineNode(line, [line], 0, recipe);
-    const node = rendered?.element as RenderedNode;
+    const content = buildDeclaration("declaracao-residencia-terceiro");
+    const node = content.find((item) => plainText(item).includes("Art. 299 - Omitir"));
 
-    expect(node.style).toBe("legalQuote");
-    expect(node.alignment).toBe("justify");
+    expect(node).toBeDefined();
+    expect(node?.style).toBe("legalQuote");
+    expect(node?.alignment).toBe("justify");
   });
 });
