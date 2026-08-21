@@ -32,7 +32,6 @@ import type {
   RespostasState,
 } from "./criar/types";
 import { ChatStep } from "./criar/chat-step";
-import { PdfPreview } from "./criar/pdf-preview";
 import { CriarLayout } from "./criar/layout";
 import {
   CriarLoading,
@@ -41,6 +40,7 @@ import {
 import { LoadingDocumento } from "../loading-documento";
 import { getProgressLine, getErrorLine } from "./criar/pet-lines";
 import { classifyFinalizationError } from "./criar/finalization-error";
+import { canLoadCreateSession } from "@/lib/documents/create-session-policy";
 import {
   FreeLimitPaywall,
   type AccessPaywallReason,
@@ -51,7 +51,7 @@ export function CriarView() {
   const slug = params.slug ?? "";
   const requestedDocumentId = params.id;
   const requestedDraftId = params.draftId;
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,7 +68,6 @@ export function CriarView() {
   const [petMood, setPetMood] = useState<PetMood>("falando");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [petOverride, setPetOverride] = useState<string | null>(null);
-  const [mobileTab, setMobileTab] = useState<"perguntas" | "visualizar">("perguntas");
   const [pulseProgress, setPulseProgress] = useState(false);
 
   const loadModel = useCallback(async () => {
@@ -132,8 +131,9 @@ export function CriarView() {
   }, [slug, requestedDocumentId, requestedDraftId, user?.uid]);
 
   useEffect(() => {
+    if (!canLoadCreateSession(authLoading)) return;
     loadModel();
-  }, [loadModel]);
+  }, [authLoading, loadModel]);
 
   const etapasEfetivas: EtapaModelo[] = useMemo(() => {
     if (!modelo?.etapas) return [];
@@ -448,8 +448,6 @@ export function CriarView() {
         total={totalEtapas}
         progressPct={progressPct}
         pulseProgress={pulseProgress}
-        mobileTab={mobileTab}
-        onMobileTabChange={setMobileTab}
         onVoltar={handleVoltar}
         onStepClick={(target) => {
           setStepIndex(Math.max(0, Math.min(target, stepIndex)));
@@ -457,17 +455,6 @@ export function CriarView() {
           setPetOverride(null);
           setPetMood("falando");
         }}
-        previewSlot={
-          <div className="w-full max-w-[340px] mx-auto">
-            <PdfPreview
-              modelo={modelo}
-              respostas={respostasComEndereco}
-              clausulasSelecionadas={clausulasSelecionadas}
-              extrasPorClausula={extrasPorClausula}
-              authenticated={Boolean(user)}
-            />
-          </div>
-        }
       >
         {etapaChat && (
           <ChatStep
