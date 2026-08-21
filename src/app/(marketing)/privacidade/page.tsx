@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { COMPANY } from "@/lib/company";
 import { LegalPageWrapper } from "@/lib/legal/legal-page-wrapper";
 import { PrivacyContent } from "@/lib/legal/privacy-content";
+import { PRIVACY_VERSION } from "@/lib/legal/versions";
 
 /**
  * /privacidade — Política de Privacidade (LGPD), server-rendered.
@@ -28,7 +29,7 @@ export default function PrivacidadePage() {
       title="Política de Privacidade"
       subtitle="Como tratamos seus dados pessoais — em conformidade com a LGPD (Lei nº 13.709/2018)."
       lastUpdated="13 de julho de 2026"
-      version="1.0"
+      version={PRIVACY_VERSION}
     >
       <PrivacyContent />
     </LegalPageWrapper>

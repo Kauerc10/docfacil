@@ -31,7 +31,7 @@ import {
 export function buildDocDefinition(
   modelo: Modelo,
   respostas: Record<string, string>,
-  options?: GerarPDFOptions
+  options?: { watermark?: boolean }
 ): unknown {
   const clausulasSelecionadas = extractClausulasSelecionadas(respostas);
   const camposOpcionais = computeCamposOpcionais(modelo, clausulasSelecionadas);
@@ -130,26 +130,24 @@ export function buildDocDefinition(
       },
       ...contentNodes,
     ],
-    footer: (currentPage: number, pageCount: number) => {
-      return {
-        margin: [cm(3.15), 0, cm(3.15), cm(1.0)] as [number, number, number, number],
-        stack: [
-          {
-            canvas: [{
-              type: "line" as const, x1: 0, y1: 0, x2: CONTENT_WIDTH, y2: 0,
-              lineWidth: 0.6, lineColor: "#cbd5e1",
-            }],
-          },
-          {
-            columns: [
-              { text: "Gerado por DocFacil · K-HUB", style: "footerText" },
-              { text: `Página ${currentPage} de ${pageCount}`, style: "footerText", alignment: "right" as const },
-            ],
-            margin: [0, 4, 0, 0] as [number, number, number, number],
-          },
-        ],
-      };
-    },
+    footer: (currentPage: number, pageCount: number) => ({
+      margin: [cm(3.15), 0, cm(3.15), cm(1.0)] as [number, number, number, number],
+      stack: [
+        {
+          canvas: [{
+            type: "line" as const, x1: 0, y1: 0, x2: CONTENT_WIDTH, y2: 0,
+            lineWidth: 0.6, lineColor: "#cbd5e1",
+          }],
+        },
+        {
+          columns: [
+            { text: "Gerado por DocFacil · K-HUB", style: "footerText" },
+            { text: `Página ${currentPage} de ${pageCount}`, style: "footerText", alignment: "right" as const },
+          ],
+          margin: [0, 4, 0, 0] as [number, number, number, number],
+        },
+      ],
+    }),
     styles: {
       // Título: sans-serif bold (hierarquia editorial: serif corpo + sans títulos)
       docTitle: { font: "Roboto", fontSize: 16, bold: true, color: "#14315c", characterSpacing: 1.5 },

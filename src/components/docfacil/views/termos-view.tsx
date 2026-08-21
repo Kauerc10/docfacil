@@ -2,6 +2,7 @@
 
 import { LegalLayout } from "./legal-layout";
 import { TermsContent } from "@/lib/legal/terms-content";
+import { TERMS_VERSION } from "@/lib/legal/versions";
 import { useNav, type View } from "../nav-context";
 
 /**
@@ -20,7 +21,7 @@ export function TermosView() {
       title="Termos de Uso"
       subtitle="As regras claras para usar o DocFacil. Sem juridiquês, mas com validade."
       lastUpdated="13 de julho de 2026"
-      version="1.0"
+      version={TERMS_VERSION}
     >
       <TermsContent onNavigate={(v) => navigate(v as View)} />
     </LegalLayout>

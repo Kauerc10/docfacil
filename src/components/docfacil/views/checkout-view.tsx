@@ -24,6 +24,7 @@ import {
   type CheckoutPlan,
 } from "@/lib/services/checkout-service";
 import { TermsConsentModal } from "@/components/docfacil/terms-consent-modal";
+import { loadGuestDraft, saveGuestDraft } from "@/lib/documents/client";
 
 /**
  * CheckoutView — tela de checkout para os planos Avulso e Pro.
@@ -60,11 +61,27 @@ export function CheckoutView() {
     setConsentOpen(false);
     setSubmitting(true);
     try {
+      const slug = params.slug;
+      if (slug && !user && guestEmail.trim()) {
+        const draft = loadGuestDraft(slug);
+        if (draft) {
+          saveGuestDraft(slug, {
+            ...draft,
+            guestContact: { email: guestEmail.trim() },
+          });
+        }
+      }
+
+      const successUrl = typeof window !== "undefined"
+        ? `${window.location.origin}/?view=sucesso${slug ? `&slug=${slug}` : ""}`
+        : undefined;
+
       const result = await createCheckout({
         plan,
         userId,
         userEmail,
         documentId: params.docId,
+        successUrl,
       });
       toast.success("Redirecionando para o pagamento…");
       // Pequeno delay para o toast aparecer antes do redirect.
@@ -78,7 +95,7 @@ export function CheckoutView() {
       toast.error("Não foi possível iniciar o pagamento. Tente novamente.");
       setSubmitting(false);
     }
-  }, [plan, userId, userEmail, params.docId]);
+  }, [plan, userId, userEmail, params.docId, params.slug, user, guestEmail]);
 
   // Pro sem login → AuthGate-style inline. Hooks já foram chamados acima.
   if (plan === "pro" && loading) return <CheckoutSkeleton />;

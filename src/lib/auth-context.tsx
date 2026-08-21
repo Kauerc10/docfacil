@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import {
   GoogleAuthProvider,
   signInWithPopup,
@@ -11,22 +11,15 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { auth, db, IS_FIREBASE_CONFIGURED } from "./firebase";
+import {
+  auth,
+  db,
+  ensureAuthPersistence,
+  IS_FIREBASE_CONFIGURED,
+} from "./firebase";
+import { resolveInitialProfileName } from "./auth/profile-bootstrap";
 import { MODELOS } from "./modelos";
 import type { AppUser, PerfilUsuario } from "./types";
-
-/**
- * AuthContext — exposes the current user and auth actions.
- *
- * Two modes:
- * - Firebase configured: real Firebase Auth (Google popup, email/password),
- *   user profile synced to Firestore (collection "users").
- * - Demo mode (no credentials): localStorage-backed mock so the team can
- *   click through auth-gated screens immediately. The mock user persists
- *   across reloads and mimics the real API shape.
- *
- * Views consume `useAuth()` — they don't know which mode is active.
- */
 
 type AuthState = {
   user: AppUser | null;
@@ -34,16 +27,15 @@ type AuthState = {
   error: string | null;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (nome: string, email: string, password: string) => Promise<void>;
+  signUpWithEmail: (nome: string, email: string, password: string) => Promise<Pick<AppUser, "uid" | "email">>;
   signOut: () => Promise<void>;
   updateProfileData: (data: Partial<Pick<PerfilUsuario, "nome" | "telefone">>) => Promise<void>;
+  clearError: () => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
-
 const DEMO_USER_KEY = "docfacil:demo-user";
 
-// --- Demo-mode helpers (localStorage) ---
 function loadDemoUser(): AppUser | null {
   if (typeof window === "undefined") return null;
   try {
@@ -53,24 +45,26 @@ function loadDemoUser(): AppUser | null {
     return null;
   }
 }
+
 function saveDemoUser(u: AppUser | null) {
   if (typeof window === "undefined") return;
   if (u) localStorage.setItem(DEMO_USER_KEY, JSON.stringify(u));
   else localStorage.removeItem(DEMO_USER_KEY);
 }
 
+function firebaseErrorCode(error: unknown): string {
+  return (error as { code?: string })?.code || "";
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Lazy init: in demo mode we can read localStorage synchronously on first
-  // render — no effect needed, no cascading renders. In Firebase mode we
-  // start null + loading=true and resolve via onAuthStateChanged.
   const [user, setUser] = useState<AppUser | null>(() => {
     if (!IS_FIREBASE_CONFIGURED) return loadDemoUser();
     return null;
   });
   const [loading, setLoading] = useState<boolean>(() => IS_FIREBASE_CONFIGURED);
   const [error, setError] = useState<string | null>(null);
+  const pendingSignupNameRef = useRef<string | null>(null);
 
-  // Subscribe to Firebase Auth state changes (only in Firebase mode).
   useEffect(() => {
     if (!IS_FIREBASE_CONFIGURED || !auth) return;
 
@@ -82,37 +76,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
-      // Load (or create) the user profile from Firestore
+
+      const pendingSignupName = pendingSignupNameRef.current;
       let perfil: PerfilUsuario | null = null;
+
       if (db) {
-        const ref = doc(db, "users", fbUser.uid);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          perfil = snap.data() as PerfilUsuario;
-        } else {
-          // First login → create profile
-          perfil = {
-            uid: fbUser.uid,
-            nome: fbUser.displayName || "Usuário",
-            email: fbUser.email || "",
-            fotoUrl: fbUser.photoURL || undefined,
-            plano: "gratis",
-            criadoEm: Date.now(),
-            atualizadoEm: Date.now(),
-          };
-          await setDoc(ref, perfil);
+        try {
+          const ref = doc(db, "users", fbUser.uid);
+          const snap = await getDoc(ref);
+          if (snap.exists()) {
+            perfil = snap.data() as PerfilUsuario;
+          } else {
+            const novoPerfil: PerfilUsuario = {
+              uid: fbUser.uid,
+              nome: resolveInitialProfileName({
+                pendingSignupName,
+                firebaseDisplayName: fbUser.displayName,
+              }),
+              email: fbUser.email || "",
+              plano: "gratis",
+              criadoEm: Date.now(),
+              atualizadoEm: Date.now(),
+            };
+            if (fbUser.photoURL) novoPerfil.fotoUrl = fbUser.photoURL;
+            await setDoc(ref, novoPerfil);
+            perfil = novoPerfil;
+          }
+        } catch (err) {
+          console.warn("[AuthContext] Não foi possível sincronizar perfil do Firestore:", err);
         }
       }
+
       if (cancelled) return;
       setUser({
         uid: fbUser.uid,
-        nome: perfil?.nome || fbUser.displayName || "Usuário",
+        nome: perfil?.nome || resolveInitialProfileName({
+          pendingSignupName,
+          firebaseDisplayName: fbUser.displayName,
+        }),
         email: fbUser.email || "",
         fotoUrl: perfil?.fotoUrl || fbUser.photoURL || undefined,
         plano: perfil?.plano || "gratis",
       });
+      pendingSignupNameRef.current = null;
       setLoading(false);
     });
+
     return () => {
       cancelled = true;
       unsub();
@@ -122,7 +131,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     setError(null);
     if (!IS_FIREBASE_CONFIGURED || !auth) {
-      // Demo mode
       const demo: AppUser = {
         uid: `demo-${Date.now()}`,
         nome: "Usuário Demo",
@@ -133,9 +141,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(demo);
       return;
     }
+
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await ensureAuthPersistence();
+      await signInWithPopup(auth, new GoogleAuthProvider());
     } catch (e) {
       setError(translateAuthError(e));
       throw e;
@@ -155,7 +164,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(demo);
       return;
     }
+
     try {
+      await ensureAuthPersistence();
       await signInWithEmailAndPassword(auth, email, password);
     } catch (e) {
       setError(translateAuthError(e));
@@ -174,13 +185,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       saveDemoUser(demo);
       setUser(demo);
-      return;
+      return { uid: demo.uid, email: demo.email };
     }
+
+    const normalizedName = nome.trim();
+    pendingSignupNameRef.current = normalizedName;
+
     try {
+      await ensureAuthPersistence();
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(cred.user, { displayName: nome });
-      // Profile doc created by onAuthStateChanged bootstrap
+      await updateProfile(cred.user, { displayName: normalizedName });
+      return { uid: cred.user.uid, email: cred.user.email || email };
     } catch (e) {
+      pendingSignupNameRef.current = null;
       setError(translateAuthError(e));
       throw e;
     }
@@ -207,9 +224,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const clearError = useCallback(() => setError(null), []);
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, error, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, updateProfileData }}
+      value={{
+        user,
+        loading,
+        error,
+        signInWithGoogle,
+        signInWithEmail,
+        signUpWithEmail,
+        signOut,
+        updateProfileData,
+        clearError,
+      }}
     >
       {children}
     </AuthContext.Provider>
@@ -222,23 +251,32 @@ export function useAuth() {
   return ctx;
 }
 
-/** Traduz mensagens de erro do Firebase Auth para PT-BR amigável. */
-function translateAuthError(e: unknown): string {
-  const code = (e as { code?: string })?.code || "";
+/** Traduz mensagens de erro do Firebase Auth para PT-BR claro e orientador. */
+export function translateAuthError(e: unknown): string {
+  const code = firebaseErrorCode(e);
+  const invalidCredentials = "E-mail ou senha incorretos. Verifique a digitação ou entre com o Google.";
   const map: Record<string, string> = {
-    "auth/invalid-email": "E-mail inválido.",
-    "auth/user-disabled": "Conta desativada.",
-    "auth/user-not-found": "E-mail ou senha incorretos.",
-    "auth/wrong-password": "E-mail ou senha incorretos.",
-    "auth/email-already-in-use": "Este e-mail já está cadastrado.",
-    "auth/weak-password": "Senha muito fraca. Use pelo menos 6 caracteres.",
-    "auth/popup-closed-by-user": "Janela de login fechada antes de concluir.",
-    "auth/cancelled-popup-request": "Login cancelado.",
-    "auth/network-request-failed": "Sem conexão. Verifique sua internet.",
-    "auth/too-many-requests": "Muitas tentativas. Tente novamente em alguns minutos.",
+    "auth/invalid-credential": invalidCredentials,
+    "auth/user-not-found": invalidCredentials,
+    "auth/wrong-password": invalidCredentials,
+    "auth/invalid-email": "E-mail com formato inválido. Verifique se digitou corretamente.",
+    "auth/missing-password": "Por favor, digite sua senha.",
+    "auth/missing-email": "Por favor, informe seu e-mail.",
+    "auth/email-already-in-use": "Este e-mail já está cadastrado. Tente entrar em vez de criar uma nova conta.",
+    "auth/weak-password": "A senha não atende aos requisitos de segurança configurados.",
+    "auth/password-does-not-meet-requirements": "A senha não atende aos requisitos de segurança configurados.",
+    "auth/account-exists-with-different-credential": "Esta conta foi cadastrada com outro método (ex: Google). Use o botão correspondente.",
+    "auth/credential-already-in-use": "Esta credencial já está associada a outra conta.",
+    "auth/user-disabled": "Esta conta foi temporariamente desativada pelo suporte.",
+    "auth/too-many-requests": "Muitas tentativas sem sucesso. Por segurança, aguarde alguns instantes antes de tentar novamente.",
+    "auth/popup-closed-by-user": "Login com o Google cancelado (a janela foi fechada antes de concluir).",
+    "auth/popup-blocked": "A janela de login com o Google foi bloqueada pelo navegador. Permita pop-ups para continuar.",
+    "auth/cancelled-popup-request": "Operação de login cancelada.",
+    "auth/network-request-failed": "Sem conexão com a internet. Verifique sua rede e tente novamente.",
+    "auth/operation-not-allowed": "Este método de login não está ativado no momento.",
+    "auth/internal-error": "Ocorreu uma instabilidade no serviço de autenticação. Tente novamente em instantes.",
   };
-  return map[code] || "Algo deu errado. Tente novamente.";
+  return map[code] || "Não foi possível concluir o login. Verifique seus dados e tente novamente.";
 }
 
-/** Re-exporta os modelos locais para uso no demo mode (não remover). */
 export { MODELOS };

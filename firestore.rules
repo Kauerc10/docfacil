@@ -6,42 +6,86 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // === Users ===
-    // Cada usuário só lê/escreve o próprio perfil.
+    // Cada usuário só lê o próprio perfil.
+    // Pode atualizar dados normais via whitelist explícita de campos seguros.
     match /users/{uid} {
+      function onlyEditableProfileFields() {
+        return request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly(['nome', 'telefone', 'fotoUrl', 'atualizadoEm']);
+      }
+
       allow read: if request.auth != null && request.auth.uid == uid;
-      allow create: if request.auth != null && request.auth.uid == uid;
-      allow update: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.uid == request.auth.uid
+        && (!request.resource.data.keys().hasAny(['plano']) || request.resource.data.plano == 'gratis');
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && onlyEditableProfileFields();
       allow delete: if false;
     }
 
     // === Models (catálogo de documentos) ===
-    // Leitura pública (qualquer um pode ver o catálogo, mesmo sem login —
-    // é o que alimenta a home e /modelos). Escrita só via Admin SDK (seed).
+    // Leitura pública. Escrita somente via Admin SDK.
     match /models/{slug} {
       allow read: if true;
       allow write: if false;
     }
 
-    // === Documents (documentos gerados pelos usuários) ===
-    // Cada usuário só acessa os próprios documentos.
+    // === Documents (documentos gerados) ===
+    // Leitura permitida para o proprietário autenticado.
+    // TODAS as mutações (criação, edição, exclusão) são estritamente bloqueadas no client
+    // e coordenadas exclusivamente pelo backend via Firebase Admin SDK.
     match /documents/{id} {
-      allow read: if request.auth != null
-        && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null
-        && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null
-        && resource.data.userId == request.auth.uid
-        && request.resource.data.userId == resource.data.userId;
-      allow delete: if request.auth != null
-        && resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && (
+        (resource.data.owner.type == 'user' && resource.data.owner.userId == request.auth.uid) ||
+        resource.data.userId == request.auth.uid
+      );
+      allow write: if false;
+
+      match /artifacts/{version} {
+        allow read: if request.auth != null && (
+          get(/databases/$(database)/documents/documents/$(id)).data.owner.userId == request.auth.uid ||
+          get(/databases/$(database)/documents/documents/$(id)).data.userId == request.auth.uid
+        );
+        allow write: if false;
+      }
     }
 
-    // === Payments (histórico de pagamentos) ===
-    // Leitura pelo dono. Escrita só via Admin SDK (webhook de billing).
-    match /payments/{id} {
-      allow read: if request.auth != null
-        && resource.data.userId == request.auth.uid;
+    // === Access Links (tokens de magic link e compartilhamento) ===
+    // Bloqueio total no client. Acesso exclusivamente server-side via hash.
+    match /access_links/{tokenHash} {
+      allow read, write: if false;
+    }
+
+    // === Orders (pedidos de pagamento) ===
+    // Leitura pelo comprador autenticado. Escrita exclusivamente server-side.
+    match /orders/{orderId} {
+      allow read: if request.auth != null && resource.data.buyer.userId == request.auth.uid;
       allow write: if false;
+    }
+
+    // === Generation Requests (idempotência e travas) ===
+    // Bloqueio total no client.
+    match /generation_requests/{requestId} {
+      allow read, write: if false;
+    }
+
+    // === Payments (legado) ===
+    match /payments/{id} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // === Consents (aceites de termos e privacidade) ===
+    // O histórico continua legível pelo próprio usuário autenticado, mas toda
+    // escrita é exclusiva do backend via Firebase Admin SDK. Isso impede que
+    // acceptedAt, IP, user-agent, versões ou hashes sejam forjados pelo client.
+    match /consents/{consentId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false;
     }
   }
 }

@@ -2,6 +2,7 @@
 
 import { LegalLayout } from "./legal-layout";
 import { PrivacyContent } from "@/lib/legal/privacy-content";
+import { PRIVACY_VERSION } from "@/lib/legal/versions";
 import { useNav, type View } from "../nav-context";
 
 /**
@@ -19,7 +20,7 @@ export function PrivacidadeView() {
       title="Política de Privacidade"
       subtitle="Como tratamos seus dados pessoais — em conformidade com a LGPD (Lei nº 13.709/2018)."
       lastUpdated="13 de julho de 2026"
-      version="1.0"
+      version={PRIVACY_VERSION}
     >
       <PrivacyContent onNavigate={(v) => navigate(v as View)} />
     </LegalLayout>

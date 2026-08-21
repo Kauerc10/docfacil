@@ -103,6 +103,8 @@ chore(deps): atualiza next de 16.1.1 para 16.1.3
 
 ```bash
 bun run lint    # 0 erros
+bun run test    # regras do motor de documentos
+bun run typecheck # 0 erros de tipo
 bun run build   # compila sem erro
 ```
 
@@ -113,7 +115,7 @@ Testou no browser? Desktop **e** mobile? Então pode abrir.
 1. **Título** = resumo da mudança (mesmo formato do commit).
 2. **Descrição** segue o template (o que faz, por quê, como testar, pegadinhas).
 3. **Pelo menos 1 approval** é obrigatório (Code Owners são automaticamente requisitados).
-4. **CI precisa passar** (lint + build + typecheck rodam automaticamente).
+4. **CI precisa passar** (testes + lint + build + typecheck rodam automaticamente).
 5. **Squash and merge** por padrão — mantém o histórico da main limpo.
 6. **Deleta a branch** depois do merge.
 
@@ -169,11 +171,12 @@ Antes de qualquer merge, a barreira mínima é:
 | Check | Comando | Aceitável |
 |---|---|---|
 | Lint | `bun run lint` | 0 erros (warnings OK se justificados) |
+| Testes | `bun run test` | 0 falhas nos cenários de domínio |
 | Build | `bun run build` | Compila sem erro |
-| TypeScript | (roda no build) | 0 erros de tipo |
+| TypeScript | `bun run typecheck` | 0 erros de tipo |
 | Browser | teste manual | Desktop + mobile, fluxo crítico funciona |
 
-Quando tivermos testes automatizados (Jest/Vitest), eles também viram barreira.
+Os testes unitários do motor de documentos são executados pelo runner nativo do Bun e fazem parte da barreira de CI.
 
 ---
 

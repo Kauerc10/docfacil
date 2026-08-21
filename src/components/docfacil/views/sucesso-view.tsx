@@ -13,6 +13,15 @@ import { useNav } from "../nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { getModel } from "@/lib/services/models-service";
 import { getDocument } from "@/lib/services/documents-service";
+import {
+  finalizeDocument,
+  loadGuestDraft,
+  clearGuestDraft,
+  clearFinalizationRequestId,
+  getDocumentDownloadUrl,
+  shareDocument,
+} from "@/lib/documents/client";
+import { buildGuestFinalizationAnswers } from "@/lib/documents/guest-draft";
 import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf/generator";
 import { logger } from "@/lib/logger";
 import { shouldWatermark } from "@/lib/services/plan-service";
@@ -52,10 +61,50 @@ export function SucessoView() {
   const [copied, setCopied] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [showConfetti, setShowConfetti] = useState(true);
+  const [finalizingGuest, setFinalizingGuest] = useState(false);
 
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [respostas, setRespostas] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+
+  const orderId = params.orderId;
+
+  useEffect(() => {
+    async function processGuestOrder() {
+      if (!user && orderId && slug && !finalizingGuest) {
+        const draft = loadGuestDraft(slug);
+        if (!draft) return;
+
+        setFinalizingGuest(true);
+        try {
+          const result = await finalizeDocument({
+            requestId: draft.requestId,
+            modeloSlug: draft.modeloSlug || slug,
+            respostas: buildGuestFinalizationAnswers(draft),
+            clausulasSelecionadas: draft.clausulasSelecionadas,
+            guestContact: draft.guestContact,
+            orderId,
+          });
+
+          if (!result.document?.guestAccessPath) {
+            throw new Error("Magic link guest ausente após finalização.");
+          }
+
+          clearGuestDraft(slug);
+          clearFinalizationRequestId(slug);
+          if (typeof window !== "undefined") {
+            window.location.assign(result.document.guestAccessPath);
+          }
+        } catch (err) {
+          logger.error("SucessoView", "falha na finalizacao do pedido guest", err);
+          toast.error("Ocorreu uma instabilidade ao gerar seu documento pago. Tente novamente.");
+          setFinalizingGuest(false);
+        }
+      }
+    }
+
+    processGuestOrder();
+  }, [user, orderId, slug, finalizingGuest]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -147,9 +196,14 @@ export function SucessoView() {
     if (!modelo || gerandoPdf) return;
     setGerandoPdf(true);
     try {
-      await gerarEBaixarPDF(modelo, respostas, modelo.slug, {
-        watermark: shouldWatermark(user),
-      });
+      if (docId && !docId.startsWith("demo-")) {
+        const { downloadUrl } = await getDocumentDownloadUrl(docId);
+        window.location.href = downloadUrl;
+      } else {
+        await gerarEBaixarPDF(modelo, respostas, modelo.slug, {
+          watermark: shouldWatermark(user),
+        });
+      }
       toast.success(SUCCESS_MESSAGES.PDF_GENERATED, {
         description: `Seu ${modelo.nome} foi baixado.`,
       });
@@ -163,19 +217,69 @@ export function SucessoView() {
     }
   };
 
-  const handleCopyLink = async () => {
+  const ensureShareUrl = async (): Promise<string | null> => {
+    if (!docId || docId.startsWith("demo-")) {
+      return window.location.href;
+    }
     try {
-      if (typeof navigator !== "undefined" && navigator.clipboard) {
-        await navigator.clipboard.writeText(window.location.href);
-      }
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard may be blocked — silent */
+      const res = await shareDocument(docId);
+      return `${window.location.origin}${res.shareUrl}`;
+    } catch (e) {
+      logger.error("SucessoView", "falha ao criar share link seguro", e, { docId });
+      toast.error("Não foi possível gerar o link seguro.");
+      return null;
     }
   };
 
+  const handleCopyLink = async () => {
+    const url = await ensureShareUrl();
+    if (!url) return;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+      toast.success("Link seguro copiado!");
+    } catch {
+      toast.error("Não foi possível copiar o link.");
+    }
+  };
+
+  const handleShareWhatsApp = async () => {
+    const url = await ensureShareUrl();
+    if (!url) return;
+    const text = encodeURIComponent(`Acesse o documento compartilhado no DocFácil: ${url}`);
+    window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+  };
+
+  const handleShareEmail = async () => {
+    const url = await ensureShareUrl();
+    if (!url) return;
+    const subject = encodeURIComponent(`Documento: ${modelo?.nome || "DocFácil"}`);
+    const body = encodeURIComponent(`Olá,\n\nVocê pode acessar o documento pelo link seguro:\n${url}\n\nDocFácil`);
+    window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
+  };
+
   // --- Loading skeleton ---
+  if (finalizingGuest) {
+    return (
+      <PageShell className="bg-[var(--green-tint)]/40 min-h-screen">
+        <div className="grid place-items-center min-h-[60vh] px-4">
+          <div className="text-center max-w-md">
+            <Loader2 className="w-10 h-10 text-[var(--coral)] animate-spin mx-auto" />
+            <h2 className="mt-4 font-[family-name:var(--font-jakarta)] text-2xl font-bold text-ink">
+              Gerando seu documento seguro…
+            </h2>
+            <p className="mt-2 text-sm text-ink/70">
+              Estamos finalizando seu PDF e preparando seu link de acesso permanente.
+            </p>
+          </div>
+        </div>
+      </PageShell>
+    );
+  }
+
   if (loading) {
     return (
       <PageShell className="bg-[var(--green-tint)]/40 min-h-screen">
@@ -330,6 +434,7 @@ export function SucessoView() {
               <button
                 data-suc="secondary"
                 type="button"
+                onClick={handleShareWhatsApp}
                 aria-label="Compartilhar no WhatsApp"
                 className="grid place-items-center w-11 h-11 rounded-full border border-[var(--border)] text-ink/70 hover:bg-[var(--blue-soft)] hover:text-[var(--blue-royal)] transition-colors"
               >
@@ -338,6 +443,7 @@ export function SucessoView() {
               <button
                 data-suc="secondary"
                 type="button"
+                onClick={handleShareEmail}
                 aria-label="Enviar por e-mail"
                 className="grid place-items-center w-11 h-11 rounded-full border border-[var(--border)] text-ink/70 hover:bg-[var(--blue-soft)] hover:text-[var(--blue-royal)] transition-colors"
               >

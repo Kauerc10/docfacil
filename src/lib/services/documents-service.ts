@@ -1,38 +1,23 @@
 /**
- * Documents service — CRUD for user-generated documents.
+ * Documents service — Fachada de acesso a documentos para a UI.
  *
- * Firestore collection: "documents" (one doc per generated document)
- *   - id (auto)
- *   - modeloSlug, modeloNome
- *   - respostas: Record<string, string>
- *   - status: "rascunho" | "concluido"
- *   - userId: Firebase Auth uid
- *   - criadoEm, atualizadoEm: timestamps
+ * Modo Real (Firebase/API):
+ *   - Toda operação real é intermediada pelas rotas server-side (/api/documents)
+ *   - Zero mutações client-side no Firestore.
+ *   - Falhas da API são propagadas. Nunca usamos fixtures/cache demo como
+ *     fallback de produção, pois isso mascara indisponibilidade e mistura dados.
  *
- * Security rules (to deploy with Firebase):
- *   match /documents/{id} {
- *     allow read: if request.auth.uid == resource.data.userId;
- *     allow create: if request.auth.uid == request.resource.data.userId;
- *     allow update, delete: if request.auth.uid == resource.data.userId;
- *   }
- *
- * Demo mode (no Firebase): in-memory array + localStorage persistence so the
- * dashboard flow works end-to-end for the team today.
+ * Modo Demo (sem Firebase / IDs demo-*):
+ *   - Armazenamento em localStorage para preview e desenvolvimento local.
  */
-import {
-  collection,
-  doc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  getDocs,
-  getDoc,
-  query,
-  where,
-  setDoc,
-} from "firebase/firestore";
-import { db, IS_FIREBASE_CONFIGURED } from "../firebase";
+import { IS_FIREBASE_CONFIGURED } from "../firebase";
 import type { Documento } from "../types";
+import {
+  listDocumentsApi,
+  getDocumentApi,
+  deleteDocumentApi,
+  duplicateDocumentApi,
+} from "../documents/client";
 
 const DEMO_KEY = "docfacil:demo-documents";
 
@@ -46,10 +31,16 @@ function loadDemoDocs(): Documento[] {
     return [];
   }
 }
-function saveDemoDocs(docs: Documento[]) {
+
+function saveDemoDocs(docs: Documento[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(DEMO_KEY, JSON.stringify(docs));
+  try {
+    localStorage.setItem(DEMO_KEY, JSON.stringify(docs));
+  } catch {
+    // ignore
+  }
 }
+
 function seedDemoDocs(): Documento[] {
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
@@ -104,80 +95,72 @@ function seedDemoDocs(): Documento[] {
 }
 
 export async function listDocuments(userId: string): Promise<Documento[]> {
-  if (!IS_FIREBASE_CONFIGURED || !db) {
+  if (!IS_FIREBASE_CONFIGURED) {
     return loadDemoDocs().filter((d) => d.userId === userId || d.userId === "demo");
   }
-  const q = query(collection(db, "documents"), where("userId", "==", userId));
-  const snap = await getDocs(q);
-  return snap.docs
-    .map((d) => ({ id: d.id, ...(d.data() as Omit<Documento, "id">) }))
-    .sort((a, b) => b.atualizadoEm - a.atualizadoEm);
+
+  const dtos = await listDocumentsApi();
+  return dtos.map((dto) => ({
+    id: dto.id,
+    modeloSlug: dto.modeloSlug,
+    modeloNome: dto.modeloNome,
+    respostas: {},
+    status: dto.status,
+    userId,
+    criadoEm: dto.criadoEm,
+    atualizadoEm: dto.atualizadoEm,
+  }));
 }
 
 export async function getDocument(id: string): Promise<Documento | null> {
-  if (!IS_FIREBASE_CONFIGURED || !db) {
+  if (!IS_FIREBASE_CONFIGURED || id.startsWith("demo-")) {
     return loadDemoDocs().find((d) => d.id === id) || null;
   }
-  const ref = doc(db, "documents", id);
-  const s = await getDoc(ref);
-  if (s.exists()) return { id: s.id, ...(s.data() as Omit<Documento, "id">) };
-  return null;
-}
 
-export async function createDocument(
-  data: Omit<Documento, "id" | "criadoEm" | "atualizadoEm">
-): Promise<Documento> {
-  const now = Date.now();
-  if (!IS_FIREBASE_CONFIGURED || !db) {
-    const docs = loadDemoDocs();
-    const novo: Documento = { ...data, id: `demo-${now}`, criadoEm: now, atualizadoEm: now };
-    docs.unshift(novo);
-    saveDemoDocs(docs);
-    return novo;
-  }
-  const ref = await addDoc(collection(db, "documents"), {
-    ...data,
-    criadoEm: now,
-    atualizadoEm: now,
-  });
-  return { ...data, id: ref.id, criadoEm: now, atualizadoEm: now };
-}
+  const dto = await getDocumentApi(id);
+  if (!dto) return null;
 
-export async function updateDocument(
-  id: string,
-  data: Partial<Pick<Documento, "respostas" | "status">>
-): Promise<void> {
-  if (!IS_FIREBASE_CONFIGURED || !db) {
-    const docs = loadDemoDocs();
-    const idx = docs.findIndex((d) => d.id === id);
-    if (idx >= 0) {
-      docs[idx] = { ...docs[idx], ...data, atualizadoEm: Date.now() };
-      saveDemoDocs(docs);
-    }
-    return;
-  }
-  await updateDoc(doc(db, "documents", id), { ...data, atualizadoEm: Date.now() });
+  return {
+    id: dto.id,
+    modeloSlug: dto.modeloSlug,
+    modeloNome: dto.modeloNome,
+    respostas: dto.respostas,
+    status: dto.status,
+    userId: "",
+    criadoEm: dto.criadoEm,
+    atualizadoEm: dto.atualizadoEm,
+  };
 }
 
 export async function deleteDocument(id: string): Promise<void> {
-  if (!IS_FIREBASE_CONFIGURED || !db) {
+  if (!IS_FIREBASE_CONFIGURED || id.startsWith("demo-")) {
     const docs = loadDemoDocs().filter((d) => d.id !== id);
     saveDemoDocs(docs);
     return;
   }
-  await deleteDoc(doc(db, "documents", id));
+
+  await deleteDocumentApi(id);
 }
 
-export async function duplicateDocument(id: string): Promise<Documento | null> {
-  const original = await getDocument(id);
-  if (!original) return null;
-  return createDocument({
-    modeloSlug: original.modeloSlug,
-    modeloNome: original.modeloNome,
-    respostas: { ...original.respostas },
-    status: "rascunho",
-    userId: original.userId,
-  });
+export interface DuplicateDraftResult {
+  modeloSlug: string;
+  respostas: Record<string, string>;
+  clausulasSelecionadas: string[];
+  extrasPorClausula: Record<string, Record<string, string>>;
 }
 
-export { setDoc };
+export async function duplicateDocument(id: string): Promise<DuplicateDraftResult | null> {
+  if (!IS_FIREBASE_CONFIGURED || id.startsWith("demo-")) {
+    const original = loadDemoDocs().find((d) => d.id === id);
+    if (!original) return null;
+    return {
+      modeloSlug: original.modeloSlug,
+      respostas: original.respostas || {},
+      clausulasSelecionadas: [],
+      extrasPorClausula: {},
+    };
+  }
+
+  const result = await duplicateDocumentApi(id);
+  return result.duplicateDraft;
+}

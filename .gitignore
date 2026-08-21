@@ -47,7 +47,7 @@ local-*
 *.log
 dev.log
 dev.out.log
-test
+/test
 prompt
 
 server.log
@@ -56,3 +56,6 @@ server.log
 # uploaded files (user attachments, not part of the project)
 /upload/
 tool-results/
+test-results/
+playwright-report/
+

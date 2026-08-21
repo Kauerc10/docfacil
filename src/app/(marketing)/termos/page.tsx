@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { COMPANY } from "@/lib/company";
 import { LegalPageWrapper } from "@/lib/legal/legal-page-wrapper";
 import { TermsContent } from "@/lib/legal/terms-content";
+import { TERMS_VERSION } from "@/lib/legal/versions";
 
 /**
  * /termos — Termos de Uso (server-rendered, crawlable).
@@ -29,7 +30,7 @@ export default function TermosPage() {
       title="Termos de Uso"
       subtitle="As regras claras para usar o DocFacil. Sem juridiquês, mas com validade."
       lastUpdated="13 de julho de 2026"
-      version="1.0"
+      version={TERMS_VERSION}
     >
       <TermsContent />
     </LegalPageWrapper>
