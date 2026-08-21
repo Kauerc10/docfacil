@@ -57,9 +57,6 @@ export function PdfDocumentPreview({
     let active = true;
     let objectUrl: string | undefined;
 
-    setPdfUrl(undefined);
-    setError(false);
-
     void (async () => {
       try {
         const pdfmake = await loadPdfmake();
@@ -70,6 +67,7 @@ export function PdfDocumentPreview({
 
         if (!active) return;
         objectUrl = URL.createObjectURL(blob);
+        setError(false);
         setPdfUrl(objectUrl);
       } catch {
         if (active) setError(true);
