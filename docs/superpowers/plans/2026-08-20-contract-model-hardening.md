@@ -71,7 +71,7 @@ Commit only relevant files with `fix(contracts): endurece regras e qualificaçõ
 >
 > Fix round 3 (2026-08-20): RED observado para imóvel pré-mudança com `sinal` e sem forma de pagamento, que antes renderizava placeholder de método. GREEN: `bun run typecheck` e 32 testes focados, 0 falhas. Esse formato legado rende `pago nesta data`; respostas novas com `possui_sinal=Sim` continuam exigindo a forma de pagamento.
 
-### Task 2: Fechamento responsivo à receita
+### Task 2: Fechamento responsivo à receita ✅
 
 **Files:**
 - Modify: `src/lib/pdf/contract-composer.ts`
