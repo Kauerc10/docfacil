@@ -203,15 +203,7 @@ test.describe("Guest Purchase and Download Flow", () => {
     if (await formaInput.isVisible()) await formaInput.fill("PIX");
     await page.getByRole("button", { name: /^avançar$/i }).click();
 
-    // Stage 4 — Moradores autorizados: a pergunta é opcional e pode ter mais de uma pessoa.
-    await page.getByRole("button", { name: /sim, adicionar morador/i }).click();
-    const moradorNomeInput = page.getByLabel("Nome completo");
-    await expect(moradorNomeInput).toBeVisible({ timeout: 10000 });
-    await moradorNomeInput.fill("Marina Lima");
-    await page.getByLabel(/CPF \(opcional\)/).fill("918.546.230-84");
-    await page.getByRole("button", { name: /^continuar$/i }).click();
-
-    // Stage 5 — Garantia locatícia: escolha única, seleciona Fiador
+    // Stage 4 — Garantia locatícia: escolha única, seleciona Fiador
     const fiadorCard = page.getByRole("radio", { name: "Fiador", exact: true });
     await expect(fiadorCard).toBeVisible({ timeout: 10000 });
     await fiadorCard.click();
@@ -228,10 +220,10 @@ test.describe("Guest Purchase and Download Flow", () => {
       await fiadorCpfInput.fill("056.489.370-84");
     }
 
-    // Stage 5 concluída: segue para as condições adicionais.
+    // Stage 4 concluída: segue para as condições adicionais.
     await page.getByRole("button", { name: /^avançar$/i }).click();
 
-    // Stage 6 — Condições adicionais: pode seguir sem selecionar cláusulas opcionais.
+    // Stage 5 — Condições adicionais: pode seguir sem selecionar cláusulas opcionais.
     await expect(page.getByText("Condições adicionais (opcionais)")).toBeVisible({
       timeout: 10000,
     });
