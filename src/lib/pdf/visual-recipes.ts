@@ -2,8 +2,9 @@
  * visual-recipes.ts — Receitas editoriais dos PDFs do DocFácil.
  *
  * Mantém decisões puramente visuais fora do catálogo jurídico dos modelos.
- * Cada documento continua usando uma das três famílias editoriais, mas pode
- * calibrar densidade, ritmo, data, título e cláusulas sem duplicar renderers.
+ * Todos os documentos oficiais compartilham a mesma shell editorial, enquanto
+ * cada família calibra densidade, ritmo, data, título e fechamento sem duplicar
+ * renderers ou introduzir condicionais por slug no compositor.
  */
 
 export type PdfLayoutProfile = "declaration" | "contract" | "instrument";
@@ -41,22 +42,27 @@ export interface PdfVisualRecipe {
   dateBottomMargin: number;
   clauseHeadingTopMargin: number;
   clauseHeadingBottomMargin: number;
-  /** Tom principal do corpo; declarações preservam seu azul atual. */
+  /** Tom principal do corpo do documento. */
   bodyColor?: string;
-  /** Cabeçalho editorial; o padrão mantém o comportamento histórico. */
+  /** Shell editorial usada pelo renderer. */
   headerStyle?: "standard" | "formal";
-  /** Alguns documentos formais usam somente o filete do cabeçalho. */
+  /** A shell formal usa o filete do cabeçalho em vez do divisor legado do título. */
   showTitleDivider?: boolean;
 }
 
+type PdfVisualBaseRecipe = Omit<
+  PdfVisualRecipe,
+  "profile" | "density" | "contractVariant"
+>;
+
 /**
- * Moldura editorial comum aos contratos DocFácil. Variações posteriores
- * ajustam apenas o ritmo de leitura; não podem voltar ao layout legado.
+ * Identidade editorial comum do DocFácil.
+ *
+ * A base não conhece a natureza jurídica do documento. Declarações, contratos
+ * e instrumentos herdam a mesma geometria, header, cores e tratamento de
+ * título; os presets de família abaixo alteram somente ritmo e densidade.
  */
-const CONTRACT_FORMAL_BASE_RECIPE: PdfVisualRecipe = {
-  profile: "contract",
-  density: "balanced",
-  contractVariant: "standard",
+const DOCUMENT_FORMAL_BASE_RECIPE: PdfVisualBaseRecipe = {
   pageMarginsCm: [2, 2.3, 2, 2],
   footerHorizontalInsetCm: 2,
   footerBottomMarginCm: 0.55,
@@ -66,6 +72,8 @@ const CONTRACT_FORMAL_BASE_RECIPE: PdfVisualRecipe = {
   signatureCharacterSpacing: 0.2,
   titleFontSize: 15,
   titleCharacterSpacing: 0.2,
+  // Mantém os números já aprovados nos contratos; famílias mais arejadas
+  // sobrescrevem apenas o ritmo necessário.
   titleBottomMargin: 3,
   dividerBottomMargin: 8,
   dividerWidthCm: null,
@@ -83,6 +91,51 @@ const CONTRACT_FORMAL_BASE_RECIPE: PdfVisualRecipe = {
   bodyColor: "#181818",
   headerStyle: "formal",
   showTitleDivider: false,
+};
+
+const DECLARATION_AIRY_RECIPE: PdfVisualRecipe = {
+  ...DOCUMENT_FORMAL_BASE_RECIPE,
+  profile: "declaration",
+  density: "airy",
+  bodyFontSize: 11.25,
+  bodyLineHeight: 1.55,
+  signatureLineHeight: 1.08,
+  titleBottomMargin: 8,
+  closingTopMargin: 15,
+  closingBottomMargin: 24,
+  paragraphBottomMargin: 10,
+  legalQuoteLineHeight: 1.45,
+  dateAlignment: "center",
+  dateTopMargin: 16,
+  dateBottomMargin: 26,
+};
+
+const DECLARATION_BALANCED_RECIPE: PdfVisualRecipe = {
+  ...DOCUMENT_FORMAL_BASE_RECIPE,
+  profile: "declaration",
+  density: "balanced",
+  bodyFontSize: 11.1,
+  bodyLineHeight: 1.48,
+  signatureLineHeight: 1.06,
+  titleBottomMargin: 8,
+  closingTopMargin: 14,
+  closingBottomMargin: 18,
+  paragraphBottomMargin: 8,
+  legalQuoteLineHeight: 1.42,
+  dateAlignment: "center",
+  dateTopMargin: 14,
+  dateBottomMargin: 22,
+};
+
+/**
+ * Moldura editorial dos contratos. O objeto preserva os valores que já estavam
+ * aprovados na família contract e apenas herda a identidade global.
+ */
+const CONTRACT_FORMAL_BASE_RECIPE: PdfVisualRecipe = {
+  ...DOCUMENT_FORMAL_BASE_RECIPE,
+  profile: "contract",
+  density: "balanced",
+  contractVariant: "standard",
 };
 
 const DEFAULT_CONTRACT_RECIPE: PdfVisualRecipe = {
@@ -123,69 +176,45 @@ const CONTRACT_PROPERTY_RECIPE: PdfVisualRecipe = {
   closingTopMargin: 16,
 };
 
+const INSTRUMENT_AIRY_RECIPE: PdfVisualRecipe = {
+  ...DOCUMENT_FORMAL_BASE_RECIPE,
+  profile: "instrument",
+  density: "airy",
+  bodyFontSize: 11.25,
+  bodyLineHeight: 1.5,
+  signatureLineHeight: 1.06,
+  closingTopMargin: 20,
+  paragraphBottomMargin: 9,
+  legalQuoteLineHeight: 1.44,
+  dateAlignment: "right",
+  dateTopMargin: 18,
+  dateBottomMargin: 16,
+};
+
+const INSTRUMENT_BALANCED_RECIPE: PdfVisualRecipe = {
+  ...DOCUMENT_FORMAL_BASE_RECIPE,
+  profile: "instrument",
+  density: "balanced",
+  bodyFontSize: 11.1,
+  bodyLineHeight: 1.42,
+  signatureLineHeight: 1.04,
+  closingTopMargin: 17,
+  paragraphBottomMargin: 8,
+  legalQuoteLineHeight: 1.4,
+  dateAlignment: "right",
+  dateTopMargin: 16,
+  dateBottomMargin: 14,
+};
+
 /**
  * As nove receitas são explícitas de propósito: o fallback existe para
  * templates futuros/IA, enquanto os modelos oficiais ficam visualmente
  * auditáveis e previsíveis.
  */
 export const PDF_VISUAL_RECIPES: Record<string, PdfVisualRecipe> = {
-  "declaracao-residencia": {
-    profile: "declaration",
-    density: "airy",
-    pageMarginsCm: [3.2, 3.05, 3.2, 1.85],
-    footerHorizontalInsetCm: 1.8,
-    footerBottomMarginCm: 0.4,
-    bodyFontSize: 12.25,
-    bodyLineHeight: 1.82,
-    signatureLineHeight: 1.12,
-    signatureCharacterSpacing: 0.9,
-    titleFontSize: 16.5,
-    titleCharacterSpacing: 1.5,
-    titleBottomMargin: 8,
-    dividerBottomMargin: 28,
-    dividerWidthCm: 4.8,
-    closingTopMargin: 12,
-    closingBottomMargin: 42,
-    paragraphBottomMargin: 12,
-    firstLineIndentSpaces: 10,
-    legalQuoteIndent: 22,
-    legalQuoteLineHeight: 1.6,
-    dateAlignment: "center",
-    dateTopMargin: 15,
-    dateBottomMargin: 32,
-    clauseHeadingTopMargin: 14,
-    clauseHeadingBottomMargin: 6,
-  },
-  "declaracao-residencia-terceiro": {
-    profile: "declaration",
-    density: "balanced",
-    pageMarginsCm: [3.2, 3.15, 3.2, 1.85],
-    footerHorizontalInsetCm: 1.8,
-    footerBottomMarginCm: 0.4,
-    bodyFontSize: 12.1,
-    bodyLineHeight: 1.72,
-    signatureLineHeight: 1.1,
-    signatureCharacterSpacing: 0.8,
-    titleFontSize: 16.25,
-    titleCharacterSpacing: 1.4,
-    titleBottomMargin: 8,
-    dividerBottomMargin: 25,
-    dividerWidthCm: 5.2,
-    closingTopMargin: 14,
-    closingBottomMargin: 34,
-    paragraphBottomMargin: 10,
-    firstLineIndentSpaces: 9,
-    legalQuoteIndent: 20,
-    legalQuoteLineHeight: 1.56,
-    dateAlignment: "center",
-    dateTopMargin: 12,
-    dateBottomMargin: 28,
-    clauseHeadingTopMargin: 13,
-    clauseHeadingBottomMargin: 5,
-  },
-  "contrato-locacao": {
-    ...CONTRACT_FORMAL_RECIPE,
-  },
+  "declaracao-residencia": DECLARATION_AIRY_RECIPE,
+  "declaracao-residencia-terceiro": DECLARATION_BALANCED_RECIPE,
+  "contrato-locacao": CONTRACT_FORMAL_RECIPE,
   "contrato-locacao-comercial": CONTRACT_DENSE_RECIPE,
   "contrato-compra-venda-imovel": CONTRACT_PROPERTY_RECIPE,
   comodato: {
@@ -196,60 +225,8 @@ export const PDF_VISUAL_RECIPES: Record<string, PdfVisualRecipe> = {
     clauseHeadingBottomMargin: 5,
   },
   "compra-venda": CONTRACT_FORMAL_RECIPE,
-  "uniao-estavel": {
-    profile: "instrument",
-    density: "airy",
-    pageMarginsCm: [3.15, 3.65, 3.15, 2.7],
-    footerHorizontalInsetCm: 2,
-    footerBottomMarginCm: 0.55,
-    bodyFontSize: 12,
-    bodyLineHeight: 1.72,
-    signatureLineHeight: 1.06,
-    signatureCharacterSpacing: 0.25,
-    titleFontSize: 16,
-    titleCharacterSpacing: 1.5,
-    titleBottomMargin: 6,
-    dividerBottomMargin: 24,
-    dividerWidthCm: null,
-    closingTopMargin: 22,
-    closingBottomMargin: 0,
-    paragraphBottomMargin: 11,
-    firstLineIndentSpaces: 10,
-    legalQuoteIndent: 20,
-    legalQuoteLineHeight: 1.54,
-    dateAlignment: "right",
-    dateTopMargin: 18,
-    dateBottomMargin: 16,
-    clauseHeadingTopMargin: 13,
-    clauseHeadingBottomMargin: 5,
-  },
-  "procuracao-simples": {
-    profile: "instrument",
-    density: "balanced",
-    pageMarginsCm: [3.15, 3.65, 3.15, 2.7],
-    footerHorizontalInsetCm: 2,
-    footerBottomMarginCm: 0.55,
-    bodyFontSize: 12,
-    bodyLineHeight: 1.62,
-    signatureLineHeight: 1.06,
-    signatureCharacterSpacing: 0.2,
-    titleFontSize: 16,
-    titleCharacterSpacing: 1.5,
-    titleBottomMargin: 6,
-    dividerBottomMargin: 22,
-    dividerWidthCm: null,
-    closingTopMargin: 20,
-    closingBottomMargin: 0,
-    paragraphBottomMargin: 9,
-    firstLineIndentSpaces: 9,
-    legalQuoteIndent: 18,
-    legalQuoteLineHeight: 1.5,
-    dateAlignment: "right",
-    dateTopMargin: 16,
-    dateBottomMargin: 14,
-    clauseHeadingTopMargin: 12,
-    clauseHeadingBottomMargin: 5,
-  },
+  "uniao-estavel": INSTRUMENT_AIRY_RECIPE,
+  "procuracao-simples": INSTRUMENT_BALANCED_RECIPE,
 };
 
 export function getPdfVisualRecipe(modelo: { slug: string }): PdfVisualRecipe {
