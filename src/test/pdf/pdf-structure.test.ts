@@ -131,7 +131,7 @@ describe("PDF Structure & Layout Protection", () => {
     expect(signatureRow!.unbreakable).toBe(true);
   });
 
-  it("mantém o fechamento contratual comum inteiro quando cabe em uma página", () => {
+  it("mantém as grades do fechamento contratual protegidas sem bloquear a introdução", () => {
     const locacao = getModelo("contrato-locacao")!;
     const ddo = buildDocDefinition(locacao, answers) as {
       content: Array<{
@@ -147,7 +147,7 @@ describe("PDF Structure & Layout Protection", () => {
 
     expect(closingStack).toBeDefined();
     expect(closingStack.stack).toBeDefined();
-    expect(closingStack.unbreakable).toBe(true);
+    expect(closingStack.unbreakable).not.toBe(true);
     expect(JSON.stringify(closingStack)).toContain('"dontBreakRows":true');
   });
 

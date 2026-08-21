@@ -82,7 +82,7 @@ Commit only relevant files with `fix(contracts): endurece regras e qualificaçõ
 - Consumes: `PdfVisualRecipe` e `getPdfLayoutGeometry(recipe)`.
 - Produces: `buildContractContent(lines, recipe)` com fechamento em grupos seguros e grids proporcionais.
 
-- [ ] **Step 1: Escrever RED para fechamento longo e largura densa**
+- [x] **Step 1: Escrever RED para fechamento longo e largura densa**
 
 ```ts
 const closing = buildContractContent(longClosingLines, denseRecipe).at(-1);
@@ -90,21 +90,23 @@ expect(closing).not.toMatchObject({ unbreakable: true });
 expect(JSON.stringify(closing)).not.toContain('"widths":[16,"*",36,112,26,84]');
 ```
 
-- [ ] **Step 2: Executar RED**
+- [x] **Step 2: Executar RED**
 
 Run: `bun test src/test/pdf/contract-composer.test.ts`
 
-- [ ] **Step 3: Implementar grupos e geometria**
+- [x] **Step 3: Implementar grupos e geometria**
 
 Faça a introdução do fechamento quebrável, mantenha a tabela de assinaturas/testemunhas como linhas indivisíveis e calcule as linhas pelo `contentWidth`. Preserve `headlineLevel` e nunca faça o compositor depender de slug.
 
-- [ ] **Step 4: Executar GREEN**
+- [x] **Step 4: Executar GREEN**
 
 Run: `bun test src/test/pdf/contract-composer.test.ts src/test/pdf/pdf-structure.test.ts`
 
-- [ ] **Step 5: Revisar e commitar**
+- [x] **Step 5: Revisar e commitar**
 
 Commit only composer/tests with `fix(pdf): estabiliza fechamento de contratos`.
+
+> Evidência da Task 2 (2026-08-20): RED observado com 4 falhas esperadas no compositor: fechamento comum marcado como `unbreakable`, grade de assinatura sem largura calculada, grade testemunhal fixa e data sem vírgula não centralizada. RED adicional observado para as colunas `Nome:`/`CPF:` em receita dense (31,19pt, menor que os 43pt necessários). GREEN: `npm exec --yes bun -- test src/test/pdf/contract-composer.test.ts src/test/pdf/pdf-structure.test.ts` com 26 testes e 79 asserções, 0 falhas; `npm run typecheck` sem erros. Auditoria visual atualizada para residencial, comercial, imóvel, comodato e bem móvel em `tmp/model-audit/rendered-task2-final` com `pdftoppm -png -r 150`; os artefatos não são versionados.
 
 ### Task 3: Auditoria visual de contratos
 

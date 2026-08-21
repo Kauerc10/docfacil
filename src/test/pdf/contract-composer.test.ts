@@ -3,9 +3,11 @@ import { buildContractContent } from "@/lib/pdf/contract-composer";
 import { getModelo } from "@/lib/modelos";
 import { buildDocDefinition } from "@/lib/pdf/styles";
 import { generatePdfServer } from "@/lib/pdf/server/generator";
+import { getPdfLayoutGeometry } from "@/lib/pdf/layout-geometry";
 import { getPdfVisualRecipe } from "@/lib/pdf/visual-recipes";
 
 const formalRecipe = getPdfVisualRecipe({ slug: "contrato-locacao" });
+const denseRecipe = getPdfVisualRecipe({ slug: "contrato-locacao-comercial" });
 
 const contractLines = [
   "(Instrumento particular firmado nos termos da Lei nº 8.245/1991)",
@@ -41,10 +43,68 @@ describe("contract composer", () => {
     const content = buildContractContent(contractLines, formalRecipe) as Array<Record<string, unknown>>;
     const closing = content.find((node) => node.id === "contract-closing");
 
-    expect(closing).toMatchObject({ unbreakable: true });
+    expect(closing).not.toMatchObject({ unbreakable: true });
     expect(JSON.stringify(closing)).toContain('"dontBreakRows":true');
     expect(JSON.stringify(closing)).toContain("LOCADOR(A) - Carlos da Silva");
     expect(JSON.stringify(closing)).toContain("TESTEMUNHAS:");
+  });
+
+  it("permite que a introdução de fechamento longa quebre sem desproteger as grades", () => {
+    const longClosingLines = [
+      "E, por estarem assim justos e contratados, as PARTES assinam o presente instrumento na presença das testemunhas abaixo, depois de lerem integralmente todas as condições, confirmarem que compreenderam o conteúdo e declararem que celebram este ajuste de livre e espontânea vontade.",
+      "Blumenau/SC, 20 de agosto de 2026.",
+      "",
+      "[ASSINATURA] _______________________________________________",
+      "LOCADOR(A) - Carlos da Silva",
+      "CPF nº 111.222.333-44",
+      "",
+      "[ASSINATURA] _______________________________________________",
+      "LOCATÁRIO(A) - Marina Souza",
+      "CPF nº 555.666.777-88",
+      "",
+      "TESTEMUNHAS:",
+      "1) _________________________________________________ Nome: _________________________ CPF: _______________",
+      "2) _________________________________________________ Nome: _________________________ CPF: _______________",
+    ];
+    const closing = buildContractContent(longClosingLines, denseRecipe).at(-1);
+
+    expect(closing).not.toMatchObject({ unbreakable: true });
+    expect(JSON.stringify(closing)).not.toContain('"widths":[16,"*",36,112,26,84]');
+    expect(JSON.stringify(closing)).toContain('"dontBreakRows":true');
+  });
+
+  it("calcula as grades de fechamento pela largura útil da receita", () => {
+    const closing = buildContractContent(contractLines, denseRecipe).at(-1) as {
+      stack: Array<{
+        table?: { widths?: number[]; body?: unknown[] };
+        stack?: Array<{ table?: { widths?: number[]; body?: unknown[] } }>;
+      }>;
+    };
+    const geometry = getPdfLayoutGeometry(denseRecipe);
+    const tables = closing.stack.filter((node) => node.table);
+    const witnessGrid = closing.stack.find((node) => node.stack);
+    const witnessTable = witnessGrid?.stack?.find((node) => node.table)?.table;
+
+    expect(tables[0]?.table?.widths).toEqual([geometry.contentWidth / 2, geometry.contentWidth / 2]);
+    expect(witnessTable?.widths?.reduce((sum, width) => sum + width, 0)).toBeCloseTo(
+      geometry.contentWidth,
+      4
+    );
+    expect(witnessTable?.widths?.[2]).toBeGreaterThanOrEqual(43);
+    expect(witnessTable?.widths?.[4]).toBeGreaterThanOrEqual(32);
+  });
+
+  it("centraliza a data de bem móvel mesmo sem vírgula antes do dia", () => {
+    const closing = buildContractContent(
+      [
+        "E, por estarem assim justos e acordados, as partes assinam o presente instrumento.",
+        "Blumenau/SC 20 de agosto de 2026.",
+      ],
+      formalRecipe
+    ).at(-1) as { stack: Array<{ alignment?: string; text?: unknown }> };
+    const date = closing.stack.find((node) => JSON.stringify(node.text).includes("20 de agosto de 2026"));
+
+    expect(date).toMatchObject({ alignment: "center" });
   });
 
   it("marca cláusulas para a proteção nativa contra heading órfão", () => {
