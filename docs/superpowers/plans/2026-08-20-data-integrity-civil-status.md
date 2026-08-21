@@ -35,7 +35,7 @@
 - Consumes: chaves de resposta que terminam em `_estado_civil` e a chave histórica `estado_civil`.
 - Guarantees: o servidor recebe respostas canônicas ou lança `BackendError` antes de sanitizá-las; `fillTemplate` nunca preserva uma abreviação conhecida truncada.
 
-- [ ] **Step 1: Escrever o teste RED da tabela canônica**
+- [x] **Step 1: Escrever o teste RED da tabela canônica**
 
 ```ts
 import { describe, expect, test } from "bun:test";
@@ -57,13 +57,13 @@ describe("normalizeCivilStatus", () => {
 });
 ```
 
-- [ ] **Step 2: Executar para confirmar RED**
+- [x] **Step 2: Executar para confirmar RED**
 
 Run: `bun test src/test/document-engine/civil-status.test.ts`
 
 Expected: falha porque o módulo `civil-status` ainda não existe.
 
-- [ ] **Step 3: Implementar a normalização mínima**
+- [x] **Step 3: Implementar a normalização mínima**
 
 ```ts
 function normalize(value: string): string {
@@ -89,13 +89,13 @@ export function normalizeCivilStatus(value: string): string | null {
 
 Os valores exibidos pela interface atual, inclusive `viúvo(a)` e `em união estável`, passam pela mesma normalização de acentos antes da busca.
 
-- [ ] **Step 4: Executar o teste GREEN**
+- [x] **Step 4: Executar o teste GREEN**
 
 Run: `bun test src/test/document-engine/civil-status.test.ts`
 
 Expected: todos os casos passam.
 
-- [ ] **Step 5: Escrever RED de fronteira no domínio e no PDF**
+- [x] **Step 5: Escrever RED de fronteira no domínio e no PDF**
 
 ```ts
 it("normaliza o estado civil legado antes de sanitizar", () => {
@@ -111,23 +111,23 @@ it("rejeita estado civil desconhecido", () => {
 
 Adicione uma asserção de `fillDocument` para `locador_estado_civil: "di"` não conter `", di,"`.
 
-- [ ] **Step 6: Executar para confirmar RED**
+- [x] **Step 6: Executar para confirmar RED**
 
 Run: `bun test src/lib/server/domain/documents.test.ts src/test/document-engine/civil-status.test.ts`
 
 Expected: a entrada desconhecida ainda é aceita e a abreviação ainda chega ao documento.
 
-- [ ] **Step 7: Integrar no domínio e no renderer defensivo**
+- [x] **Step 7: Integrar no domínio e no renderer defensivo**
 
 Em `reconstructAndValidateResponses`, normalize toda chave `estado_civil` antes da composição; se o normalizador devolver `null`, lance `BackendError("INVALID_REQUEST", 400, "Estado civil inválido.")`. Em `fillTemplate`, substitua o bloco local de aliases por `normalizeCivilStatus`; mantenha valor original somente para chaves que não são de estado civil.
 
-- [ ] **Step 8: Executar regressões focadas**
+- [x] **Step 8: Executar regressões focadas**
 
 Run: `bun test src/lib/server/domain/documents.test.ts src/test/document-engine/civil-status.test.ts src/test/document-engine/document-engine.test.ts`
 
 Expected: 0 falhas.
 
-- [ ] **Step 9: Revisar, commitar e registrar evidência**
+- [x] **Step 9: Revisar, commitar e registrar evidência**
 
 Run: `bun run typecheck && bun run lint`
 
