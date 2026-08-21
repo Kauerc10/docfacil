@@ -171,13 +171,14 @@ export function textRuns(
 // === Citações legais ======================================================
 
 /**
- * Heurística ampliada para detecção de citações legais.
- * Captura art./Art., lei, código, CP, CC, CDC, CF/88, constituição,
- * pena — com ou sem aspas, case-insensitive.
+ * Detecta somente linhas que materializam uma transcrição legal explícita.
+ * Referências incidentais, como "conforme o art. 1.724 do Código Civil",
+ * permanecem como corpo normal e não recebem itálico/recuo de citação.
  */
-export const LEGAL_QUOTE_REGEX = /\b(art\.?\s*\d|lei\s*(n\.?)?\s*\d|c[oó]digo\s+\w|CP\b|CC\b|CDC\b|CF\/?88\b|constitui[çc][ãa]o\s+federal|pena\s+(de\s+)?\w)/i;
+export const LEGAL_QUOTE_REGEX =
+  /^\s*["'“‘]?\s*(?:art\.?\s*\d+[A-Za-zº°-]*\s*[-–—:]|pena\s*[-–—:])/i;
 
-/** Retorna true se o texto parece ser uma citação de dispositivo legal. */
+/** Retorna true se o texto parece ser uma transcrição de dispositivo legal. */
 export function isLegalQuote(text: string): boolean {
   return LEGAL_QUOTE_REGEX.test(text);
 }
