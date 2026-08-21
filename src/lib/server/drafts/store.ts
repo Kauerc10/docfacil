@@ -1,6 +1,8 @@
 import "server-only";
 import { getAdminFirestore } from "../firebase-admin";
 import { BackendError } from "../errors";
+import { getServerEnv } from "../env";
+import { assertProductionServerConfig } from "../config/assert-production-config";
 import type { AccountDraft, AccountDraftInput } from "../domain/drafts";
 
 export interface DraftStore {
@@ -144,9 +146,12 @@ let singleton: DraftStore | null = null;
 export function getDraftStore(): DraftStore {
   if (singleton) return singleton;
 
+  const env = getServerEnv();
+  assertProductionServerConfig(env);
+
   const useInMemory =
-    process.env.ALLOW_IN_MEMORY_REPOSITORIES === "true" ||
-    (process.env.NODE_ENV === "test" && !process.env.FIRESTORE_EMULATOR_HOST);
+    env.ALLOW_IN_MEMORY_REPOSITORIES ||
+    (env.NODE_ENV === "test" && !env.FIRESTORE_EMULATOR_HOST);
 
   singleton = useInMemory ? new InMemoryDraftStore() : new FirestoreDraftStore();
   return singleton;
