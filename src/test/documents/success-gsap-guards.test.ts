@@ -7,11 +7,12 @@ function source(path: string): string {
 }
 
 describe("SucessoView GSAP guards", () => {
-  it("não tenta animar targets antes de modelo e escopo existirem", () => {
+  it("não tenta animar a prévia real antes de modelo e escopo existirem", () => {
     const sucesso = source("src/components/docfacil/views/sucesso-view.tsx");
 
     expect(sucesso).toContain("if (!root.current || !modelo) return;");
     expect(sucesso).toContain("root.current.querySelector");
-    expect(sucesso).toContain("if (!stamp || !sheet || !cta) return;");
+    expect(sucesso).toContain("if (!sheet || !cta) return;");
+    expect(sucesso).not.toContain("data-suc=\"stamp\"");
   });
 });
