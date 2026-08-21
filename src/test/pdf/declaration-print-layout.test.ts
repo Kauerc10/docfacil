@@ -24,7 +24,7 @@ type Node = {
 };
 
 describe("Declaration print layout", () => {
-  it("mantém o footer nativo fora da caixa lateral do corpo e perto da borda física", () => {
+  it("usa a mesma geometria de folha e footer da shell formal", () => {
     const modelo = getModelo("declaracao-residencia")!;
     const ddo = buildDocDefinition(modelo, answers) as {
       pageMargins: number[];
@@ -34,27 +34,31 @@ describe("Declaration print layout", () => {
     expect(typeof ddo.footer).toBe("function");
     const footer = ddo.footer!(1, 1);
 
-    expect(footer.margin?.[0] ?? Infinity).toBeLessThan(ddo.pageMargins[0]);
-    expect(footer.margin?.[2] ?? Infinity).toBeLessThan(ddo.pageMargins[2]);
-    expect(ddo.pageMargins[3]).toBeLessThan(cm(2.5));
+    expect(ddo.pageMargins[0]).toBeCloseTo(cm(2), 2);
+    expect(ddo.pageMargins[2]).toBeCloseTo(cm(2), 2);
+    expect(footer.margin?.[0]).toBeCloseTo(cm(2), 2);
+    expect(footer.margin?.[2]).toBeCloseTo(cm(2), 2);
+    expect(ddo.pageMargins[3]).toBeCloseTo(cm(2), 2);
   });
 
-  it("sobe o título da declaração sem apertar o corpo", () => {
+  it("mantém o título alto sem recuperar as margens largas do layout antigo", () => {
     const modelo = getModelo("declaracao-residencia")!;
     const ddo = buildDocDefinition(modelo, answers) as { pageMargins: number[] };
 
-    expect(ddo.pageMargins[1]).toBeLessThan(cm(3.5));
+    expect(ddo.pageMargins[1]).toBeCloseTo(cm(2.3), 2);
+    expect(ddo.pageMargins[0]).toBeLessThan(cm(2.5));
   });
 
-  it("sobe a data e aumenta o vão até a assinatura", () => {
+  it("mantém a data centralizada com respiro suficiente antes da assinatura", () => {
     const modelo = getModelo("declaracao-residencia")!;
     const recipe = getPdfVisualRecipe(modelo);
 
-    expect(recipe.dateTopMargin).toBeLessThan(22);
-    expect(recipe.dateBottomMargin).toBeGreaterThanOrEqual(26);
+    expect(recipe.dateAlignment).toBe("center");
+    expect(recipe.dateTopMargin).toBeLessThanOrEqual(18);
+    expect(recipe.dateBottomMargin).toBeGreaterThanOrEqual(22);
   });
 
-  it("reserva uma assinatura mais larga e uma área branca generosa abaixo do declarante", () => {
+  it("preserva espaço de assinatura sem forçar whitespace excessivo", () => {
     const modelo = getModelo("declaracao-residencia")!;
     const recipe = getPdfVisualRecipe(modelo);
     const ddo = buildDocDefinition(modelo, answers) as {
@@ -63,9 +67,11 @@ describe("Declaration print layout", () => {
     };
     const closing = ddo.content[ddo.content.length - 1];
 
-    expect(recipe.signatureCharacterSpacing).toBeGreaterThanOrEqual(0.8);
-    expect(ddo.styles.signature.characterSpacing ?? 0).toBeGreaterThanOrEqual(0.8);
-    expect(recipe.closingBottomMargin).toBeGreaterThanOrEqual(34);
-    expect(closing.margin?.[3] ?? 0).toBeGreaterThanOrEqual(34);
+    expect(recipe.signatureCharacterSpacing).toBeLessThanOrEqual(0.4);
+    expect(ddo.styles.signature.characterSpacing ?? Infinity).toBeLessThanOrEqual(0.4);
+    expect(recipe.closingBottomMargin).toBeGreaterThanOrEqual(18);
+    expect(recipe.closingBottomMargin).toBeLessThanOrEqual(28);
+    expect(closing.margin?.[3] ?? 0).toBeGreaterThanOrEqual(18);
+    expect(closing.margin?.[3] ?? Infinity).toBeLessThanOrEqual(28);
   });
 });
