@@ -10,6 +10,11 @@ type PdfNode = {
   [key: string]: unknown;
 };
 
+type LocatedNode = {
+  node: PdfNode;
+  path: string;
+};
+
 function plainText(value: unknown): string {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) return value.map(plainText).join("");
@@ -20,10 +25,14 @@ function plainText(value: unknown): string {
   return "";
 }
 
-function findStyledNode(value: unknown, fragment: string): PdfNode | undefined {
+function findStyledNode(
+  value: unknown,
+  fragment: string,
+  path = "content"
+): LocatedNode | undefined {
   if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = findStyledNode(item, fragment);
+    for (let index = 0; index < value.length; index++) {
+      const found = findStyledNode(value[index], fragment, `${path}[${index}]`);
       if (found) return found;
     }
     return undefined;
@@ -33,11 +42,11 @@ function findStyledNode(value: unknown, fragment: string): PdfNode | undefined {
 
   const node = value as PdfNode;
   if (typeof node.style === "string" && plainText(node).includes(fragment)) {
-    return node;
+    return { node, path };
   }
 
-  for (const child of Object.values(node)) {
-    const found = findStyledNode(child, fragment);
+  for (const [key, child] of Object.entries(node)) {
+    const found = findStyledNode(child, fragment, `${path}.${key}`);
     if (found) return found;
   }
 
@@ -71,7 +80,14 @@ describe("tipografia formal das declarações", () => {
 
   it("mantém menção ao art. 299 como parágrafo normal justificado e recuado", () => {
     const content = buildDeclaration("declaracao-residencia-terceiro");
-    const node = findStyledNode(content, "falsidade da presente declaração");
+    const located = findStyledNode(content, "falsidade da presente declaração");
+    const node = located?.node;
+
+    console.error("DECLARATION_TYPOGRAPHY_DIAGNOSTIC", JSON.stringify({
+      fragment: "falsidade da presente declaração",
+      path: located?.path,
+      node,
+    }));
 
     expect(node).toBeDefined();
     expect(node?.style).toBe("body");
@@ -83,7 +99,14 @@ describe("tipografia formal das declarações", () => {
 
   it("reserva o estilo de citação para a transcrição literal da lei e também a justifica", () => {
     const content = buildDeclaration("declaracao-residencia-terceiro");
-    const node = findStyledNode(content, "Art. 299 - Omitir");
+    const located = findStyledNode(content, "Art. 299 - Omitir");
+    const node = located?.node;
+
+    console.error("DECLARATION_TYPOGRAPHY_DIAGNOSTIC", JSON.stringify({
+      fragment: "Art. 299 - Omitir",
+      path: located?.path,
+      node,
+    }));
 
     expect(node).toBeDefined();
     expect(node?.style).toBe("legalQuote");
