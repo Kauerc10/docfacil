@@ -10,15 +10,16 @@ const shortFormSlugs = [
 ] as const;
 
 describe("ritmo editorial dos documentos curtos", () => {
-  it("evita uma caixa de texto larga demais em peças de uma página", () => {
+  it("estreita o miolo sem deslocar a moldura institucional da folha", () => {
     for (const slug of shortFormSlugs) {
       const modelo = getModelo(slug);
       expect(modelo).toBeDefined();
 
       const recipe = getPdfVisualRecipe(modelo!);
       expect(recipe.profile).not.toBe("contract");
-      expect(recipe.pageMarginsCm[0]).toBeGreaterThanOrEqual(2.3);
-      expect(recipe.pageMarginsCm[2]).toBeGreaterThanOrEqual(2.3);
+      expect(recipe.pageMarginsCm[0]).toBe(2);
+      expect(recipe.pageMarginsCm[2]).toBe(2);
+      expect(recipe.bodyHorizontalInsetCm ?? 0).toBeGreaterThanOrEqual(0.3);
     }
   });
 
@@ -37,7 +38,7 @@ describe("ritmo editorial dos documentos curtos", () => {
       const recipe = getPdfVisualRecipe(getModelo(slug)!);
 
       expect(recipe.pageMarginsCm[1]).toBeGreaterThanOrEqual(2.5);
-      expect(recipe.titleBottomMargin).toBeGreaterThanOrEqual(9);
+      expect(recipe.titleBottomMargin).toBeGreaterThanOrEqual(10);
       expect(recipe.closingTopMargin).toBeGreaterThanOrEqual(16);
     }
   });
