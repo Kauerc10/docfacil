@@ -245,6 +245,24 @@ export function reconstructAndValidateResponses(
   rawRespostas: Record<string, string>,
   clausulasSelecionadas: string[] = []
 ): Record<string, string> {
+  const declaredClauseIds = new Set(
+    (modelo.etapas || []).flatMap((etapa) =>
+      etapa.tipo === "clausulas"
+        ? etapa.clausulas.map((clausula) => clausula.id)
+        : []
+    )
+  );
+  const unknownClauseId = clausulasSelecionadas.find(
+    (id) => !declaredClauseIds.has(id)
+  );
+  if (unknownClauseId) {
+    throw new BackendError(
+      "INVALID_REQUEST",
+      400,
+      `Cláusula selecionada não existe neste modelo: ${unknownClauseId}`
+    );
+  }
+
   const respostasCompativeis = normalizarRespostasLegadasDeContrato(
     modelo,
     rawRespostas
@@ -295,8 +313,14 @@ export function reconstructAndValidateResponses(
     for (const etapa of modelo.etapas) {
       if (etapa.tipo === "campo") {
         allowedKeys.add(etapa.campo.key);
-        if (!optionalSet.has(etapa.campo.key) && etapa.campo.obrigatorio !== false) {
-          requiredKeys.add({ key: etapa.campo.key, label: etapa.campo.pergunta || etapa.campo.key });
+        if (
+          !optionalSet.has(etapa.campo.key) &&
+          etapa.campo.obrigatorio !== false
+        ) {
+          requiredKeys.add({
+            key: etapa.campo.key,
+            label: etapa.campo.pergunta || etapa.campo.key,
+          });
         }
       } else if (etapa.tipo === "campo_grupo") {
         if (etapa.endereco?.saidaKey) {
@@ -309,7 +333,9 @@ export function reconstructAndValidateResponses(
           }
           if (c.key === "rg" || c.key.endsWith("_rg")) {
             const prefix = c.key === "rg" ? "" : c.key.slice(0, -3);
-            const sepKey = prefix ? `${prefix}_rg_separador` : "rg_separador";
+            const sepKey = prefix
+              ? `${prefix}_rg_separador`
+              : "rg_separador";
             allowedKeys.add(sepKey);
           }
         }
@@ -321,7 +347,10 @@ export function reconstructAndValidateResponses(
               for (const c of clausula.camposExtras) {
                 allowedKeys.add(c.key);
                 if (!optionalSet.has(c.key) && c.obrigatorio !== false) {
-                  requiredKeys.add({ key: c.key, label: c.pergunta || c.key });
+                  requiredKeys.add({
+                    key: c.key,
+                    label: c.pergunta || c.key,
+                  });
                 }
               }
             }
@@ -370,7 +399,9 @@ export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export function calculateSourceHash(respostas: Record<string, string>): string {
+export function calculateSourceHash(
+  respostas: Record<string, string>
+): string {
   const sortedKeys = Object.keys(respostas).sort();
   const canonical: Record<string, string> = {};
   for (const k of sortedKeys) {
@@ -437,7 +468,10 @@ export function reconstructDuplicateDraft(
     }
   }
 
-  const respostasCompativeis = normalizarRespostasLegadasDeContrato(modelo, respostas);
+  const respostasCompativeis = normalizarRespostasLegadasDeContrato(
+    modelo,
+    respostas
+  );
   delete respostasCompativeis[SINAL_LEGADO_SEM_FORMA_KEY];
   Object.assign(respostas, respostasCompativeis);
 
