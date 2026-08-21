@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { assertProductionServerConfig } from "@/lib/server/config/assert-production-config";
 import type { ServerEnv } from "@/lib/server/env";
 
@@ -50,6 +52,29 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
   it("fails closed when ALLOW_IN_MEMORY_ARTIFACT_STORAGE is true in production", () => {
     const invalid = { ...validProductionEnv, ALLOW_IN_MEMORY_ARTIFACT_STORAGE: true };
     expect(() => assertProductionServerConfig(invalid)).toThrow(/In-memory artifact storage/i);
+  });
+
+  it("fails closed when ALLOW_IN_MEMORY_REPOSITORIES is true in production", () => {
+    const invalid = {
+      ...validProductionEnv,
+      ALLOW_IN_MEMORY_REPOSITORIES: true,
+    };
+
+    expect(() => assertProductionServerConfig(invalid as ServerEnv)).toThrow(
+      /In-memory repositories/i
+    );
+  });
+
+  it("não permite que a seleção de repositories contorne a trava de produção", () => {
+    const repositoriesSource = readFileSync(
+      resolve(process.cwd(), "src/lib/server/firestore/repositories.ts"),
+      "utf8"
+    );
+
+    expect(repositoriesSource).not.toContain(
+      'process.env.ALLOW_IN_MEMORY_REPOSITORIES === "true"'
+    );
+    expect(repositoriesSource).toContain("assertProductionServerConfig(env)");
   });
 
   it("does not treat Vercel preview as the final production deployment", () => {
