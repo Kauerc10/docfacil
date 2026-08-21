@@ -22,6 +22,7 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
     APP_CHECK_ENFORCED: true,
     ALLOW_DEMO_BILLING: false,
     ALLOW_IN_MEMORY_ARTIFACT_STORAGE: false,
+    ALLOW_IN_MEMORY_REPOSITORIES: false,
     NEXT_PUBLIC_APP_URL: "https://docfacil.com",
   };
 
@@ -110,6 +111,7 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
       APP_CHECK_ENFORCED: false,
       ALLOW_DEMO_BILLING: true,
       ALLOW_IN_MEMORY_ARTIFACT_STORAGE: true,
+      ALLOW_IN_MEMORY_REPOSITORIES: false,
       NEXT_PUBLIC_APP_URL: "http://localhost:3000",
     };
     expect(() => assertProductionServerConfig(devEnv)).not.toThrow();
