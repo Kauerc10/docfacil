@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { classifyLine } from "@/lib/document-engine/classify";
 import { getModelo } from "@/lib/modelos";
 import { buildDocDefinition } from "@/lib/pdf/styles";
 import { getPdfVisualRecipe } from "@/lib/pdf/visual-recipes";
@@ -8,11 +9,6 @@ type PdfNode = {
   style?: string;
   alignment?: string;
   [key: string]: unknown;
-};
-
-type LocatedNode = {
-  node: PdfNode;
-  path: string;
 };
 
 function plainText(value: unknown): string {
@@ -25,14 +21,10 @@ function plainText(value: unknown): string {
   return "";
 }
 
-function findStyledNode(
-  value: unknown,
-  fragment: string,
-  path = "content"
-): LocatedNode | undefined {
+function findStyledNode(value: unknown, fragment: string): PdfNode | undefined {
   if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index++) {
-      const found = findStyledNode(value[index], fragment, `${path}[${index}]`);
+    for (const item of value) {
+      const found = findStyledNode(item, fragment);
       if (found) return found;
     }
     return undefined;
@@ -42,11 +34,11 @@ function findStyledNode(
 
   const node = value as PdfNode;
   if (typeof node.style === "string" && plainText(node).includes(fragment)) {
-    return { node, path };
+    return node;
   }
 
-  for (const [key, child] of Object.entries(node)) {
-    const found = findStyledNode(child, fragment, `${path}.${key}`);
+  for (const child of Object.values(node)) {
+    const found = findStyledNode(child, fragment);
     if (found) return found;
   }
 
@@ -70,6 +62,11 @@ describe("tipografia formal das declarações", () => {
     expect(text).not.toContain("Declaração firmada sob as penas da lei");
   });
 
+  it("não confunde campos ainda vazios dentro do texto com linha de assinatura", () => {
+    expect(classifyLine("Eu, ____________, declaro que ____________ reside neste endereço.").tipo).toBe("paragraph");
+    expect(classifyLine("_______________________________________________").tipo).toBe("signature");
+  });
+
   it("usa recuo de primeira linha nas duas receitas de declaração", () => {
     const propria = getPdfVisualRecipe({ slug: "declaracao-residencia" });
     const terceiro = getPdfVisualRecipe({ slug: "declaracao-residencia-terceiro" });
@@ -80,14 +77,7 @@ describe("tipografia formal das declarações", () => {
 
   it("mantém menção ao art. 299 como parágrafo normal justificado e recuado", () => {
     const content = buildDeclaration("declaracao-residencia-terceiro");
-    const located = findStyledNode(content, "falsidade da presente declaração");
-    const node = located?.node;
-
-    console.error("DECLARATION_TYPOGRAPHY_DIAGNOSTIC", JSON.stringify({
-      fragment: "falsidade da presente declaração",
-      path: located?.path,
-      node,
-    }));
+    const node = findStyledNode(content, "falsidade da presente declaração");
 
     expect(node).toBeDefined();
     expect(node?.style).toBe("body");
@@ -99,14 +89,7 @@ describe("tipografia formal das declarações", () => {
 
   it("reserva o estilo de citação para a transcrição literal da lei e também a justifica", () => {
     const content = buildDeclaration("declaracao-residencia-terceiro");
-    const located = findStyledNode(content, "Art. 299 - Omitir");
-    const node = located?.node;
-
-    console.error("DECLARATION_TYPOGRAPHY_DIAGNOSTIC", JSON.stringify({
-      fragment: "Art. 299 - Omitir",
-      path: located?.path,
-      node,
-    }));
+    const node = findStyledNode(content, "Art. 299 - Omitir");
 
     expect(node).toBeDefined();
     expect(node?.style).toBe("legalQuote");
