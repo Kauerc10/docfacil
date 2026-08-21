@@ -10,9 +10,10 @@ describe("authenticated paid draft continuation", () => {
   it("permite que um usuário autenticado finalize o rascunho avulso ao retornar do checkout", () => {
     const sucesso = source("src/components/docfacil/views/sucesso-view.tsx");
 
-    expect(sucesso).toContain("orderId && slug");
-    expect(sucesso).not.toContain("!user && orderId && slug");
+    expect(sucesso).toContain("shouldStartPaidOrderFinalization");
+    expect(sucesso).toContain("attemptedOrderId: attemptedPaidOrderId.current");
     expect(sucesso).toContain("loadGuestDraft(slug)");
+    expect(sucesso).toContain("guestContact: user ? undefined : draft.guestContact");
     expect(sucesso).toContain("orderId,");
     expect(sucesso).toContain('navigate("sucesso", { slug, id: result.document.id })');
   });
