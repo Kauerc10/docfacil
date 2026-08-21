@@ -150,6 +150,30 @@ const RENTAL_GUARANTEE_IDS = new Set([
   "cessao_fiduciaria",
 ]);
 
+function normalizarRespostasLegadasDeContrato(
+  modelo: Modelo,
+  respostas: Record<string, string>
+): Record<string, string> {
+  const normalized = { ...respostas };
+
+  if (
+    modelo.slug === "comodato" &&
+    !normalized.periodo_emprestimo?.trim() &&
+    normalized.prazo?.trim()
+  ) {
+    normalized.periodo_emprestimo = normalized.prazo;
+  }
+
+  if (
+    modelo.slug === "contrato-compra-venda-imovel" &&
+    !Object.hasOwn(normalized, "possui_sinal")
+  ) {
+    normalized.possui_sinal = normalized.sinal?.trim() ? "Sim" : "Não";
+  }
+
+  return normalized;
+}
+
 /**
  * Regras de coerência que não cabem em validação de campo isolado.
  *
@@ -173,16 +197,24 @@ export function validateDocumentSemanticInvariants(
       throw new BackendError(
         "INVALID_REQUEST",
         400,
-        "Informe a matrícula, o Registro de Imóveis e a descrição complementar do imóvel."
+        "Atualize esta nova versão com a matrícula, o Registro de Imóveis e a descrição complementar do imóvel."
       );
     }
 
     if (/^sim$/i.test(rawRespostas.possui_sinal?.trim() ?? "")) {
-      if (!rawRespostas.sinal?.trim() || !rawRespostas.forma_pagamento_sinal?.trim()) {
+      if (!rawRespostas.sinal?.trim()) {
         throw new BackendError(
           "INVALID_REQUEST",
           400,
-          "Informe o valor e a forma de pagamento do sinal."
+          "Informe o valor do sinal."
+        );
+      }
+
+      if (!rawRespostas.forma_pagamento_sinal?.trim()) {
+        throw new BackendError(
+          "INVALID_REQUEST",
+          400,
+          "Informe a forma de pagamento do sinal."
         );
       }
     }
@@ -233,8 +265,12 @@ export function reconstructAndValidateResponses(
   rawRespostas: Record<string, string>,
   clausulasSelecionadas: string[] = []
 ): Record<string, string> {
+  const respostasCompativeis = normalizarRespostasLegadasDeContrato(
+    modelo,
+    rawRespostas
+  );
   const normalizedRawRespostas = Object.fromEntries(
-    Object.entries(rawRespostas).map(([key, value]) => {
+    Object.entries(respostasCompativeis).map(([key, value]) => {
       if (key !== "estado_civil" && !key.endsWith("_estado_civil")) {
         return [key, value];
       }
@@ -261,7 +297,9 @@ export function reconstructAndValidateResponses(
   );
 
   const composed = aplicarComposicaoModelo(normalizedRawRespostas, modelo);
-  const optionalSet = new Set(computeCamposOpcionais(modelo, clausulasSelecionadas));
+  const optionalSet = new Set(
+    computeCamposOpcionais(modelo, clausulasSelecionadas, composed)
+  );
 
   const allowedKeys = new Set<string>();
   const requiredKeys = new Set<{ key: string; label: string }>();
@@ -388,6 +426,7 @@ export function calculateModelSnapshotHash(modelo: Modelo): string {
       pergunta: c.pergunta,
       tipo: c.tipo,
       obrigatorio: c.obrigatorio,
+      visivelQuando: c.visivelQuando,
       listaPessoas: c.listaPessoas,
     })),
     renderRulesVersion: DOCUMENT_RENDER_RULES_VERSION,
@@ -417,6 +456,11 @@ export function reconstructDuplicateDraft(
       respostas[key] = value;
     }
   }
+
+  Object.assign(
+    respostas,
+    normalizarRespostasLegadasDeContrato(modelo, respostas)
+  );
 
   for (const etapa of modelo.etapas || []) {
     if (etapa.tipo !== "clausulas") continue;

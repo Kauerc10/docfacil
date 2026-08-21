@@ -39,6 +39,8 @@ export function validateModel(modelo: Modelo): ModelValidationError[] {
   // 1. Coleta todas as chaves de campos válidas e checa duplicatas
   const declaredKeys = new Set<string>();
   const clauseIds = new Set<string>();
+  const renderPlaceholders = new Set(modelo.template.placeholdersDeRenderizacao ?? []);
+  const renderClauseIds = new Set(modelo.template.clausulasDeRenderizacao ?? []);
 
   for (const campo of modelo.campos || []) {
     if (declaredKeys.has(campo.key)) {
@@ -100,7 +102,7 @@ export function validateModel(modelo: Modelo): ModelValidationError[] {
     const clauseMatches = line.matchAll(/\{\{\s*clausula:([a-zA-Z0-9_-]+)\s*\}\}/g);
     for (const match of clauseMatches) {
       const cid = match[1];
-      if (!clauseIds.has(cid)) {
+      if (!clauseIds.has(cid) && !renderClauseIds.has(cid)) {
         errors.push({
           code: "MISSING_CLAUSE",
           message: `A tag '{{clausula:${cid}}}' no template de '${slug}' não possui cláusula correspondente definida nas etapas.`,
@@ -117,7 +119,7 @@ export function validateModel(modelo: Modelo): ModelValidationError[] {
       if (rawKey.startsWith("clausula:")) continue;
       if (KNOWN_HELPERS.has(rawKey)) continue;
 
-      if (!declaredKeys.has(rawKey)) {
+      if (!declaredKeys.has(rawKey) && !renderPlaceholders.has(rawKey)) {
         errors.push({
           code: "UNREGISTERED_VARIABLE",
           message: `A tag '{{${rawKey}}}' no template de '${slug}' não foi cadastrada nos campos ou etapas do modelo.`,

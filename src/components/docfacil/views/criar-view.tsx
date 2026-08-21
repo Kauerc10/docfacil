@@ -22,7 +22,7 @@ import { normalizarEstado } from "@/lib/normalizers";
 import { aplicarComposicaoModelo, hasInvalidMoradoresAutorizados } from "@/lib/document-engine";
 import { logger } from "@/lib/logger";
 import { UX_CONFIG } from "@/lib/constants";
-import type { Modelo, EtapaModelo } from "@/lib/types";
+import { campoEstaVisivel, type Modelo, type EtapaModelo } from "@/lib/types";
 import type {
   EtapaModelo as ChatEtapa,
   PetMood,
@@ -148,7 +148,7 @@ export function CriarView() {
     for (const etapa of modelo.etapas) {
       if (etapa.tipo === "campo_grupo") {
         for (const c of etapa.campos) {
-          if (c.obrigatorio === false) out.push(c.key);
+          if (c.obrigatorio === false || !campoEstaVisivel(c, answers)) out.push(c.key);
           if (c.key === "rg" || c.key.endsWith("_rg")) {
             const prefix = c.key === "rg" ? "" : c.key.slice(0, -3);
             out.push(prefix ? `${prefix}_rg_separador` : "rg_separador");
@@ -245,6 +245,7 @@ export function CriarView() {
     }
     if (etapaAtual.tipo === "campo_grupo") {
       for (const c of etapaAtual.campos) {
+        if (!campoEstaVisivel(c, answers)) continue;
         const v = (answers[c.key] ?? "").trim();
         if (c.obrigatorio !== false && !v) {
           return `Preencha: ${c.pergunta}`;

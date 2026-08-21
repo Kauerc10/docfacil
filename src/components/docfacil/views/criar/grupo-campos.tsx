@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ArrowRight, ChevronDown, Loader2, MapPin, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizarEstado, normalizarLogradouro } from "@/lib/normalizers";
 import { buscarCep } from "@/lib/services/cep-service";
-import type { CampoModelo, EnderecoConfig } from "@/lib/types";
+import { campoEstaVisivel, type CampoModelo, type EnderecoConfig } from "@/lib/types";
 import type { InputRef } from "./types";
 import { aplicarMascara, detectarMascara, validarPorTipo } from "./types";
 
@@ -63,6 +63,10 @@ export function GrupoCampos({
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [cepEncontrado, setCepEncontrado] = useState(false);
   const [cepFalhou, setCepFalhou] = useState(false);
+  const camposVisiveis = useMemo(
+    () => campos.filter((campo) => campoEstaVisivel(campo, values)),
+    [campos, values]
+  );
 
   // Mount animation — stagger suave do título + cada campo
   useGSAP(
@@ -104,11 +108,11 @@ export function GrupoCampos({
   // Focus no primeiro campo ao montar
   useEffect(() => {
     const t = window.setTimeout(() => {
-      const first = campos[0];
+      const first = camposVisiveis[0];
       if (first) refs.current[first.key]?.focus();
     }, 80);
     return () => window.clearTimeout(t);
-  }, [campos]);
+  }, [camposVisiveis]);
 
   const validar = (c: CampoModelo, v: string): string | null => {
     if (!v.trim()) return null; // required check happens at submit
@@ -204,10 +208,10 @@ export function GrupoCampos({
   const handleKeyDown = (e: React.KeyboardEvent, idx: number) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (idx + 1 >= campos.length) {
+      if (idx + 1 >= camposVisiveis.length) {
         onAvancar();
       } else {
-        const next = campos[idx + 1];
+        const next = camposVisiveis[idx + 1];
         if (next) refs.current[next.key]?.focus();
       }
     }
@@ -217,7 +221,7 @@ export function GrupoCampos({
     // valida todos antes de avançar
     const novosErros: Record<string, string | null> = {};
     let primeiroComErro: CampoModelo | null = null;
-    for (const c of campos) {
+    for (const c of camposVisiveis) {
       const v = values[c.key] ?? "";
       const erro = validar(c, v);
       if (erro) {
@@ -274,7 +278,7 @@ export function GrupoCampos({
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        {campos.map((c, idx) => {
+        {camposVisiveis.map((c, idx) => {
           const isTextarea = c.tipo === "textarea";
           const isSelect = c.tipo === "select" && c.opcoes && c.opcoes.length > 0;
           const erro = erros[c.key];

@@ -641,6 +641,7 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
     ],
     template: {
       titulo: "CONTRATO DE LOCAÇÃO COMERCIAL",
+      placeholdersDeRenderizacao: ["vistoria_comercial"],
       corpo: [
         "(Instrumento particular firmado nos termos da Lei nº 8.245/1991)",
         "",
@@ -899,14 +900,14 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
             pergunta: "Valor do sinal pago nesta data (R$):",
             placeholder: "Ex: 35.000,00",
             tipo: "number",
-            obrigatorio: false,
+            visivelQuando: { campo: "possui_sinal", igualA: "Sim" },
             microcopy: "O sinal serve como arras confirmatórias (arts. 417-420 CC).",
           },
           {
             key: "forma_pagamento_sinal",
             pergunta: "Como o sinal será pago?",
             placeholder: "Ex: PIX, transferência ou dinheiro",
-            obrigatorio: false,
+            visivelQuando: { campo: "possui_sinal", igualA: "Sim" },
           },
           {
             key: "saldo_pagamento",
@@ -920,6 +921,7 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
     ],
     template: {
       titulo: "INSTRUMENTO PARTICULAR DE COMPRA E VENDA DE IMÓVEL",
+      clausulasDeRenderizacao: ["arras"],
       corpo: [
         "(Compromisso/Contrato particular — sujeito a escrituração pública quando exigida em lei)",
         "",
@@ -1120,11 +1122,13 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
             key: "vendedor_cidade",
             pergunta: "Cidade do vendedor para assinatura:",
             placeholder: "Ex: Blumenau",
+            obrigatorio: false,
           },
           {
             key: "vendedor_uf",
             pergunta: "UF do vendedor para assinatura:",
             placeholder: "Ex: SC",
+            obrigatorio: false,
           },
         ],
       },

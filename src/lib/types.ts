@@ -7,6 +7,12 @@ export type Categoria = "Locação" | "Família" | "Comercial" | "Pessoal";
 
 export type TipoCampo = "text" | "textarea" | "date" | "number" | "select" | "lista_pessoas";
 
+/** Regra declarativa para exibir um campo conforme outra resposta. */
+export interface VisibilidadeCondicionalCampo {
+  campo: string;
+  igualA: string | string[];
+}
+
 export interface ListaPessoasConfig {
   /** Rótulo singular usado na interface, como "morador" ou "dependente". */
   itemLabel: string;
@@ -27,11 +33,37 @@ export interface CampoModelo {
   listaPessoas?: ListaPessoasConfig;
   /** se true, campo obrigatório (default true) */
   obrigatorio?: boolean;
+  /** Condição declarativa para exibir o campo no fluxo de preenchimento. */
+  visivelQuando?: VisibilidadeCondicionalCampo;
+}
+
+/** Avalia a visibilidade declarada sem conhecer modelo, slug ou regra jurídica. */
+export function campoEstaVisivel(
+  campo: CampoModelo,
+  respostas: Record<string, string>
+): boolean {
+  const condicao = campo.visivelQuando;
+  if (!condicao) return true;
+
+  const esperados = Array.isArray(condicao.igualA)
+    ? condicao.igualA
+    : [condicao.igualA];
+  return esperados.includes(respostas[condicao.campo] ?? "");
 }
 
 export interface TemplateModelo {
   titulo: string;
   corpo: string[];
+  /**
+   * Placeholders preenchidos por regras declaradas de renderização, sem
+   * expor uma pergunta adicional no fluxo de criação.
+   */
+  placeholdersDeRenderizacao?: string[];
+  /**
+   * Pontos de inserção de cláusulas resolvidos por regras de renderização,
+   * sem criar uma cláusula selecionável na interface.
+   */
+  clausulasDeRenderizacao?: string[];
 }
 
 /**

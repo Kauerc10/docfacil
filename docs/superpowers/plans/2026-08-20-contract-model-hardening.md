@@ -64,6 +64,8 @@ Run: `bun run typecheck`
 Commit only relevant files with `fix(contracts): endurece regras e qualificações`.
 
 > Evidência da Task 1 (2026-08-20): RED executado com os testes de hardening e domínio, com 9 falhas esperadas por condicionais/invariantes ausentes. GREEN focado: 29 testes, 0 falhas. `bun run typecheck`: concluído sem erros.
+>
+> Fix round 1 (2026-08-20): RED adicional observado para a visibilidade declarativa de sinal e para placeholders/cláusulas resolvidos por regras de renderização. GREEN: `bun run typecheck` e 76 testes focados (criação, engine, integridade/snapshots e domínio), 0 falhas. Compatibilidade legada cobre `prazo` do comodato, inferência de sinal imobiliário e bem móvel sem cidade/UF inventadas.
 
 ### Task 2: Fechamento responsivo à receita
 

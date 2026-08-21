@@ -70,6 +70,9 @@ const REAL_ESTATE_DEED =
 
 const MOVABLE_RECEIPT =
   "O presente instrumento, após assinado por ambas as partes, servirá como recibo de quitação das parcelas pagas na data da assinatura.";
+const MOVABLE_FORUM =
+  "Fica eleito o foro da Comarca de {{vendedor_cidade}}/{{vendedor_uf}} para dirimir quaisquer dúvidas ou controvérsias oriundas deste contrato.";
+const MOVABLE_CLOSING = "{{vendedor_cidade}}/{{vendedor_uf}}, [data de assinatura].";
 
 const UNION_OPENING =
   "Por este instrumento particular de Declaração de União Estável, as declarantes:";
@@ -216,8 +219,20 @@ export function applyLegalTemplateRule(
     }
   }
 
-  if (modelSlug === "compra-venda" && line === MOVABLE_RECEIPT) {
-    return "O presente instrumento comprova o negócio celebrado e dá quitação somente dos valores expressamente declarados como pagos na forma de pagamento acima, não presumindo quitação de saldo ainda pendente.";
+  if (modelSlug === "compra-venda") {
+    if (line === MOVABLE_RECEIPT) {
+      return "O presente instrumento comprova o negócio celebrado e dá quitação somente dos valores expressamente declarados como pagos na forma de pagamento acima, não presumindo quitação de saldo ainda pendente.";
+    }
+
+    const possuiLocalVendedor = Boolean(
+      answers.vendedor_cidade?.trim() && answers.vendedor_uf?.trim()
+    );
+    if (line === MOVABLE_FORUM && !possuiLocalVendedor) {
+      return "Fica eleito o foro do domicílio do VENDEDOR para dirimir quaisquer dúvidas ou controvérsias oriundas deste contrato.";
+    }
+    if (line === MOVABLE_CLOSING && !possuiLocalVendedor) {
+      return "[data de assinatura].";
+    }
   }
 
   if (modelSlug === "uniao-estavel") {

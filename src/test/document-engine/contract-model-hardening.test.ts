@@ -95,4 +95,11 @@ describe("robustez dos contratos auditados", () => {
     expect(document).toContain("Blumenau/SC, ");
     expect(document).toContain("foro da Comarca de Blumenau/SC");
   });
+
+  it("preserva a redação segura do bem móvel legado sem cidade e UF inventadas", () => {
+    const document = render("compra-venda");
+
+    expect(document).toContain("foro do domicílio do VENDEDOR");
+    expect(document).not.toContain("______________________/______________________");
+  });
 });
