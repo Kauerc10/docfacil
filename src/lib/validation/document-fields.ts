@@ -27,6 +27,7 @@ export function detectarTipoValidacaoCampo(
   if (/(^|_)cnpj($|_)/.test(key)) return "cnpj";
   if (/(^|_)cep($|_)/.test(key)) return "cep";
   if (/(telefone|fone|celular|whats)/.test(key)) return "telefone";
+  if (campo.tipo === "date") return "data";
   if (/(^|_)(data|nascimento)($|_)/.test(key)) return "data";
 
   if (/^\s*(telefone|fone|celular|whats)/.test(pergunta)) {
@@ -46,9 +47,7 @@ export function validarCPF(cpf: string): string | null {
   }
 
   let soma = 0;
-  for (let i = 0; i < 9; i++) {
-    soma += Number(nums[i]) * (10 - i);
-  }
+  for (let i = 0; i < 9; i++) soma += Number(nums[i]) * (10 - i);
   let resto = (soma * 10) % 11;
   if (resto === 10) resto = 0;
   if (resto !== Number(nums[9])) {
@@ -56,15 +55,12 @@ export function validarCPF(cpf: string): string | null {
   }
 
   soma = 0;
-  for (let i = 0; i < 10; i++) {
-    soma += Number(nums[i]) * (11 - i);
-  }
+  for (let i = 0; i < 10; i++) soma += Number(nums[i]) * (11 - i);
   resto = (soma * 10) % 11;
   if (resto === 10) resto = 0;
   if (resto !== Number(nums[10])) {
     return "CPF inválido (dígito verificador incorreto).";
   }
-
   return null;
 }
 
@@ -80,9 +76,7 @@ export function validarCNPJ(cnpj: string): string | null {
         ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
         : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
     let soma = 0;
-    for (let i = 0; i < length; i++) {
-      soma += Number(nums[i]) * pesos[i];
-    }
+    for (let i = 0; i < length; i++) soma += Number(nums[i]) * pesos[i];
     const resto = soma % 11;
     return resto < 2 ? 0 : 11 - resto;
   };
@@ -93,7 +87,6 @@ export function validarCNPJ(cnpj: string): string | null {
   if (calcularDigito(13) !== Number(nums[13])) {
     return "CNPJ inválido (dígito verificador incorreto).";
   }
-
   return null;
 }
 
@@ -136,14 +129,9 @@ export function validarData(data: string): string | null {
   ) {
     return "Data inválida.";
   }
-
   return null;
 }
 
-/**
- * Retorna mensagem humana para formato inválido ou `null` quando o campo não
- * possui validação estrutural, está vazio ou já está válido.
- */
 export function validarCampoDocumento(
   campo: CampoValidavel,
   valor: string
