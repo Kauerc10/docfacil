@@ -100,7 +100,7 @@ export function buildDocDefinition(
   const dividerX2 = dividerX1 + dividerWidth;
   const footerHorizontalInset = cm(recipe.footerHorizontalInsetCm);
   const footerWidth = A4_WIDTH - 2 * footerHorizontalInset;
-  const isFormalContract = recipe.profile === "contract" && recipe.headerStyle === "formal";
+  const usesFormalShell = recipe.headerStyle === "formal";
   const headingColor = "#14315c";
   const bodyColor = recipe.bodyColor ?? "#0e2340";
   const titleDivider = {
@@ -148,7 +148,7 @@ export function buildDocDefinition(
         }
       : undefined,
     header: (currentPage: number) => {
-      if (isFormalContract) {
+      if (usesFormalShell) {
         return {
           margin: [pageMargins[0], cm(0.65), pageMargins[2], 0] as [number, number, number, number],
           stack: [
@@ -260,9 +260,9 @@ export function buildDocDefinition(
         characterSpacing: recipe.titleCharacterSpacing,
       },
       sectionHeading: { font: "Roboto", fontSize: 13.5, bold: true, color: headingColor, characterSpacing: 0.5 },
-      clauseHeading: { font: "Roboto", fontSize: isFormalContract ? 10.75 : 12, bold: true, color: headingColor },
+      clauseHeading: { font: "Roboto", fontSize: usesFormalShell ? 10.75 : 12, bold: true, color: headingColor },
       body: { font: "Roboto", fontSize: recipe.bodyFontSize, color: bodyColor, lineHeight: recipe.bodyLineHeight },
-      label: { font: "Roboto", fontSize: isFormalContract ? 10.5 : 12, bold: true, color: bodyColor },
+      label: { font: "Roboto", fontSize: usesFormalShell ? 10.5 : 12, bold: true, color: bodyColor },
       signature: {
         font: "Roboto",
         fontSize: 12,
