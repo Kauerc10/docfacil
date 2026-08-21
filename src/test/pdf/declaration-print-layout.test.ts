@@ -24,7 +24,7 @@ type Node = {
 };
 
 describe("Declaration print layout", () => {
-  it("usa a mesma geometria de folha e footer da shell formal", () => {
+  it("usa a mesma geometria lateral de folha e footer da shell formal", () => {
     const modelo = getModelo("declaracao-residencia")!;
     const ddo = buildDocDefinition(modelo, answers) as {
       pageMargins: number[];
@@ -41,21 +41,25 @@ describe("Declaration print layout", () => {
     expect(ddo.pageMargins[3]).toBeCloseTo(cm(2), 2);
   });
 
-  it("mantém o título alto sem recuperar as margens largas do layout antigo", () => {
+  it("desce levemente o título sem deslocar a moldura lateral", () => {
     const modelo = getModelo("declaracao-residencia")!;
     const ddo = buildDocDefinition(modelo, answers) as { pageMargins: number[] };
 
-    expect(ddo.pageMargins[1]).toBeCloseTo(cm(2.3), 2);
-    expect(ddo.pageMargins[0]).toBeLessThan(cm(2.5));
+    expect(ddo.pageMargins[1]).toBeGreaterThanOrEqual(cm(2.5));
+    expect(ddo.pageMargins[1]).toBeLessThanOrEqual(cm(2.7));
+    expect(ddo.pageMargins[0]).toBeCloseTo(cm(2), 2);
+    expect(ddo.pageMargins[2]).toBeCloseTo(cm(2), 2);
   });
 
-  it("mantém a data centralizada com respiro suficiente antes da assinatura", () => {
+  it("mantém a data centralizada e usa o fechamento para distribuir melhor a página", () => {
     const modelo = getModelo("declaracao-residencia")!;
     const recipe = getPdfVisualRecipe(modelo);
 
     expect(recipe.dateAlignment).toBe("center");
-    expect(recipe.dateTopMargin).toBeLessThanOrEqual(18);
-    expect(recipe.dateBottomMargin).toBeGreaterThanOrEqual(22);
+    expect(recipe.dateTopMargin).toBeGreaterThanOrEqual(20);
+    expect(recipe.dateTopMargin).toBeLessThanOrEqual(26);
+    expect(recipe.dateBottomMargin).toBeGreaterThanOrEqual(28);
+    expect(recipe.dateBottomMargin).toBeLessThanOrEqual(36);
   });
 
   it("preserva espaço de assinatura sem forçar whitespace excessivo", () => {
