@@ -45,6 +45,67 @@ export interface GenerateDocumentResult {
   guestAccessPath?: string;
 }
 
+export const BILLING_TIME_ZONE = "America/Sao_Paulo";
+
+const billingDateTimeFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: BILLING_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+function getBillingZoneParts(date: Date) {
+  const parts = billingDateTimeFormatter.formatToParts(date);
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+
+  return {
+    year: getPart("year"),
+    month: getPart("month"),
+    day: getPart("day"),
+    hour: getPart("hour"),
+    minute: getPart("minute"),
+    second: getPart("second"),
+  };
+}
+
+function getBillingZoneOffsetMs(timestamp: number): number {
+  const parts = getBillingZoneParts(new Date(timestamp));
+  const representedAsUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
+  return representedAsUtc - Math.trunc(timestamp / 1000) * 1000;
+}
+
+/**
+ * Retorna o instante UTC correspondente à meia-noite do primeiro dia do mês
+ * civil vigente em São Paulo. A conversão usa o fuso IANA, sem hardcode de
+ * UTC-3, para continuar correta se as regras de horário civil mudarem.
+ */
+export function getStartOfBillingMonthTimestamp(now = new Date()): number {
+  const { year, month } = getBillingZoneParts(now);
+  const localMidnightAsUtc = Date.UTC(year, month - 1, 1, 0, 0, 0);
+
+  let candidate = localMidnightAsUtc;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const nextCandidate =
+      localMidnightAsUtc - getBillingZoneOffsetMs(candidate);
+    if (nextCandidate === candidate) break;
+    candidate = nextCandidate;
+  }
+
+  return candidate;
+}
+
 export async function generateDocumentArtifact(
   input: GenerateDocumentInput
 ): Promise<GenerateDocumentResult> {
@@ -331,11 +392,7 @@ export async function generateDocumentArtifact(
       }
     } else {
       const profile = await repos.users.getUserProfile(principal.userId);
-      const startOfMonth = new Date(
-        new Date().getFullYear(),
-        new Date().getMonth(),
-        1
-      ).getTime();
+      const startOfMonth = getStartOfBillingMonthTimestamp();
       const userDocuments = await repos.documents.listUserDocuments(
         principal.userId
       );
