@@ -1,95 +1,75 @@
-/**
- * Shared types and utilities for the criar-view subcomponents and the
- * documento-detalhe-view subcomponents.
- *
- * The DocFacil "Concierge" flow is structured as a sequence of steps
- * (`EtapaModelo`). Each step is one of:
- *   - a single pergunta (one `CampoModelo`),
- *   - a group of related fields (e.g. address with CEP auto-fill), or
- *   - a set of optional dynamic clauses (`ClausulaDinamica`) the user can
- *     tick on/off, each contributing a paragraph to the document body.
- *
- * The template engine replaces `{{key}}` (regular field) and
- * `{{clausula:clauseId}}` (selected clause body) tokens.
- *
- * Mask + validation helpers live here too so both the criar flow and the
- * documento-detalhe view use the same deterministic (non-AI) rules.
- */
 import type { CampoModelo, EnderecoConfig } from "@/lib/types";
+import {
+  validarCEP,
+  validarCNPJ,
+  validarCPF,
+  validarData,
+  validarTelefone,
+} from "@/lib/validation/document-fields";
 
-// === Mascote mood (espelha o tipo interno do pet.tsx) ===
+export {
+  validarCEP,
+  validarCNPJ,
+  validarCPF,
+  validarData,
+  validarTelefone,
+} from "@/lib/validation/document-fields";
+
 export type PetMood = "idle" | "falando" | "feliz" | "atencao" | "pensando";
 
-// === Input ref union type (single text input OR textarea OR select) ===
-export type InputElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+export type InputElement =
+  | HTMLInputElement
+  | HTMLTextAreaElement
+  | HTMLSelectElement;
 export type InputRef = InputElement | null;
 
-// === Etapa (step) of the criar flow ===
-// "grupo" pode ter `endereco` configurado — quando presente, habilita
-// auto-fill ViaCEP, normalização de logradouro e composição automática.
 export type EtapaModelo =
   | { tipo: "pergunta"; campo: CampoModelo }
-  | { tipo: "grupo"; titulo?: string; campos: CampoModelo[]; endereco?: EnderecoConfig }
+  | {
+      tipo: "grupo";
+      titulo?: string;
+      campos: CampoModelo[];
+      endereco?: EnderecoConfig;
+    }
   | { tipo: "clausulas"; titulo?: string; clausulas: ClausulaDinamica[] };
 
-// === Dynamic clause (optional paragraph the user toggles) ===
 export interface ClausulaDinamica {
-  /** unique id used in `{{clausula:id}}` template tokens */
   id: string;
   titulo: string;
   descricao: string;
-  /** body inserted into the document when the clause is selected */
   corpo: string;
-  /** extra inputs shown when the clause is selected (e.g. "testemunha 1 nome") */
   camposExtras?: CampoModelo[];
 }
 
-// === Respostas estendidas (campos + clausulas selecionadas + extras) ===
 export interface RespostasState {
-  /** valor por chave de campo — espelha Documento.respostas */
   campos: Record<string, string>;
-  /** ids das cláusulas dinâmicas selecionadas */
   clausulasSelecionadas: string[];
 }
 
-// ============================================================================
-// Props das sub-componentes
-// ============================================================================
-
 export interface ChatStepProps {
-  /** texto que o Pet "fala" (digitado progressivamente) */
   petText: string;
   petMood?: PetMood;
-  /** etapa atual (define qual input vai aparecer embaixo do pet) */
   etapa: EtapaModelo;
-  /** índice da etapa atual (0-based) */
   stepIndex: number;
-  /** total de etapas (para o indicador "faltam X") */
   totalEtapas: number;
-  /** respostas atuais (controladas) */
   respostas: RespostasState;
-  /** callback quando o usuário digita em um campo de uma pergunta simples */
   onInputChange: (key: string, value: string) => void;
-  /** callback quando o usuário altera um campo dentro de um grupo */
-  onGrupoFieldChange: (grupoKey: string, fieldKey: string, value: string) => void;
-  /** callback quando o usuário marca/desmarca uma cláusula ou altera um campo extra */
+  onGrupoFieldChange: (
+    grupoKey: string,
+    fieldKey: string,
+    value: string
+  ) => void;
   onClausulaFieldChange: (
     clausulaId: string,
     payload:
       | { tipo: "toggle"; selecionada: boolean }
       | { tipo: "extra"; fieldKey: string; value: string }
   ) => void;
-  /** avança para a próxima etapa (ou finaliza) */
   onAvancar: () => void;
-  /** true quando estamos na última etapa */
   isLast: boolean;
-  /** true enquanto o documento está sendo salvo (botão mostra "Salvando…") */
   submitting?: boolean;
-  /** erro de validação vindo do parent (obrigatório) — exibido no CampoPergunta */
   fieldError?: string | null;
-  /** extras de cláusulas por id — repassado ao ClausulasPergunta para refletir valores */
   extrasPorClausula?: Record<string, Record<string, string>>;
-  /** callback quando o usuário clica no balão do pet (skip typing) */
   onSkipTyping?: () => void;
 }
 
@@ -99,9 +79,7 @@ export interface CampoPerguntaProps {
   onChange: (value: string) => void;
   onAvancar: () => void;
   submitting?: boolean;
-  /** quando true, o botão mostra "Finalizar" em vez de "Avançar" */
   isLast?: boolean;
-  /** erro de validação opcional (string exibida abaixo do campo) */
   erro?: string | null;
 }
 
@@ -110,7 +88,11 @@ export interface ClausulasPerguntaProps {
   selecionadas: string[];
   extras: Record<string, Record<string, string>>;
   onToggle: (clausulaId: string, selecionada: boolean) => void;
-  onExtraChange: (clausulaId: string, fieldKey: string, value: string) => void;
+  onExtraChange: (
+    clausulaId: string,
+    fieldKey: string,
+    value: string
+  ) => void;
   onAvancar: () => void;
   isLast?: boolean;
   submitting?: boolean;
@@ -128,55 +110,54 @@ export interface PdfPreviewProps {
   modelo: import("@/lib/types").Modelo;
   respostas: Record<string, string>;
   clausulasSelecionadas: string[];
-  /** campos extras das cláusulas, mantidos fora das respostas principais */
   extrasPorClausula: Record<string, Record<string, string>>;
   authenticated: boolean;
 }
 
-// ============================================================================
-// Detecção de máscara (key autoritativa, pergunta como fallback)
-// ============================================================================
+export type TipoMascara =
+  | "cpf"
+  | "cnpj"
+  | "cep"
+  | "telefone"
+  | "data"
+  | "estado"
+  | "numero"
+  | "moeda"
+  | "texto";
 
 /**
- * Detecta o tipo de máscara a aplicar a um campo.
- *
- * 1. KEY é a fonte autoritativa — só aplica máscara CPF/CNPJ/CEP se a key
- *    explicitamente diz isso. Evita falso positivo em campos como
- *    "Seu RG e CPF (opcional):" (key "rg") — a menção a "CPF" no label
- *    não significa que o campo deva ter máscara de CPF.
- * 2. PERGUNTA — só para casos onde a key não ajuda (ex.: "telefone"
- *    aparece no label mas a key é "contato"). Stricter: a pergunta
- *    precisa começar com a palavra-chave (não apenas conter).
- * 3. tipo "number" → numero; senão texto.
+ * Detecta a máscara de edição. A key é autoritativa para identificadores;
+ * pergunta funciona somente como fallback estrito para telefone/data.
  */
-export function detectarMascara(c: CampoModelo): TipoMascara {
-  const k = c.key.toLowerCase();
-  const p = c.pergunta.toLowerCase();
-  if (/cpf/.test(k)) return "cpf";
-  if (/cnpj/.test(k)) return "cnpj";
-  if (/cep/.test(k)) return "cep";
-  if (/telefone|fone|celular|whats/.test(k)) return "telefone";
-  if (/data|nascimento/.test(k)) return "data";
-  if (/_uf$|^uf$|estado/.test(k)) return "estado";
-  // Campos de contagem de tempo/prazo (meses, dias, prazo): sempre número inteiro
-  if (/meses|prazo|dia_vencimento|quantidade|dias/.test(k)) return "numero";
-  // Campos monetários: detectados por palavras-chave de valor monetário ou R$ na pergunta
-  if (/valor|honorar|preco|multa|deposito/.test(k) || (k.includes("caucao") && !k.includes("meses"))) return "moeda";
-  if (/r\$/.test(p)) return "moeda";
-  if (/^\s*(telefone|fone|celular|whats)/.test(p)) return "telefone";
-  if (/^\s*(data|nascimento)/.test(p)) return "data";
-  if (/sigla do estado/.test(p)) return "estado";
-  if (c.tipo === "number") return "numero";
+export function detectarMascara(campo: CampoModelo): TipoMascara {
+  const key = campo.key.toLowerCase();
+  const pergunta = campo.pergunta.toLowerCase();
+
+  if (/cpf/.test(key)) return "cpf";
+  if (/cnpj/.test(key)) return "cnpj";
+  if (/cep/.test(key)) return "cep";
+  if (/telefone|fone|celular|whats/.test(key)) return "telefone";
+  if (/data|nascimento/.test(key)) return "data";
+  if (/_uf$|^uf$|estado/.test(key)) return "estado";
+  if (/meses|prazo|dia_vencimento|quantidade|dias/.test(key)) {
+    return "numero";
+  }
+  if (
+    /valor|honorar|preco|multa|deposito/.test(key) ||
+    (key.includes("caucao") && !key.includes("meses"))
+  ) {
+    return "moeda";
+  }
+  if (/r\$/.test(pergunta)) return "moeda";
+  if (/^\s*(telefone|fone|celular|whats)/.test(pergunta)) {
+    return "telefone";
+  }
+  if (/^\s*(data|nascimento)/.test(pergunta)) return "data";
+  if (/sigla do estado/.test(pergunta)) return "estado";
+  if (campo.tipo === "number") return "numero";
   return "texto";
 }
 
-// ============================================================================
-// Máscaras determinísticas (espelham normalizers.ts onde aplicável)
-// ============================================================================
-
-export type TipoMascara = "cpf" | "cnpj" | "cep" | "telefone" | "data" | "estado" | "numero" | "moeda" | "texto";
-
-/** Aplica a máscara apropriada para o tipo. Texto/numero = passa direto. */
 export function aplicarMascara(valor: string, tipo: TipoMascara): string {
   const nums = valor.replace(/\D/g, "");
   switch (tipo) {
@@ -185,18 +166,18 @@ export function aplicarMascara(valor: string, tipo: TipoMascara): string {
     case "cnpj":
       return aplicarMascaraCNPJ(nums);
     case "cep":
-      return nums.length <= 5 ? nums : `${nums.slice(0, 5)}-${nums.slice(5, 8)}`;
+      return nums.length <= 5
+        ? nums
+        : `${nums.slice(0, 5)}-${nums.slice(5, 8)}`;
     case "telefone":
       return aplicarMascaraTelefone(nums);
     case "data":
       return aplicarMascaraData(nums);
     case "estado":
-      // máscara não aplica — só normaliza para maiúsculas e limita 2 chars
       return valor.toUpperCase().slice(0, 2).replace(/[^A-Z]/g, "");
     case "moeda":
       return aplicarMascaraMoeda(nums);
     case "numero":
-      // mantém apenas dígitos inteiros (ex: 3, 12, 30)
       return valor.replace(/\D/g, "");
     case "texto":
     default:
@@ -205,152 +186,75 @@ export function aplicarMascara(valor: string, tipo: TipoMascara): string {
 }
 
 function aplicarMascaraCPF(nums: string): string {
-  const s = nums.slice(0, 11);
-  if (s.length <= 3) return s;
-  if (s.length <= 6) return `${s.slice(0, 3)}.${s.slice(3)}`;
-  if (s.length <= 9) return `${s.slice(0, 3)}.${s.slice(3, 6)}.${s.slice(6)}`;
-  return `${s.slice(0, 3)}.${s.slice(3, 6)}.${s.slice(6, 9)}-${s.slice(9)}`;
+  const value = nums.slice(0, 11);
+  if (value.length <= 3) return value;
+  if (value.length <= 6) return `${value.slice(0, 3)}.${value.slice(3)}`;
+  if (value.length <= 9) {
+    return `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6)}`;
+  }
+  return `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6, 9)}-${value.slice(9)}`;
 }
 
 function aplicarMascaraCNPJ(nums: string): string {
-  const s = nums.slice(0, 14);
-  if (s.length <= 2) return s;
-  if (s.length <= 5) return `${s.slice(0, 2)}.${s.slice(2)}`;
-  if (s.length <= 8) return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5)}`;
-  if (s.length <= 12) return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5, 8)}/${s.slice(8)}`;
-  return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5, 8)}/${s.slice(8, 12)}-${s.slice(12)}`;
+  const value = nums.slice(0, 14);
+  if (value.length <= 2) return value;
+  if (value.length <= 5) return `${value.slice(0, 2)}.${value.slice(2)}`;
+  if (value.length <= 8) {
+    return `${value.slice(0, 2)}.${value.slice(2, 5)}.${value.slice(5)}`;
+  }
+  if (value.length <= 12) {
+    return `${value.slice(0, 2)}.${value.slice(2, 5)}.${value.slice(5, 8)}/${value.slice(8)}`;
+  }
+  return `${value.slice(0, 2)}.${value.slice(2, 5)}.${value.slice(5, 8)}/${value.slice(8, 12)}-${value.slice(12)}`;
 }
 
 function aplicarMascaraTelefone(nums: string): string {
-  const s = nums.slice(0, 11);
-  if (s.length <= 2) return s;
-  if (s.length <= 6) return `(${s.slice(0, 2)}) ${s.slice(2)}`;
-  if (s.length <= 10) return `(${s.slice(0, 2)}) ${s.slice(2, 6)}-${s.slice(6)}`;
-  return `(${s.slice(0, 2)}) ${s.slice(2, 7)}-${s.slice(7)}`;
+  const value = nums.slice(0, 11);
+  if (value.length <= 2) return value;
+  if (value.length <= 6) return `(${value.slice(0, 2)}) ${value.slice(2)}`;
+  if (value.length <= 10) {
+    return `(${value.slice(0, 2)}) ${value.slice(2, 6)}-${value.slice(6)}`;
+  }
+  return `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
 }
 
 function aplicarMascaraData(nums: string): string {
-  const s = nums.slice(0, 8);
-  if (s.length <= 2) return s;
-  if (s.length <= 4) return `${s.slice(0, 2)}/${s.slice(2)}`;
-  return `${s.slice(0, 2)}/${s.slice(2, 4)}/${s.slice(4)}`;
+  const value = nums.slice(0, 8);
+  if (value.length <= 2) return value;
+  if (value.length <= 4) return `${value.slice(0, 2)}/${value.slice(2)}`;
+  return `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
 }
 
-/**
- * Formata um valor monetário no padrão BRL (Real brasileiro).
- *
- * Estratégia "centavos à direita" (igual terminais POS):
- *   - Extrai somente dígitos do input
- *   - Interpreta os últimos 2 dígitos como centavos
- *   - Os dígitos restantes são os reais, separados por ponto a cada 3 casas
- *   - Resultado: "1.000,93", "12,00", "0,05"
- *
- * Limite máximo: 13 dígitos (R$ 99.999.999.999,99) para evitar overflow.
- */
 function aplicarMascaraMoeda(nums: string): string {
-  // Limita a 13 dígitos para evitar valores absurdos
-  const s = nums.slice(0, 13);
-  if (s.length === 0) return "";
-  // Pad à esquerda para garantir pelo menos 3 chars (ex: "5" → "005")
-  const padded = s.padStart(3, "0");
+  const value = nums.slice(0, 13);
+  if (value.length === 0) return "";
+
+  const padded = value.padStart(3, "0");
   const intPart = padded.slice(0, -2);
   const decPart = padded.slice(-2);
-  // Remove zeros à esquerda da parte inteira, mas mantém pelo menos "0"
   const intClean = intPart.replace(/^0+/, "") || "0";
-  // Adiciona separadores de milhar (ponto)
   const intFormatted = intClean.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return `${intFormatted},${decPart}`;
 }
 
-// ============================================================================
-// Validadores (retornam mensagem de erro em PT-BR, ou null se válido)
-// ============================================================================
-
-/** Valida CPF (formatação + dígitos verificadores). */
-export function validarCPF(cpf: string): string | null {
-  const nums = cpf.replace(/\D/g, "");
-  if (nums.length === 0) return "Digite o CPF.";
-  if (nums.length !== 11) return "CPF deve ter 11 dígitos.";
-  if (/^(\d)\1{10}$/.test(nums)) return "CPF inválido (não pode ter todos os dígitos iguais).";
-  let soma = 0;
-  for (let i = 0; i < 9; i++) soma += parseInt(nums[i], 10) * (10 - i);
-  let resto = (soma * 10) % 11;
-  if (resto === 10) resto = 0;
-  if (resto !== parseInt(nums[9], 10)) return "CPF inválido (dígito verificador incorreto).";
-  soma = 0;
-  for (let i = 0; i < 10; i++) soma += parseInt(nums[i], 10) * (11 - i);
-  resto = (soma * 10) % 11;
-  if (resto === 10) resto = 0;
-  if (resto !== parseInt(nums[10], 10)) return "CPF inválido (dígito verificador incorreto).";
-  return null;
-}
-
-/** Valida CNPJ (formatação + dígitos verificadores). */
-export function validarCNPJ(cnpj: string): string | null {
-  const nums = cnpj.replace(/\D/g, "");
-  if (nums.length === 0) return "Digite o CNPJ.";
-  if (nums.length !== 14) return "CNPJ deve ter 14 dígitos.";
-  if (/^(\d)\1{13}$/.test(nums)) return "CNPJ inválido.";
-  const calc = (len: number): number => {
-    const pesos = len === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-    let s = 0;
-    for (let i = 0; i < len; i++) s += parseInt(nums[i], 10) * pesos[i];
-    const r = s % 11;
-    return r < 2 ? 0 : 11 - r;
-  };
-  const d1 = calc(12);
-  if (d1 !== parseInt(nums[12], 10)) return "CNPJ inválido (dígito verificador incorreto).";
-  const d2 = calc(13);
-  if (d2 !== parseInt(nums[13], 10)) return "CNPJ inválido (dígito verificador incorreto).";
-  return null;
-}
-
-/** Valida CEP (apenas formato: 8 dígitos). */
-export function validarCEP(cep: string): string | null {
-  const nums = cep.replace(/\D/g, "");
-  if (nums.length === 0) return "Digite o CEP.";
-  if (nums.length !== 8) return "CEP deve ter 8 dígitos.";
-  return null;
-}
-
-/** Valida telefone (10 ou 11 dígitos com DDD). */
-export function validarTelefone(tel: string): string | null {
-  const nums = tel.replace(/\D/g, "");
-  if (nums.length === 0) return "Digite o telefone.";
-  if (nums.length < 10) return "Telefone incompleto (precisa do DDD + número).";
-  if (nums.length > 11) return "Telefone longo demais.";
-  // DDD 11 dígitos: celular (começa com 9 após DDD); 10 dígitos: fixo
-  if (nums.length === 11 && nums[2] !== "9") return "Celular deve começar com 9 após o DDD.";
-  return null;
-}
-
-/** Valida data no formato DD/MM/AAAA (e checagem básica de sanidade). */
-export function validarData(data: string): string | null {
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(data);
-  if (!m) return "Use o formato DD/MM/AAAA.";
-  const [, dd, mm, aaaa] = m;
-  const d = parseInt(dd, 10);
-  const mes = parseInt(mm, 10);
-  const ano = parseInt(aaaa, 10);
-  if (mes < 1 || mes > 12) return "Mês inválido.";
-  if (d < 1 || d > 31) return "Dia inválido.";
-  if (ano < 1900 || ano > new Date().getFullYear()) return "Ano inválido.";
-  return null;
-}
-
-/**
- * Valida um campo de acordo com o TipoMascara detectado.
- * Retorna mensagem de erro em PT-BR, ou null se válido/vazio.
- * (Campos vazios retornam null — o check de obrigatório é no submit.)
- */
-export function validarPorTipo(tipo: TipoMascara, valor: string): string | null {
+/** Compatibilidade para consumidores antigos baseados na máscara visual. */
+export function validarPorTipo(
+  tipo: TipoMascara,
+  valor: string
+): string | null {
   if (!valor.trim()) return null;
   switch (tipo) {
-    case "cpf": return validarCPF(valor);
-    case "cnpj": return validarCNPJ(valor);
-    case "cep": return validarCEP(valor);
-    case "telefone": return validarTelefone(valor);
-    case "data": return validarData(valor);
-    default: return null;
+    case "cpf":
+      return validarCPF(valor);
+    case "cnpj":
+      return validarCNPJ(valor);
+    case "cep":
+      return validarCEP(valor);
+    case "telefone":
+      return validarTelefone(valor);
+    case "data":
+      return validarData(valor);
+    default:
+      return null;
   }
 }
