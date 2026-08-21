@@ -20,9 +20,9 @@ import {
 } from "@/lib/documents/client";
 import { normalizarEstado } from "@/lib/normalizers";
 import {
-  aplicarComposicaoModelo,
   hasInvalidMoradoresAutorizados,
 } from "@/lib/document-engine";
+import { buildFinalizationAnswers } from "@/lib/documents/finalization-answers";
 import { logger } from "@/lib/logger";
 import { UX_CONFIG } from "@/lib/constants";
 import { campoEstaVisivel, type Modelo, type EtapaModelo } from "@/lib/types";
@@ -144,11 +144,6 @@ export function CriarView() {
   const totalEtapas = etapasEfetivas.length;
   const etapaAtual = etapasEfetivas[stepIndex];
   const isLast = stepIndex + 1 >= totalEtapas;
-
-  const respostasComEndereco = useMemo(() => {
-    if (!modelo) return answers;
-    return aplicarComposicaoModelo(answers, modelo);
-  }, [answers, modelo]);
 
   const respostas: RespostasState = useMemo(
     () => ({ campos: answers, clausulasSelecionadas }),
@@ -397,12 +392,7 @@ export function CriarView() {
       }
 
       setPetMood("feliz");
-      const respostasFinais: Record<string, string> = {
-        ...respostasComEndereco,
-      };
-      for (const extraMap of Object.values(extrasPorClausula)) {
-        for (const [key, value] of Object.entries(extraMap)) respostasFinais[key] = value;
-      }
+      const respostasFinais = buildFinalizationAnswers(answers, extrasPorClausula);
       void salvarDocumento(respostasFinais);
       return;
     }
