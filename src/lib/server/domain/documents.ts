@@ -1,13 +1,14 @@
 import "server-only";
 import { z } from "zod";
 import { randomBytes, createHash } from "crypto";
-import type { Modelo } from "../../types";
+import type { CampoModelo, Modelo } from "../../types";
 import { BackendError } from "../errors";
 import { aplicarComposicaoModelo } from "../../document-engine/compose";
 import { normalizeCivilStatus } from "../../document-engine/civil-status";
 import { computeCamposOpcionais } from "../../document-engine/optional-fields";
 import { hasInvalidMoradoresAutorizados } from "../../document-engine/authorized-residents";
 import { DOCUMENT_RENDER_RULES_VERSION } from "../../document-engine/legal-rules";
+import { validarCampoDocumento } from "../../validation/document-fields";
 import {
   normalizarRespostasLegadasDeContrato,
   SINAL_LEGADO_SEM_FORMA_KEY,
@@ -240,6 +241,13 @@ export function validateDocumentSemanticInvariants(
   }
 }
 
+function registerField(
+  fields: Map<string, CampoModelo>,
+  campo: CampoModelo
+): void {
+  fields.set(campo.key, campo);
+}
+
 export function reconstructAndValidateResponses(
   modelo: Modelo,
   rawRespostas: Record<string, string>,
@@ -301,9 +309,11 @@ export function reconstructAndValidateResponses(
 
   const allowedKeys = new Set<string>();
   const requiredKeys = new Set<{ key: string; label: string }>();
+  const fieldsToValidate = new Map<string, CampoModelo>();
 
   for (const campo of modelo.campos || []) {
     allowedKeys.add(campo.key);
+    registerField(fieldsToValidate, campo);
     if (!optionalSet.has(campo.key) && campo.obrigatorio !== false) {
       requiredKeys.add({ key: campo.key, label: campo.pergunta || campo.key });
     }
@@ -313,6 +323,7 @@ export function reconstructAndValidateResponses(
     for (const etapa of modelo.etapas) {
       if (etapa.tipo === "campo") {
         allowedKeys.add(etapa.campo.key);
+        registerField(fieldsToValidate, etapa.campo);
         if (
           !optionalSet.has(etapa.campo.key) &&
           etapa.campo.obrigatorio !== false
@@ -326,13 +337,18 @@ export function reconstructAndValidateResponses(
         if (etapa.endereco?.saidaKey) {
           allowedKeys.add(etapa.endereco.saidaKey);
         }
-        for (const c of etapa.campos) {
-          allowedKeys.add(c.key);
-          if (!optionalSet.has(c.key) && c.obrigatorio !== false) {
-            requiredKeys.add({ key: c.key, label: c.pergunta || c.key });
+        for (const campo of etapa.campos) {
+          allowedKeys.add(campo.key);
+          registerField(fieldsToValidate, campo);
+          if (!optionalSet.has(campo.key) && campo.obrigatorio !== false) {
+            requiredKeys.add({
+              key: campo.key,
+              label: campo.pergunta || campo.key,
+            });
           }
-          if (c.key === "rg" || c.key.endsWith("_rg")) {
-            const prefix = c.key === "rg" ? "" : c.key.slice(0, -3);
+          if (campo.key === "rg" || campo.key.endsWith("_rg")) {
+            const prefix =
+              campo.key === "rg" ? "" : campo.key.slice(0, -3);
             const sepKey = prefix
               ? `${prefix}_rg_separador`
               : "rg_separador";
@@ -341,18 +357,17 @@ export function reconstructAndValidateResponses(
         }
       } else if (etapa.tipo === "clausulas") {
         for (const clausula of etapa.clausulas) {
-          if (clausulasSelecionadas.includes(clausula.id)) {
-            allowedKeys.add(`__clausula_${clausula.id}`);
-            if (clausula.camposExtras) {
-              for (const c of clausula.camposExtras) {
-                allowedKeys.add(c.key);
-                if (!optionalSet.has(c.key) && c.obrigatorio !== false) {
-                  requiredKeys.add({
-                    key: c.key,
-                    label: c.pergunta || c.key,
-                  });
-                }
-              }
+          if (!clausulasSelecionadas.includes(clausula.id)) continue;
+
+          allowedKeys.add(`__clausula_${clausula.id}`);
+          for (const campo of clausula.camposExtras || []) {
+            allowedKeys.add(campo.key);
+            registerField(fieldsToValidate, campo);
+            if (!optionalSet.has(campo.key) && campo.obrigatorio !== false) {
+              requiredKeys.add({
+                key: campo.key,
+                label: campo.pergunta || campo.key,
+              });
             }
           }
         }
@@ -363,8 +378,8 @@ export function reconstructAndValidateResponses(
   allowedKeys.add("cidade_data");
 
   for (const req of requiredKeys) {
-    const val = composed[req.key];
-    if (val === undefined || val === null || val.trim() === "") {
+    const value = composed[req.key];
+    if (value === undefined || value === null || value.trim() === "") {
       throw new BackendError(
         "INVALID_REQUEST",
         400,
@@ -373,8 +388,21 @@ export function reconstructAndValidateResponses(
     }
   }
 
-  const sanitized: Record<string, string> = {};
+  for (const [key, campo] of fieldsToValidate) {
+    const value = composed[key];
+    if (typeof value !== "string" || value.trim() === "") continue;
 
+    const validationError = validarCampoDocumento(campo, value);
+    if (validationError) {
+      throw new BackendError(
+        "INVALID_REQUEST",
+        400,
+        `${campo.pergunta || key} ${validationError}`
+      );
+    }
+  }
+
+  const sanitized: Record<string, string> = {};
   for (const [key, value] of Object.entries(composed)) {
     if (allowedKeys.has(key) && typeof value === "string") {
       sanitized[key] = value.trim();
@@ -485,10 +513,8 @@ export function reconstructDuplicateDraft(
         clausulasSelecionadas.push(clausula.id);
 
         const extras: Record<string, string> = {};
-
         for (const campo of clausula.camposExtras || []) {
           const value = storedRespostas[campo.key];
-
           if (typeof value === "string") {
             extras[campo.key] = value;
             delete respostas[campo.key];
