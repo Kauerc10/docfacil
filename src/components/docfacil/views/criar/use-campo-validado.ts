@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { aplicarMascara, detectarMascara, validarPorTipo } from "./types";
+import { aplicarMascara, detectarMascara } from "./types";
 import type { CampoModelo } from "@/lib/types";
+import { validarCampoDocumento } from "@/lib/validation/document-fields";
 
 /**
  * useCampoValidado — encapsula máscara + validação determinística para
@@ -12,14 +13,8 @@ import type { CampoModelo } from "@/lib/types";
  *  - CampoPergunta (campo único)
  *  - ClausulaCard (campos extras)
  *
- * Centraliza a lógica que antes só existia no GrupoCampos, garantindo
- * consistência: um CPF em campo extra de cláusula agora é formatado e
- * validado igual ao CPF no GrupoCampos.
- *
- * @param campo   definição do campo (key, pergunta, tipo)
- * @param value    valor atual (controlado)
- * @param onChange callback para atualizar o valor no parent
- * @returns handlers prontos para plugar no input + estado de erro
+ * As máscaras continuam sendo uma preocupação visual; a regra de validade do
+ * dado é compartilhada com o servidor, que permanece a autoridade final.
  */
 export function useCampoValidado(
   campo: CampoModelo,
@@ -27,33 +22,31 @@ export function useCampoValidado(
   onChange: (v: string) => void
 ) {
   const [erro, setErro] = useState<string | null>(null);
-
   const tipo = detectarMascara(campo);
 
   const handleChange = useCallback(
     (raw: string) => {
       const mascarado = aplicarMascara(raw, tipo);
       onChange(mascarado);
-      // limpa erro se voltou a válido
       if (erro) {
-        const novoErro = validarPorTipo(tipo, mascarado);
+        const novoErro = validarCampoDocumento(campo, mascarado);
         if (!novoErro) setErro(null);
       }
     },
-    [erro, onChange, tipo]
+    [campo, erro, onChange, tipo]
   );
 
   const handleBlur = useCallback(() => {
-    const novoErro = validarPorTipo(tipo, value);
+    const novoErro = validarCampoDocumento(campo, value);
     setErro(novoErro);
     return novoErro;
-  }, [tipo, value]);
+  }, [campo, value]);
 
   const validar = useCallback(() => {
-    const novoErro = validarPorTipo(tipo, value);
+    const novoErro = validarCampoDocumento(campo, value);
     setErro(novoErro);
     return novoErro;
-  }, [tipo, value]);
+  }, [campo, value]);
 
   return { tipo, erro, setErro, handleChange, handleBlur, validar };
 }
