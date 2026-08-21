@@ -33,7 +33,7 @@
 - Consumes: `Modelo`, `fillDocument`, `validateDocumentSemanticInvariants` e cláusulas selecionadas.
 - Produces: modelos que só inserem caução, arras e vistoria quando seus dados e escolhas existem; respostas sem sinal não materializam arras.
 
-- [ ] **Step 1: Escrever RED para as escolhas condicionais**
+- [x] **Step 1: Escrever RED para as escolhas condicionais**
 
 ```ts
 expect(render("contrato-locacao-comercial", {}, [])).toContain("SEM QUALQUER MODALIDADE");
@@ -41,27 +41,29 @@ expect(render("contrato-compra-venda-imovel", { possui_sinal: "Não" })).not.toC
 expect(() => reconstructAndValidateResponses(imovel, validWithoutRegistry, [])).toThrow("matrícula");
 ```
 
-- [ ] **Step 2: Executar RED**
+- [x] **Step 2: Executar RED**
 
 Run: `bun test src/test/document-engine/contract-model-hardening.test.ts src/lib/server/domain/documents.test.ts`
 
 Expected: falhas por ausência de campos/invariantes e por linhas incondicionais.
 
-- [ ] **Step 3: Implementar o menor modelo coerente**
+- [x] **Step 3: Implementar o menor modelo coerente**
 
 Em `modelos.ts`, introduza os campos registral e a escolha `possui_sinal`; a escolha `Sim` revela sinal e forma. Use placeholders de cláusula para inserir a redação de arras apenas quando selecionada internamente pela escolha. Corrija garantia comercial, alienação, vistoria separada, prazo/retorno do comodato e local/data de bem móvel. Em `documents.ts`, bloqueie somente identificação registral ausente e sinal selecionado sem dados. Em `legal-rules.ts`, mantenha apenas redações que dependem de uma resposta.
 
-- [ ] **Step 4: Executar GREEN focado**
+- [x] **Step 4: Executar GREEN focado**
 
 Run: `bun test src/test/document-engine/contract-model-hardening.test.ts src/lib/server/domain/documents.test.ts src/test/document-engine/model-polish.test.ts`
 
 Expected: 0 falhas.
 
-- [ ] **Step 5: Revisar e commitar**
+- [x] **Step 5: Revisar e commitar**
 
 Run: `bun run typecheck`
 
 Commit only relevant files with `fix(contracts): endurece regras e qualificações`.
+
+> Evidência da Task 1 (2026-08-20): RED executado com os testes de hardening e domínio, com 9 falhas esperadas por condicionais/invariantes ausentes. GREEN focado: 29 testes, 0 falhas. `bun run typecheck`: concluído sem erros.
 
 ### Task 2: Fechamento responsivo à receita
 

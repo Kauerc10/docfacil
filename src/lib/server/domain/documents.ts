@@ -162,6 +162,32 @@ export function validateDocumentSemanticInvariants(
   rawRespostas: Record<string, string>,
   clausulasSelecionadas: string[] = []
 ): void {
+  if (modelo.slug === "contrato-compra-venda-imovel") {
+    const identificacaoRegistral = [
+      rawRespostas.matricula_imovel,
+      rawRespostas.registro_imoveis,
+      rawRespostas.descricao_registral,
+    ];
+
+    if (identificacaoRegistral.some((value) => !value?.trim())) {
+      throw new BackendError(
+        "INVALID_REQUEST",
+        400,
+        "Informe a matrícula, o Registro de Imóveis e a descrição complementar do imóvel."
+      );
+    }
+
+    if (/^sim$/i.test(rawRespostas.possui_sinal?.trim() ?? "")) {
+      if (!rawRespostas.sinal?.trim() || !rawRespostas.forma_pagamento_sinal?.trim()) {
+        throw new BackendError(
+          "INVALID_REQUEST",
+          400,
+          "Informe o valor e a forma de pagamento do sinal."
+        );
+      }
+    }
+  }
+
   if (!RENTAL_MODEL_SLUGS.has(modelo.slug)) return;
 
   if (

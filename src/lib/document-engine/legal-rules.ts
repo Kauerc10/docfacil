@@ -14,7 +14,7 @@
  * modificar diretamente o template bruto do catálogo. Deve ser incrementada
  * sempre que uma regra abaixo mudar o conteúdo jurídico/editorial final.
  */
-export const DOCUMENT_RENDER_RULES_VERSION = "2026-08-20.5";
+export const DOCUMENT_RENDER_RULES_VERSION = "2026-08-20.6";
 
 const RESIDENTIAL_ART_46_LINE =
   "O prazo de locação é de {{prazo}} meses, com início na data da assinatura, findo o qual o contrato se extinguirá de pleno direito, independentemente de notificação ou aviso, nos termos do art. 46 da Lei nº 8.245/1991.";
@@ -42,6 +42,7 @@ const RESIDENTIAL_FORUM_HEADING =
   "## CLÁUSULA DÉCIMA QUINTA – DO FORO";
 const COMMERCIAL_CHARGES_LINE =
   "Correrão por conta exclusiva do LOCATÁRIO, durante toda a vigência da locação: a) despesas de consumo (água, esgoto, energia elétrica, gás, internet e telefonia); b) despesas condominiais ordinárias e extraordinárias, quando o imóvel integrar condomínio comercial; c) o IPTU, taxas municipais, e eventual Imposto sobre Serviços (ISS) incidente sobre a própria atividade explorada; d) prêmios de seguro contra incêndio e demais riscos exigidos por lei ou pela administração do imóvel/condomínio.";
+const COMMERCIAL_INSPECTION_PLACEHOLDER = "{{vistoria_comercial}}";
 
 const RESIDENCE_SUBTITLE =
   "(Declaração firmada sob as penas da lei — art. 299 do Código Penal)";
@@ -61,6 +62,7 @@ const REAL_ESTATE_PRICE =
   "O preço certo e ajustado para a presente compra e venda é de R$ {{valor}}, a ser pago pelo COMPRADOR ao VENDEDOR da seguinte forma:";
 const REAL_ESTATE_ARRAS =
   'As arras mencionadas na Cláusula Segunda, alínea "a", têm caráter confirmatório do negócio, nos termos dos arts. 417 a 420 do Código Civil. Caso o COMPRADOR desista injustificadamente do negócio, perderá o valor das arras em favor do VENDEDOR. Caso a desistência parta do VENDEDOR, este deverá restituir ao COMPRADOR o valor das arras em dobro, devidamente atualizado.';
+const REAL_ESTATE_ARRAS_PLACEHOLDER = "{{clausula:arras}}";
 const REAL_ESTATE_POSSESSION =
   "A posse do IMÓVEL será transmitida ao COMPRADOR na data de quitação integral do preço / assinatura da escritura pública, momento a partir do qual correrão por conta do COMPRADOR todas as despesas de manutenção, condomínio, tributos e demais encargos incidentes sobre o imóvel.";
 const REAL_ESTATE_DEED =
@@ -162,8 +164,16 @@ export function applyLegalTemplateRule(
     }
   }
 
-  if (modelSlug === "contrato-locacao-comercial" && line === COMMERCIAL_CHARGES_LINE) {
-    return "Correrão por conta exclusiva do LOCATÁRIO, durante toda a vigência da locação: a) despesas de consumo de água, esgoto, energia elétrica, gás, internet e telefonia; b) despesas condominiais ordinárias; c) o IPTU e taxas municipais, conforme expressamente pactuado neste contrato; d) tributos incidentes sobre a própria atividade explorada; e) prêmios de seguro contra incêndio e demais riscos quando contratualmente atribuídos ao LOCATÁRIO. As despesas condominiais extraordinárias, nos termos do art. 22, § 1º, da Lei nº 8.245/1991, correrão por conta do LOCADOR.";
+  if (modelSlug === "contrato-locacao-comercial") {
+    if (line === COMMERCIAL_CHARGES_LINE) {
+      return "Correrão por conta exclusiva do LOCATÁRIO, durante toda a vigência da locação: a) despesas de consumo de água, esgoto, energia elétrica, gás, internet e telefonia; b) despesas condominiais ordinárias; c) o IPTU e taxas municipais, conforme expressamente pactuado neste contrato; d) tributos incidentes sobre a própria atividade explorada; e) prêmios de seguro contra incêndio e demais riscos quando contratualmente atribuídos ao LOCATÁRIO. As despesas condominiais extraordinárias, nos termos do art. 22, § 1º, da Lei nº 8.245/1991, correrão por conta do LOCADOR.";
+    }
+
+    if (line === COMMERCIAL_INSPECTION_PLACEHOLDER) {
+      return /^sim$/i.test(answers.vistoria_anexa?.trim() ?? "")
+        ? "As PARTES declaram que o Termo de Vistoria e o registro fotográfico são documentos apartados, assinados e juntados pelas PARTES, sem declaração de upload pela plataforma."
+        : "";
+    }
   }
 
   if (modelSlug === "declaracao-residencia") {
@@ -183,6 +193,8 @@ export function applyLegalTemplateRule(
   }
 
   if (modelSlug === "contrato-compra-venda-imovel") {
+    const possuiSinal = /^sim$/i.test(answers.possui_sinal?.trim() ?? "");
+
     if (line === REAL_ESTATE_INTRO) {
       return "têm entre si justo e contratado o presente Instrumento Particular de Compromisso de Compra e Venda de Imóvel, mediante as cláusulas e condições a seguir:";
     }
@@ -192,8 +204,9 @@ export function applyLegalTemplateRule(
     if (line === REAL_ESTATE_PRICE) {
       return "O preço certo e ajustado para o presente compromisso é de R$ {{valor}}, a ser pago pelo COMPRADOR ao VENDEDOR da seguinte forma:";
     }
-    if (line === REAL_ESTATE_ARRAS) {
-      return 'As arras mencionadas na Cláusula Segunda, alínea "a", têm caráter confirmatório do negócio, nos termos dos arts. 417 a 420 do Código Civil. Em caso de inexecução imputável ao COMPRADOR, o VENDEDOR poderá considerar desfeito o compromisso e reter as arras. Se a inexecução for imputável ao VENDEDOR, o COMPRADOR poderá considerar desfeito o compromisso e exigir a devolução das arras mais o equivalente, com atualização monetária, juros e honorários de advogado, nos termos do art. 418 do Código Civil. Permanecem ressalvados os direitos previstos no art. 419 do Código Civil.';
+    if (line === REAL_ESTATE_ARRAS || line === REAL_ESTATE_ARRAS_PLACEHOLDER) {
+      if (!possuiSinal) return "";
+      return 'Sinal e princípio de pagamento (arras confirmatórias) no valor de R$ {{sinal}}, pago mediante {{forma_pagamento_sinal}}. As arras têm caráter confirmatório do negócio, nos termos dos arts. 417 a 420 do Código Civil. Em caso de inexecução imputável ao COMPRADOR, o VENDEDOR poderá considerar desfeito o compromisso e reter as arras. Se a inexecução for imputável ao VENDEDOR, o COMPRADOR poderá considerar desfeito o compromisso e exigir a devolução das arras mais o equivalente, com atualização monetária, juros e honorários de advogado, nos termos do art. 418 do Código Civil. Permanecem ressalvados os direitos previstos no art. 419 do Código Civil.';
     }
     if (line === REAL_ESTATE_POSSESSION) {
       return "A posse do IMÓVEL será transmitida ao COMPRADOR após a quitação integral do preço e a entrega das chaves, salvo se as partes formalizarem por escrito outro momento de imissão na posse. A partir da efetiva posse correrão por conta do COMPRADOR as despesas de manutenção, condomínio, tributos e demais encargos incidentes sobre o imóvel.";

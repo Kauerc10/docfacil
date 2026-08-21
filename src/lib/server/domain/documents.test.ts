@@ -194,6 +194,64 @@ describe("reconstructAndValidateResponses", () => {
       )
     ).toThrow(BackendError);
   });
+
+  const imovel = MODELOS.find((m) => m.slug === "contrato-compra-venda-imovel")!;
+  const validWithoutRegistry = {
+    vendedor_nome: "Ana Silva",
+    vendedor_nacionalidade: "Brasileira",
+    vendedor_estado_civil: "Solteira",
+    vendedor_profissao: "Arquiteta",
+    vendedor_cpf: "111.222.333-44",
+    vendedor_cep: "89010-000",
+    vendedor_rua: "Rua das Flores",
+    vendedor_numero: "100",
+    vendedor_bairro: "Centro",
+    vendedor_cidade: "Blumenau",
+    vendedor_uf: "SC",
+    comprador_nome: "Bruno Souza",
+    comprador_nacionalidade: "Brasileiro",
+    comprador_estado_civil: "Solteiro",
+    comprador_profissao: "Professor",
+    comprador_cpf: "555.666.777-88",
+    comprador_cep: "01310-100",
+    comprador_rua: "Avenida Paulista",
+    comprador_numero: "1000",
+    comprador_bairro: "Bela Vista",
+    comprador_cidade: "São Paulo",
+    comprador_uf: "SP",
+    imovel_cep: "89010-000",
+    imovel_rua: "Rua XV de Novembro",
+    imovel_numero: "500",
+    imovel_bairro: "Centro",
+    imovel_cidade: "Blumenau",
+    imovel_uf: "SC",
+    valor: "350.000,00",
+    sinal: "35.000,00",
+    possui_sinal: "Não",
+    saldo_pagamento: "À vista na escritura pública",
+  };
+
+  it("rejeita compromisso de imóvel sem identificação registral suficiente", () => {
+    expect(() =>
+      reconstructAndValidateResponses(imovel, validWithoutRegistry, [])
+    ).toThrow("matrícula");
+  });
+
+  it("exige valor e forma de pagamento quando o compromisso prevê sinal", () => {
+    expect(() =>
+      reconstructAndValidateResponses(
+        imovel,
+        {
+          ...validWithoutRegistry,
+          matricula_imovel: "12.345",
+          registro_imoveis: "1º Registro de Imóveis de Blumenau/SC",
+          descricao_registral: "Apartamento 302, com área privativa de 80 m².",
+          possui_sinal: "Sim",
+        },
+        []
+      )
+    ).toThrow("forma de pagamento do sinal");
+  });
 });
 
 describe("tokens and hashes", () => {

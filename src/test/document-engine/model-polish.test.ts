@@ -42,7 +42,11 @@ describe("lapidação editorial e jurídica dos modelos V1", () => {
   });
 
   it("usa a redação vigente do art. 418 para arras confirmatórias", () => {
-    const text = render("contrato-compra-venda-imovel");
+    const text = render("contrato-compra-venda-imovel", {
+      possui_sinal: "Sim",
+      sinal: "35.000,00",
+      forma_pagamento_sinal: "PIX",
+    });
 
     expect(text).toContain("devolução das arras mais o equivalente");
     expect(text).toContain("atualização monetária");
