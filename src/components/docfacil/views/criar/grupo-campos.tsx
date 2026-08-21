@@ -10,24 +10,18 @@ import { buscarCep } from "@/lib/services/cep-service";
 import { campoEstaVisivel, type CampoModelo, type EnderecoConfig } from "@/lib/types";
 import type { InputRef } from "./types";
 import { aplicarMascara, detectarMascara, validarPorTipo } from "./types";
+import { getVisibleMicrocopy } from "./microcopy";
 
 gsap.registerPlugin(useGSAP);
 
 export interface GrupoCamposProps {
   titulo?: string;
   campos: CampoModelo[];
-  /** valores atuais por key */
   values: Record<string, string>;
   onFieldChange: (fieldKey: string, value: string) => void;
   onAvancar: () => void;
   isLast?: boolean;
   submitting?: boolean;
-  /**
-   * Configuração de endereço — quando presente, habilita:
-   *  - auto-fill ViaCEP ao digitar CEP (preenche logradouro/bairro/cidade/uf)
-   *  - normalização automática do logradouro no blur (strip "rua"/"avenida"/etc.)
-   *  - layout otimizado com CEP e rua em linhas próprias
-   */
   camposEndereco?: EnderecoConfig;
 }
 
@@ -41,22 +35,6 @@ export function getVisibleFieldsSignature(
     .join("|");
 }
 
-/**
- * GrupoCampos — card com múltiplos campos relacionados (ex.: endereço).
- *
- * - Grid 1-col mobile, 2-col desktop (cada campo ocupa 1 célula; textarea 2)
- * - CEP auto-fill via `buscarCep` (ViaCEP). Quando o usuário digita 8 dígitos
- *   e sai do campo, busca o endereço e preenche logradouro/bairro/cidade/uf.
- * - Logradouro (rua) é normalizado no blur: "rua arnoldo beck" ou "arnoldo
- *   beck" viram "Rua Arnoldo Beck" — sem duplicar ou faltar o prefixo.
- * - Máscaras automáticas por tipo (CPF, CNPJ, CEP, telefone, data, estado).
- * - Validação interna (CPF/CNPJ/CEP) — exibe erro abaixo do campo.
- * - Enter no ÚLTIMO campo avança. Enter nos outros pula para o próximo.
- * - Botão mostra "Finalizar" na última etapa, "Avançar" caso contrário.
- *
- * ANIMAÇÃO DE ENTRADA: cada campo entra em stagger (fade + slide-up + scale
- * leve) — mais suave e amigável para o usuário idoso. O título também anima.
- */
 export function GrupoCampos({
   titulo,
   campos,
@@ -82,19 +60,16 @@ export function GrupoCampos({
     [campos, values]
   );
 
-  // Mount animation — stagger suave do título + cada campo
   useGSAP(
     () => {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       if (!root.current) return;
       const tl = gsap.timeline();
-      // título
       tl.fromTo(
         "[data-grupo='titulo']",
         { y: 10, opacity: 0 },
         { y: 0, opacity: 1, duration: 0.32, ease: "power3.out" }
       );
-      // cada campo com stagger
       tl.fromTo(
         "[data-grupo='campo']",
         { y: 18, opacity: 0, scale: 0.98 },
@@ -108,7 +83,6 @@ export function GrupoCampos({
         },
         "-=0.15"
       );
-      // botão final
       tl.fromTo(
         "[data-grupo='acao']",
         { y: 12, opacity: 0 },
@@ -119,7 +93,6 @@ export function GrupoCampos({
     { scope: root }
   );
 
-  // Focus no primeiro campo ao montar
   useEffect(() => {
     const t = window.setTimeout(() => {
       const first = camposVisiveis[0];
@@ -129,7 +102,7 @@ export function GrupoCampos({
   }, [camposVisiveisSignature]);
 
   const validar = (c: CampoModelo, v: string): string | null => {
-    if (!v.trim()) return null; // required check happens at submit
+    if (!v.trim()) return null;
     return validarPorTipo(detectarMascara(c), v);
   };
 
@@ -137,12 +110,10 @@ export function GrupoCampos({
     const tipo = detectarMascara(c);
     const mascarado = aplicarMascara(raw, tipo);
     onFieldChange(c.key, mascarado);
-    // limpa erro se voltou a válido
     if (erros[c.key]) {
       const novoErro = validar(c, mascarado);
       if (!novoErro) setErros((prev) => ({ ...prev, [c.key]: null }));
     }
-    // quando o usuário muda o CEP, esconde o check de "encontrado" e o aviso de falha
     if (camposEndereco && c.key === camposEndereco.cepKey) {
       setCepEncontrado(false);
       setCepFalhou(false);
@@ -151,24 +122,20 @@ export function GrupoCampos({
 
   const handleBlur = async (c: CampoModelo) => {
     const v = values[c.key] ?? "";
-    // 1. validação
     const erro = validar(c, v);
     setErros((prev) => ({ ...prev, [c.key]: erro }));
 
-    // 2. auto-normaliza estado
     const tipo = detectarMascara(c);
     if (tipo === "estado") {
       const norm = normalizarEstado(v);
       if (norm !== v) onFieldChange(c.key, norm);
     }
 
-    // 3. auto-normaliza logradouro (rua) — strip/normaliza prefixo
     if (camposEndereco && c.key === camposEndereco.logradouroKey) {
       const norm = normalizarLogradouro(v);
       if (norm !== v) onFieldChange(c.key, norm);
     }
 
-    // 4. CEP auto-fill
     if (camposEndereco && c.key === camposEndereco.cepKey) {
       const nums = v.replace(/\D/g, "");
       if (nums.length === 8) {
@@ -178,8 +145,6 @@ export function GrupoCampos({
           const end = await buscarCep(nums);
           if (end && (end.logradouro || end.localidade)) {
             if (camposEndereco.logradouroKey && end.logradouro) {
-              // ViaCEP retorna "Rua das Flores" já com prefixo — normaliza
-              // para garantir formato consistente
               onFieldChange(
                 camposEndereco.logradouroKey,
                 normalizarLogradouro(end.logradouro)
@@ -195,19 +160,16 @@ export function GrupoCampos({
               onFieldChange(camposEndereco.ufKey, end.uf);
             }
             setCepEncontrado(true);
-            // foca no campo de número para o usuário continuar
             if (camposEndereco.numeroKey) {
               setTimeout(() => refs.current[camposEndereco.numeroKey]?.focus(), 50);
             }
           } else {
-            // ViaCEP respondeu mas não encontrou o CEP
             setCepFalhou(true);
             if (camposEndereco.logradouroKey) {
               setTimeout(() => refs.current[camposEndereco.logradouroKey]?.focus(), 50);
             }
           }
         } catch {
-          // rede/API indisponível — feedback honesto em vez de silêncio
           setCepFalhou(true);
           if (camposEndereco.logradouroKey) {
             setTimeout(() => refs.current[camposEndereco.logradouroKey]?.focus(), 50);
@@ -232,7 +194,6 @@ export function GrupoCampos({
   };
 
   const handleAvancar = () => {
-    // valida todos antes de avançar
     const novosErros: Record<string, string | null> = {};
     let primeiroComErro: CampoModelo | null = null;
     for (const c of camposVisiveis) {
@@ -246,7 +207,6 @@ export function GrupoCampos({
     setErros(novosErros);
     if (primeiroComErro) {
       refs.current[primeiroComErro.key]?.focus();
-      // shake
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         gsap.fromTo(
           refs.current[primeiroComErro.key],
@@ -259,8 +219,6 @@ export function GrupoCampos({
     onAvancar();
   };
 
-  // Para layout do endereço: CEP e Rua em linha própria (full width),
-  // Número e Complemento dividem linha, Bairro e Cidade dividem linha, UF sozinho.
   const isEnderecoField = (key: string) => {
     if (!camposEndereco) return false;
     return (
@@ -276,7 +234,6 @@ export function GrupoCampos({
 
   const isFullWidth = (key: string) => {
     if (!camposEndereco) return false;
-    // CEP e logradouro (rua) ocupam linha própria no desktop
     return key === camposEndereco.cepKey || key === camposEndereco.logradouroKey;
   };
 
@@ -302,6 +259,7 @@ export function GrupoCampos({
           const falhou = cepFalhou && c.key === camposEndereco?.cepKey;
           const isEnd = isEnderecoField(c.key);
           const fullW = isFullWidth(c.key) || isTextarea;
+          const microcopy = getVisibleMicrocopy(c);
           return (
             <div
               key={c.key}
@@ -433,10 +391,10 @@ export function GrupoCampos({
                 </p>
               )}
 
-              {!erro && c.microcopy && (
+              {!erro && microcopy && (
                 <p className="text-xs text-ink/55 italic flex items-start gap-1">
                   <span aria-hidden="true" className="text-[var(--selo-green)] mt-px">•</span>
-                  <span>{c.microcopy}</span>
+                  <span>{microcopy}</span>
                 </p>
               )}
             </div>
