@@ -21,7 +21,6 @@ import {
 import { normalizarEstado } from "@/lib/normalizers";
 import {
   aplicarComposicaoModelo,
-  computeCamposOpcionais,
   hasInvalidMoradoresAutorizados,
 } from "@/lib/document-engine";
 import { logger } from "@/lib/logger";
@@ -33,7 +32,7 @@ import type {
   RespostasState,
 } from "./criar/types";
 import { ChatStep } from "./criar/chat-step";
-import { PreviewA4 } from "./criar/preview-a4";
+import { PdfPreview } from "./criar/pdf-preview";
 import { CriarLayout } from "./criar/layout";
 import {
   CriarLoading,
@@ -133,7 +132,6 @@ export function CriarView() {
   }, [slug, requestedDocumentId, requestedDraftId, user?.uid]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadModel();
   }, [loadModel]);
 
@@ -145,11 +143,6 @@ export function CriarView() {
   const totalEtapas = etapasEfetivas.length;
   const etapaAtual = etapasEfetivas[stepIndex];
   const isLast = stepIndex + 1 >= totalEtapas;
-
-  const camposOpcionais = useMemo(() => {
-    if (!modelo) return [];
-    return computeCamposOpcionais(modelo, clausulasSelecionadas, answers);
-  }, [modelo, clausulasSelecionadas, answers]);
 
   const respostasComEndereco = useMemo(() => {
     if (!modelo) return answers;
@@ -466,13 +459,12 @@ export function CriarView() {
         }}
         previewSlot={
           <div className="w-full max-w-[340px] mx-auto">
-            <PreviewA4
-              titulo={modelo.template.titulo}
-              corpo={modelo.template.corpo}
+            <PdfPreview
+              modelo={modelo}
               respostas={respostasComEndereco}
               clausulasSelecionadas={clausulasSelecionadas}
-              modelo={modelo}
-              camposOpcionais={camposOpcionais}
+              extrasPorClausula={extrasPorClausula}
+              authenticated={Boolean(user)}
             />
           </div>
         }

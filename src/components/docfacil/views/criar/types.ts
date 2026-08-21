@@ -124,24 +124,13 @@ export interface ClausulaCardProps {
   onExtraChange: (fieldKey: string, value: string) => void;
 }
 
-export interface PreviewA4Props {
-  titulo: string;
-  corpo: string[];
+export interface PdfPreviewProps {
+  modelo: import("@/lib/types").Modelo;
   respostas: Record<string, string>;
-  /** IDs das cláusulas dinâmicas selecionadas (injetadas via `{{clausula:id}}`) */
-  clausulasSelecionadas?: string[];
-  /** modelo (usado para composição de endereço e definição de cláusulas) */
-  modelo?: import("@/lib/types").Modelo;
-  /** campos opcionais que, quando vazios, viram string vazia em vez de "_____" */
-  camposOpcionais?: string[];
-  /** doc id exibido no canto superior (quando aplicável) */
-  docId?: string;
-  /** quando false, esconde o badge "ao vivo" */
-  showLiveBadge?: boolean;
-  /** quando false, esconde o selo marca d'água */
-  showWatermark?: boolean;
-  /** className extra no root (sheet) */
-  className?: string;
+  clausulasSelecionadas: string[];
+  /** campos extras das cláusulas, mantidos fora das respostas principais */
+  extrasPorClausula: Record<string, Record<string, string>>;
+  authenticated: boolean;
 }
 
 // ============================================================================

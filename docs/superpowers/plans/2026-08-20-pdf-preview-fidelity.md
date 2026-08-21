@@ -19,7 +19,7 @@
 
 ---
 
-### Task 1: Route de PDF efêmero e política visual compartilhada
+### Task 1: Route de PDF efêmero e política visual compartilhada ✅
 
 **Files:**
 - Create: `src/app/api/documents/preview/route.ts`
@@ -33,7 +33,7 @@
 - Produces: `resolveDocumentWatermark(entitlement): boolean`, pure and shared.
 - Consumes: `reconstructAndValidateResponses`, `MODELOS`, `generatePdfServer`, App Check and principal helpers.
 
-- [ ] **Step 1: Write route and policy RED tests**
+- [x] **Step 1: Write route and policy RED tests**
 
 ```ts
 expect((await POST(noBearerRequest)).status).toBe(401);
@@ -42,23 +42,23 @@ expect(await response.arrayBuffer()).toStartWithPdfHeader();
 expect(repositories.documents.createDocument).not.toHaveBeenCalled();
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `bun test src/app/api/documents/preview/route.test.ts src/lib/server/domain/preview-render-policy.test.ts`
 
-- [ ] **Step 3: Implement the no-write route**
+- [x] **Step 3: Implement the no-write route**
 
 Set `runtime = "nodejs"`, `dynamic = "force-dynamic"`, `maxDuration = 8`; reject over-sized bodies before JSON parse, authenticate, resolve only a catalog model, reconstruct responses and produce `new Response(pdf)`. Apply all no-cache/privacy headers and catch `BackendError` without logging body data.
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
 Run: `bun test src/app/api/documents/preview/route.test.ts src/lib/server/domain/preview-render-policy.test.ts src/lib/server/domain/orchestrator.test.ts`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit only route/domain/tests with `feat(preview): gera PDF efêmero autenticado`.
 
-### Task 2: Cliente cancelável e visualizador nativo
+### Task 2: Cliente cancelável e visualizador nativo ✅
 
 **Files:**
 - Create: `src/lib/documents/preview-client.ts`
@@ -72,7 +72,7 @@ Commit only route/domain/tests with `feat(preview): gera PDF efêmero autenticad
 - Produces: `requestPdfPreview(payload, signal): Promise<Blob>` and `PdfPreview` props based on answers/clauses/model.
 - Consumes: `apiFetch`, `AbortController`, `URL.createObjectURL`, `URL.revokeObjectURL`.
 
-- [ ] **Step 1: Write client RED tests**
+- [x] **Step 1: Write client RED tests**
 
 ```ts
 expect(apiFetch).toHaveBeenCalledWith("/api/documents/preview", expect.objectContaining({ signal }));
@@ -80,19 +80,19 @@ expect(revokeObjectURL).toHaveBeenCalledWith(previousUrl);
 expect(lastResolvedUrl).toBe(newestUrl);
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `bun test src/lib/documents/preview-client.test.ts src/components/docfacil/views/criar/pdf-preview.test.tsx`
 
-- [ ] **Step 3: Implement the smallest UI integration**
+- [x] **Step 3: Implement the smallest UI integration**
 
 Debounce 600 ms only after minimum fields are present. Abort prior request, compare monotonic request sequence before setting state, replace/revoke Blob URL, and render an accessible `iframe title="Prévia fiel do documento"`. For guest render a short locked state and do not call the endpoint. Remove `PreviewA4` from `/criar`; it may remain unused for non-creation structural contexts.
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
 Run: `bun test src/lib/documents/preview-client.test.ts src/components/docfacil/views/criar/pdf-preview.test.tsx`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit only client/view/tests with `feat(preview): exibe documento pelo renderer final`.
 
