@@ -66,13 +66,7 @@ export function PdfDocumentPreview({
         const pdf = pdfmake.createPdf(
           buildDocDefinition(modelo, previewAnswers, { watermark })
         );
-        const blob = await new Promise<Blob>((resolve, reject) => {
-          try {
-            pdf.getBlob((value: Blob) => resolve(value));
-          } catch (err) {
-            reject(err);
-          }
-        });
+        const blob = await pdf.getBlob();
 
         if (!active) return;
         objectUrl = URL.createObjectURL(blob);
