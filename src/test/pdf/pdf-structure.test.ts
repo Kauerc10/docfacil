@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { getModelo } from "@/lib/modelos";
 import { buildDocDefinition, getPdfLayoutProfile } from "@/lib/pdf/styles";
-import { buildContent, cm, CONTENT_WIDTH, renderLineNode } from "@/lib/pdf/content-builder";
+import { buildContent, cm, renderLineNode } from "@/lib/pdf/content-builder";
 import { getPdfVisualRecipe } from "@/lib/pdf/visual-recipes";
 import { getPdfLayoutGeometry } from "@/lib/pdf/layout-geometry";
 
@@ -46,6 +46,18 @@ const thirdPartyDeclarationAnswers: Record<string, string> = {
   residente_documento: "RG nº 45.678.910-1 SSP/SC",
   residente_cpf: "999.888.777-66",
 };
+
+const officialModelSlugs = [
+  "declaracao-residencia",
+  "declaracao-residencia-terceiro",
+  "contrato-locacao",
+  "contrato-locacao-comercial",
+  "contrato-compra-venda-imovel",
+  "comodato",
+  "compra-venda",
+  "uniao-estavel",
+  "procuracao-simples",
+] as const;
 
 type InspectablePdfNode = {
   text?: unknown;
@@ -253,20 +265,35 @@ describe("PDF Structure & Layout Protection", () => {
     );
   });
 
-  it("usa filete curto e centralizado no título das declarações em vez de uma linha de página inteira", () => {
-    const declaracao = getModelo("declaracao-residencia")!;
-    const ddo = buildDocDefinition(declaracao, declarationAnswers) as {
-      content: Array<{
-        canvas?: Array<{ x1: number; x2: number }>;
-      }>;
-    };
+  it("mantém a mesma shell editorial formal nos nove modelos oficiais", () => {
+    for (const slug of officialModelSlugs) {
+      const modelo = getModelo(slug)!;
+      const recipe = getPdfVisualRecipe(modelo);
+      const ddo = buildDocDefinition(modelo, {}) as {
+        header?: (currentPage: number) => unknown;
+      };
+      const serializedHeader = JSON.stringify(ddo.header?.(1));
 
-    const divider = ddo.content[1]?.canvas?.[0];
+      expect(recipe.headerStyle).toBe("formal");
+      expect(recipe.showTitleDivider).toBe(false);
+      expect(recipe.pageMarginsCm[0]).toBe(2);
+      expect(recipe.pageMarginsCm[2]).toBe(2);
+      expect(recipe.bodyColor).toBe("#181818");
+      expect(serializedHeader).toContain("DocFácil");
+      expect(serializedHeader).toContain("Documentos jurídicos simplificados");
+      expect(serializedHeader).toContain("#b9853d");
+    }
+  });
 
-    expect(divider).toBeDefined();
-    expect(divider!.x1).toBeGreaterThan(0);
-    expect(divider!.x2).toBeLessThan(CONTENT_WIDTH);
-    expect(divider!.x2 - divider!.x1).toBeLessThan(CONTENT_WIDTH / 2);
+  it("não reinsere o divisor legado abaixo do título em nenhuma família", () => {
+    for (const slug of officialModelSlugs) {
+      const modelo = getModelo(slug)!;
+      const ddo = buildDocDefinition(modelo, {}) as {
+        content: Array<Record<string, unknown>>;
+      };
+
+      expect(ddo.content[1]?.canvas).toBeUndefined();
+    }
   });
 
   it("centraliza a data das declarações com respiro próprio antes da assinatura", () => {
@@ -290,7 +317,6 @@ describe("PDF Structure & Layout Protection", () => {
 
     expect(propria.margin![3]).toBeGreaterThan(terceiro.margin![3]);
   });
-
 
   it("atribui variantes editoriais reutilizáveis à família de contratos", () => {
     expect(getPdfVisualRecipe(getModelo("contrato-locacao")!).contractVariant).toBe(
