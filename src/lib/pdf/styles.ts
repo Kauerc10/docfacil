@@ -16,6 +16,7 @@ import {
 } from "./content-builder";
 import { A4_WIDTH, cm, getPdfLayoutGeometry } from "./layout-geometry";
 import { buildContractContentForModel } from "./contract-composer";
+import { refineDeclarationContent } from "./declaration-composer";
 import {
   getPdfLayoutProfile as resolvePdfLayoutProfile,
   getPdfVisualRecipe,
@@ -89,12 +90,15 @@ export function buildDocDefinition(
   const geometry = getPdfLayoutGeometry(recipe);
   const { pageMargins } = geometry;
   const renderedTitle = applyLegalTitleRule(modelo.slug, modelo.template.titulo);
-  const contentNodes = recipe.profile === "contract"
+  const baseContentNodes = recipe.profile === "contract"
     ? buildContractContentForModel(modelo, respostasCompativeis, clausulasSelecionadas, camposOpcionais)
     : applyClosingRhythm(
         buildContent(modelo, respostasCompativeis, clausulasSelecionadas, camposOpcionais),
         recipe
       );
+  const contentNodes = recipe.profile === "declaration"
+    ? refineDeclarationContent(baseContentNodes, recipe)
+    : baseContentNodes;
   const dividerWidth = recipe.dividerWidthCm === null ? geometry.contentWidth : cm(recipe.dividerWidthCm);
   const dividerX1 = (geometry.contentWidth - dividerWidth) / 2;
   const dividerX2 = dividerX1 + dividerWidth;
@@ -270,7 +274,13 @@ export function buildDocDefinition(
         lineHeight: recipe.signatureLineHeight,
         characterSpacing: recipe.signatureCharacterSpacing,
       },
-      legalQuote: { font: "Roboto", fontSize: 10.5, italics: true, color: "#5a6b82", lineHeight: recipe.legalQuoteLineHeight },
+      legalQuote: {
+        font: "Roboto",
+        fontSize: 10.5,
+        italics: true,
+        color: recipe.profile === "declaration" ? bodyColor : "#5a6b82",
+        lineHeight: recipe.legalQuoteLineHeight,
+      },
       witness: { font: "Roboto", fontSize: 9.5, italics: true, color: "#5a6b82" },
       headerContinuation: { font: "Roboto", fontSize: 9, color: "#5a6b82" },
       footerText: { font: "Roboto", fontSize: 8, color: "#5a6b82", characterSpacing: 0.3 },
