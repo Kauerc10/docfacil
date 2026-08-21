@@ -9,11 +9,13 @@ import {
   calculateModelSnapshotHash,
   canonicalizeJson,
   reconstructDuplicateDraft,
+  PDF_EDITORIAL_IDENTITY_VERSION,
 } from "./documents";
 import { fillDocument } from "../../document-engine";
 import { BackendError } from "../errors";
 import { MODELOS } from "../../modelos";
 import { DOCUMENT_RENDER_RULES_VERSION } from "../../document-engine/legal-rules";
+import { getPdfVisualRecipe } from "../../pdf/visual-recipes";
 import type { Modelo } from "../../types";
 
 describe("documentDraftInputSchema", () => {
@@ -345,7 +347,7 @@ describe("tokens and hashes", () => {
     expect(h1.length).toBe(64);
   });
 
-  it("includes the material render-rules version in modelSnapshotHash", () => {
+  it("includes material render and editorial identity in modelSnapshotHash", () => {
     const modelo = MODELOS[0];
     const snapshot = {
       slug: modelo.slug,
@@ -361,6 +363,10 @@ describe("tokens and hashes", () => {
         listaPessoas: c.listaPessoas,
       })),
       renderRulesVersion: DOCUMENT_RENDER_RULES_VERSION,
+      editorial: {
+        identityVersion: PDF_EDITORIAL_IDENTITY_VERSION,
+        visualRecipe: getPdfVisualRecipe(modelo),
+      },
     };
     const expected = createHash("sha256")
       .update(JSON.stringify(canonicalizeJson(snapshot)))

@@ -8,6 +8,7 @@ import { normalizeCivilStatus } from "../../document-engine/civil-status";
 import { computeCamposOpcionais } from "../../document-engine/optional-fields";
 import { hasInvalidMoradoresAutorizados } from "../../document-engine/authorized-residents";
 import { DOCUMENT_RENDER_RULES_VERSION } from "../../document-engine/legal-rules";
+import { getPdfVisualRecipe } from "../../pdf/visual-recipes";
 import { validarCampoDocumento } from "../../validation/document-fields";
 import {
   normalizarRespostasLegadasDeContrato,
@@ -454,7 +455,16 @@ export function canonicalizeJson(value: unknown): unknown {
   );
 }
 
-export function calculateModelSnapshotHash(modelo: Modelo): string {
+export const PDF_EDITORIAL_IDENTITY_VERSION = "docfacil-formal-v1";
+
+export interface ModelSnapshotTraceabilityOptions {
+  editorialIdentityVersion?: string;
+}
+
+export function calculateModelSnapshotHash(
+  modelo: Modelo,
+  options: ModelSnapshotTraceabilityOptions = {}
+): string {
   const snapshot = {
     slug: modelo.slug,
     nome: modelo.nome,
@@ -469,6 +479,11 @@ export function calculateModelSnapshotHash(modelo: Modelo): string {
       listaPessoas: c.listaPessoas,
     })),
     renderRulesVersion: DOCUMENT_RENDER_RULES_VERSION,
+    editorial: {
+      identityVersion:
+        options.editorialIdentityVersion ?? PDF_EDITORIAL_IDENTITY_VERSION,
+      visualRecipe: getPdfVisualRecipe(modelo),
+    },
   };
   const canonical = canonicalizeJson(snapshot);
   return createHash("sha256")
