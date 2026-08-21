@@ -31,6 +31,16 @@ export interface GrupoCamposProps {
   camposEndereco?: EnderecoConfig;
 }
 
+export function getVisibleFieldsSignature(
+  campos: CampoModelo[],
+  values: Record<string, string>
+): string {
+  return campos
+    .filter((campo) => campoEstaVisivel(campo, values))
+    .map((campo) => campo.key)
+    .join("|");
+}
+
 /**
  * GrupoCampos — card com múltiplos campos relacionados (ex.: endereço).
  *
@@ -65,6 +75,10 @@ export function GrupoCampos({
   const [cepFalhou, setCepFalhou] = useState(false);
   const camposVisiveis = useMemo(
     () => campos.filter((campo) => campoEstaVisivel(campo, values)),
+    [campos, values]
+  );
+  const camposVisiveisSignature = useMemo(
+    () => getVisibleFieldsSignature(campos, values),
     [campos, values]
   );
 
@@ -112,7 +126,7 @@ export function GrupoCampos({
       if (first) refs.current[first.key]?.focus();
     }, 80);
     return () => window.clearTimeout(t);
-  }, [camposVisiveis]);
+  }, [camposVisiveisSignature]);
 
   const validar = (c: CampoModelo, v: string): string | null => {
     if (!v.trim()) return null; // required check happens at submit

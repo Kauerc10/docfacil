@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GrupoCampos } from "@/components/docfacil/views/criar/grupo-campos";
+import { getVisibleFieldsSignature } from "@/components/docfacil/views/criar/grupo-campos";
 import { getModelo } from "@/lib/modelos";
 
 const imovel = getModelo("contrato-compra-venda-imovel")!;
@@ -27,6 +28,19 @@ function renderFields(values: Record<string, string>) {
 }
 
 describe("campos condicionais de sinal", () => {
+  it("não considera uma simples digitação como mudança de campos visíveis", () => {
+    const before = getVisibleFieldsSignature(etapaValores.campos, {
+      possui_sinal: "Não",
+      valor_total: "100.000,00",
+    });
+    const after = getVisibleFieldsSignature(etapaValores.campos, {
+      possui_sinal: "Não",
+      valor_total: "100.000,01",
+    });
+
+    expect(after).toBe(before);
+  });
+
   it("oculta valor e forma do sinal quando a resposta é Não", () => {
     const markup = renderFields({ possui_sinal: "Não" });
 
