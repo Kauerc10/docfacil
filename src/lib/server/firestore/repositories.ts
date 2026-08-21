@@ -2,6 +2,8 @@ import "server-only";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { getAdminFirestore } from "../firebase-admin";
 import { BackendError } from "../errors";
+import { getServerEnv } from "../env";
+import { assertProductionServerConfig } from "../config/assert-production-config";
 import { createOrderBuyerPrincipalKey } from "../billing/order-identity";
 import type {
   IDocumentsRepository,
@@ -683,9 +685,12 @@ export function getRepositories(): BackendRepositories {
     return repositoriesSingleton;
   }
 
+  const env = getServerEnv();
+  assertProductionServerConfig(env);
+
   const useInMemory =
-    process.env.ALLOW_IN_MEMORY_REPOSITORIES === "true" ||
-    (process.env.NODE_ENV === "test" && !process.env.FIRESTORE_EMULATOR_HOST);
+    env.ALLOW_IN_MEMORY_REPOSITORIES ||
+    (env.NODE_ENV === "test" && !env.FIRESTORE_EMULATOR_HOST);
 
   if (useInMemory) {
     const docs = new InMemoryDocumentsRepository(false);
