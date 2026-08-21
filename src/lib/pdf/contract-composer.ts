@@ -1,4 +1,8 @@
-import { classifyLine, fillDocument } from "../document-engine";
+import {
+  classifyLine,
+  fillDocument,
+  normalizarRespostasLegadasDeContrato,
+} from "../document-engine";
 import type { Modelo } from "../types";
 import {
   computeCamposOpcionais,
@@ -230,12 +234,23 @@ export function buildContractContent(lines: string[], recipe: PdfVisualRecipe): 
 export function buildContractContentForModel(
   modelo: Modelo,
   respostas: Record<string, string>,
-  clausulasSelecionadas = extractClausulasSelecionadas(respostas),
-  camposOpcionais = computeCamposOpcionais(modelo, clausulasSelecionadas)
+  clausulasSelecionadas?: string[],
+  camposOpcionais?: string[]
 ): PdfNode[] {
+  const respostasCompativeis = normalizarRespostasLegadasDeContrato(modelo, respostas);
+  const clausulasCompativeis = clausulasSelecionadas
+    ?? extractClausulasSelecionadas(respostasCompativeis);
+  const camposOpcionaisCompativeis = camposOpcionais
+    ?? computeCamposOpcionais(modelo, clausulasCompativeis, respostasCompativeis);
   const lines = fillDocument(
-    { titulo: modelo.template.titulo, corpo: modelo.template.corpo, respostas, clausulasSelecionadas, modelo },
-    { camposOpcionais }
+    {
+      titulo: modelo.template.titulo,
+      corpo: modelo.template.corpo,
+      respostas: respostasCompativeis,
+      clausulasSelecionadas: clausulasCompativeis,
+      modelo,
+    },
+    { camposOpcionais: camposOpcionaisCompativeis }
   ).slice(1);
   return buildContractContent(lines, getPdfVisualRecipe(modelo));
 }

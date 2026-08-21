@@ -89,3 +89,7 @@ export {
 export {
   computeCamposOpcionais,
 } from "./optional-fields";
+
+export {
+  normalizarRespostasLegadasDeContrato,
+} from "./legacy-contract-answers";

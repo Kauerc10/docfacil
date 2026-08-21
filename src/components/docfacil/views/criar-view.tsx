@@ -19,7 +19,11 @@ import {
   clearFinalizationRequestId,
 } from "@/lib/documents/client";
 import { normalizarEstado } from "@/lib/normalizers";
-import { aplicarComposicaoModelo, hasInvalidMoradoresAutorizados } from "@/lib/document-engine";
+import {
+  aplicarComposicaoModelo,
+  computeCamposOpcionais,
+  hasInvalidMoradoresAutorizados,
+} from "@/lib/document-engine";
 import { logger } from "@/lib/logger";
 import { UX_CONFIG } from "@/lib/constants";
 import { campoEstaVisivel, type Modelo, type EtapaModelo } from "@/lib/types";
@@ -143,35 +147,9 @@ export function CriarView() {
   const isLast = stepIndex + 1 >= totalEtapas;
 
   const camposOpcionais = useMemo(() => {
-    if (!modelo?.etapas) return [];
-    const out: string[] = [];
-    for (const etapa of modelo.etapas) {
-      if (etapa.tipo === "campo_grupo") {
-        for (const c of etapa.campos) {
-          if (c.obrigatorio === false || !campoEstaVisivel(c, answers)) out.push(c.key);
-          if (c.key === "rg" || c.key.endsWith("_rg")) {
-            const prefix = c.key === "rg" ? "" : c.key.slice(0, -3);
-            out.push(prefix ? `${prefix}_rg_separador` : "rg_separador");
-          }
-        }
-        if (etapa.endereco) {
-          const e = etapa.endereco;
-          out.push(e.cepKey, e.logradouroKey, e.numeroKey, e.bairroKey, e.cidadeKey, e.ufKey);
-          if (e.complementoKey) out.push(e.complementoKey);
-        }
-      } else if (etapa.tipo === "campo" && etapa.campo.obrigatorio === false) {
-        out.push(etapa.campo.key);
-      }
-      if (etapa.tipo === "clausulas") {
-        for (const cl of etapa.clausulas) {
-          if (!clausulasSelecionadas.includes(cl.id) && cl.camposExtras) {
-            for (const ex of cl.camposExtras) out.push(ex.key);
-          }
-        }
-      }
-    }
-    return out;
-  }, [modelo, clausulasSelecionadas]);
+    if (!modelo) return [];
+    return computeCamposOpcionais(modelo, clausulasSelecionadas, answers);
+  }, [modelo, clausulasSelecionadas, answers]);
 
   const respostasComEndereco = useMemo(() => {
     if (!modelo) return answers;

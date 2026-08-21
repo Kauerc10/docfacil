@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { fillDocument } from "@/lib/document-engine";
+import {
+  fillDocument,
+  normalizarRespostasLegadasDeContrato,
+} from "@/lib/document-engine";
 import { getModelo } from "@/lib/modelos";
 
 function render(
@@ -101,5 +104,25 @@ describe("robustez dos contratos auditados", () => {
 
     expect(document).toContain("foro do domicílio do VENDEDOR");
     expect(document).not.toContain("______________________/______________________");
+  });
+
+  it("renderiza respostas legadas sem inventar a matrícula imobiliária", () => {
+    const modeloImovel = getModelo("contrato-compra-venda-imovel")!;
+    const respostasLegadas = {
+      sinal: "35.000,00",
+      forma_pagamento_sinal: "PIX",
+    };
+    const comodatoLegado = render("comodato", { prazo: "seis meses" });
+    const imovelLegado = render("contrato-compra-venda-imovel", respostasLegadas);
+    const normalizadas = normalizarRespostasLegadasDeContrato(modeloImovel, respostasLegadas);
+
+    expect(normalizadas.possui_sinal).toBe("Sim");
+    expect(normalizadas).not.toHaveProperty("matricula_imovel");
+    expect(normalizadas).not.toHaveProperty("registro_imoveis");
+    expect(comodatoLegado).toContain("seis meses");
+    expect(imovelLegado).toContain("arras confirmatórias");
+    expect(imovelLegado).toContain("pago mediante PIX");
+    expect(imovelLegado).toMatch(/matriculado sob o nº _+/);
+    expect(imovelLegado).not.toContain("matriculado sob o nº 0");
   });
 });

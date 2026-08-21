@@ -14,6 +14,7 @@
 import { aplicarComposicaoModelo } from "./compose";
 import { buildClausulaMap, fillTemplate } from "./template";
 import { applyLegalTemplateRule, applyLegalTitleRule } from "./legal-rules";
+import { normalizarRespostasLegadasDeContrato } from "./legacy-contract-answers";
 import { classifyLine } from "./classify";
 import { wrapLines, paginate } from "./paginate";
 import type { PaginaRenderizada, RenderInput, RenderOptions } from "./types";
@@ -67,9 +68,12 @@ export function renderDocument(
     context,
   } = opts;
 
+  const respostasCompativeis = modelo
+    ? normalizarRespostasLegadasDeContrato(modelo, respostas)
+    : respostas;
   const respostasCompostas = modelo
-    ? aplicarComposicaoModelo(respostas, modelo)
-    : { ...respostas };
+    ? aplicarComposicaoModelo(respostasCompativeis, modelo)
+    : { ...respostasCompativeis };
 
   const clausulaPorId = modelo?.etapas ? buildClausulaMap(modelo.etapas) : {};
 
@@ -133,9 +137,12 @@ export function fillDocument(
   const { titulo, corpo, respostas, clausulasSelecionadas = [], modelo } = input;
   const { camposOpcionais = [], context } = opts;
 
+  const respostasCompativeis = modelo
+    ? normalizarRespostasLegadasDeContrato(modelo, respostas)
+    : respostas;
   const respostasCompostas = modelo
-    ? aplicarComposicaoModelo(respostas, modelo)
-    : { ...respostas };
+    ? aplicarComposicaoModelo(respostasCompativeis, modelo)
+    : { ...respostasCompativeis };
 
   const clausulaPorId = modelo?.etapas ? buildClausulaMap(modelo.etapas) : {};
 

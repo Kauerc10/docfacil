@@ -8,6 +8,7 @@
 import type { Modelo } from "../types";
 import type { GerarPDFOptions } from "./types";
 import { applyLegalTitleRule } from "../document-engine/legal-rules";
+import { normalizarRespostasLegadasDeContrato } from "../document-engine/legacy-contract-answers";
 import {
   buildContent,
   extractClausulasSelecionadas,
@@ -77,16 +78,21 @@ export function buildDocDefinition(
   respostas: Record<string, string>,
   options?: { watermark?: boolean }
 ): unknown {
-  const clausulasSelecionadas = extractClausulasSelecionadas(respostas);
-  const camposOpcionais = computeCamposOpcionais(modelo, clausulasSelecionadas);
+  const respostasCompativeis = normalizarRespostasLegadasDeContrato(modelo, respostas);
+  const clausulasSelecionadas = extractClausulasSelecionadas(respostasCompativeis);
+  const camposOpcionais = computeCamposOpcionais(
+    modelo,
+    clausulasSelecionadas,
+    respostasCompativeis
+  );
   const recipe = getPdfVisualRecipe(modelo);
   const geometry = getPdfLayoutGeometry(recipe);
   const { pageMargins } = geometry;
   const renderedTitle = applyLegalTitleRule(modelo.slug, modelo.template.titulo);
   const contentNodes = recipe.profile === "contract"
-    ? buildContractContentForModel(modelo, respostas, clausulasSelecionadas, camposOpcionais)
+    ? buildContractContentForModel(modelo, respostasCompativeis, clausulasSelecionadas, camposOpcionais)
     : applyClosingRhythm(
-        buildContent(modelo, respostas, clausulasSelecionadas, camposOpcionais),
+        buildContent(modelo, respostasCompativeis, clausulasSelecionadas, camposOpcionais),
         recipe
       );
   const dividerWidth = recipe.dividerWidthCm === null ? geometry.contentWidth : cm(recipe.dividerWidthCm);

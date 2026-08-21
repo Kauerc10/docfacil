@@ -30,6 +30,13 @@ const contractLines = [
 ];
 
 describe("contract composer", () => {
+  it("mantém campos de sinal obrigatórios no PDF quando a resposta muda de Não para Sim", () => {
+    const modelo = getModelo("contrato-compra-venda-imovel")!;
+    const ddo = buildDocDefinition(modelo, { possui_sinal: "Sim" });
+
+    expect(JSON.stringify(ddo)).toMatch(/pago mediante _+\./);
+  });
+
   it("mantém o fechamento comum como unidade editorial com grade de assinaturas", () => {
     const content = buildContractContent(contractLines, formalRecipe) as Array<Record<string, unknown>>;
     const closing = content.find((node) => node.id === "contract-closing");

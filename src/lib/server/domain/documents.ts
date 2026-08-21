@@ -8,6 +8,7 @@ import { normalizeCivilStatus } from "../../document-engine/civil-status";
 import { computeCamposOpcionais } from "../../document-engine/optional-fields";
 import { hasInvalidMoradoresAutorizados } from "../../document-engine/authorized-residents";
 import { DOCUMENT_RENDER_RULES_VERSION } from "../../document-engine/legal-rules";
+import { normalizarRespostasLegadasDeContrato } from "../../document-engine/legacy-contract-answers";
 
 export type DocumentOwner =
   | { type: "guest"; contact: { email?: string; phone?: string } }
@@ -149,30 +150,6 @@ const RENTAL_GUARANTEE_IDS = new Set([
   "seguro_fianca",
   "cessao_fiduciaria",
 ]);
-
-function normalizarRespostasLegadasDeContrato(
-  modelo: Modelo,
-  respostas: Record<string, string>
-): Record<string, string> {
-  const normalized = { ...respostas };
-
-  if (
-    modelo.slug === "comodato" &&
-    !normalized.periodo_emprestimo?.trim() &&
-    normalized.prazo?.trim()
-  ) {
-    normalized.periodo_emprestimo = normalized.prazo;
-  }
-
-  if (
-    modelo.slug === "contrato-compra-venda-imovel" &&
-    !Object.hasOwn(normalized, "possui_sinal")
-  ) {
-    normalized.possui_sinal = normalized.sinal?.trim() ? "Sim" : "Não";
-  }
-
-  return normalized;
-}
 
 /**
  * Regras de coerência que não cabem em validação de campo isolado.

@@ -22,7 +22,11 @@ import { AuthGate } from "@/components/docfacil/views/auth-gate";
 import { useNav } from "@/components/docfacil/nav-context";
 import { getDocument } from "@/lib/services/documents-service";
 import { getModel } from "@/lib/services/models-service";
-import { extractClausulasSelecionadas } from "@/lib/document-engine";
+import {
+  computeCamposOpcionais,
+  extractClausulasSelecionadas,
+  normalizarRespostasLegadasDeContrato,
+} from "@/lib/document-engine";
 import { logger } from "@/lib/logger";
 import { useAsync } from "@/hooks/use-async";
 import type { Documento, Modelo } from "@/lib/types";
@@ -126,54 +130,24 @@ function DocumentoDetalheContent() {
     { scope: root, dependencies: [doc?.id] }
   );
 
-  // Campos opcionais do modelo (para o preview tratar vazio como "" em vez
-  // de "______________________"). Calculado ANTES dos early returns pra
-  // respeitar a regra de hooks.
-  // Inclui campos individuais de endereço (ex.: "_cep", "_rua") e separadores
-  // de RG — só a string composta (saidaKey) e `<prefix>_rg_separador` aparecem
-  // no template.
-  const camposOpcionais = useMemo(() => {
-    if (!modelo?.etapas) return [];
-    const out: string[] = [];
-    for (const etapa of modelo.etapas) {
-      if (etapa.tipo === "campo_grupo") {
-        for (const c of etapa.campos) {
-          if (c.obrigatorio === false) out.push(c.key);
-          if (c.key === "rg" || c.key.endsWith("_rg")) {
-            const prefix = c.key === "rg" ? "" : c.key.slice(0, -3);
-            out.push(prefix ? `${prefix}_rg_separador` : "rg_separador");
-          }
-        }
-        if (etapa.endereco) {
-          const e = etapa.endereco;
-          out.push(e.cepKey, e.logradouroKey, e.numeroKey, e.bairroKey, e.cidadeKey, e.ufKey);
-          if (e.complementoKey) out.push(e.complementoKey);
-        }
-      } else if (etapa.tipo === "campo" && etapa.campo.obrigatorio === false) {
-        out.push(etapa.campo.key);
-      }
-      // clausula extras de cláusulas NÃO selecionadas viram ""
-      if (etapa.tipo === "clausulas") {
-        for (const cl of etapa.clausulas) {
-          // no detalhe, não sabemos quais foram selecionadas a partir do modelo
-          // — extraímos das respostas. Mas o loop de campos opcionais precisa
-          // marcar TODOS os extras como opcionais porque o motor já filtra
-          // cláusulas não selecionadas (corpo inteiro vira ""). Marcando como
-          // opcional garantimos que, se algum extra sobrar no mapa, vira "".
-          if (cl.camposExtras) {
-            for (const ex of cl.camposExtras) out.push(ex.key);
-          }
-        }
-      }
-    }
-    return out;
-  }, [modelo]);
+  const respostasCompativeis = useMemo(() => {
+    if (!doc) return {};
+    return modelo
+      ? normalizarRespostasLegadasDeContrato(modelo, doc.respostas)
+      : doc.respostas;
+  }, [doc, modelo]);
 
   // Extrai cláusulas selecionadas das respostas (convenção __clausula_${id} = "true")
   const clausulasSelecionadas = useMemo(() => {
-    if (!doc) return [];
-    return extractClausulasSelecionadas(doc.respostas);
-  }, [doc]);
+    return extractClausulasSelecionadas(respostasCompativeis);
+  }, [respostasCompativeis]);
+
+  // Campos opcionais do modelo usam as respostas atuais, inclusive as
+  // condições de visibilidade declaradas no catálogo.
+  const camposOpcionais = useMemo(() => {
+    if (!modelo) return [];
+    return computeCamposOpcionais(modelo, clausulasSelecionadas, respostasCompativeis);
+  }, [modelo, clausulasSelecionadas, respostasCompativeis]);
 
   // === Loading skeleton ====================================================
   if (loading) {
@@ -290,7 +264,7 @@ function DocumentoDetalheContent() {
                     docId={doc.id}
                     titulo={modelo.template.titulo}
                     corpo={modelo.template.corpo}
-                    respostas={doc.respostas}
+                    respostas={respostasCompativeis}
                     clausulasSelecionadas={clausulasSelecionadas}
                     modelo={modelo}
                     camposOpcionais={camposOpcionais}
