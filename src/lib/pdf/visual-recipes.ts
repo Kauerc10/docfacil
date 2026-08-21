@@ -49,79 +49,78 @@ export interface PdfVisualRecipe {
   showTitleDivider?: boolean;
 }
 
-const DEFAULT_CONTRACT_RECIPE: PdfVisualRecipe = {
+/**
+ * Moldura editorial comum aos contratos DocFácil. Variações posteriores
+ * ajustam apenas o ritmo de leitura; não podem voltar ao layout legado.
+ */
+const CONTRACT_FORMAL_BASE_RECIPE: PdfVisualRecipe = {
   profile: "contract",
   density: "balanced",
   contractVariant: "standard",
-  pageMarginsCm: [3.15, 3.45, 3.15, 2.6],
+  pageMarginsCm: [2, 2.3, 2, 2],
   footerHorizontalInsetCm: 2,
   footerBottomMarginCm: 0.55,
-  bodyFontSize: 12,
-  bodyLineHeight: 1.6,
+  bodyFontSize: 10.5,
+  bodyLineHeight: 1.3,
   signatureLineHeight: 1,
   signatureCharacterSpacing: 0.2,
-  titleFontSize: 16,
-  titleCharacterSpacing: 1.5,
-  titleBottomMargin: 4,
-  dividerBottomMargin: 20,
+  titleFontSize: 15,
+  titleCharacterSpacing: 0.2,
+  titleBottomMargin: 3,
+  dividerBottomMargin: 8,
   dividerWidthCm: null,
-  closingTopMargin: 15,
+  closingTopMargin: 12,
   closingBottomMargin: 0,
-  paragraphBottomMargin: 10,
-  firstLineIndentSpaces: 10,
-  legalQuoteIndent: 20,
-  legalQuoteLineHeight: 1.5,
+  paragraphBottomMargin: 6,
+  firstLineIndentSpaces: 0,
+  legalQuoteIndent: 0,
+  legalQuoteLineHeight: 1.26,
   dateAlignment: "right",
   dateTopMargin: 14,
   dateBottomMargin: 14,
-  clauseHeadingTopMargin: 13,
-  clauseHeadingBottomMargin: 5,
+  clauseHeadingTopMargin: 10,
+  clauseHeadingBottomMargin: 4,
+  bodyColor: "#181818",
+  headerStyle: "formal",
+  showTitleDivider: false,
+};
+
+const DEFAULT_CONTRACT_RECIPE: PdfVisualRecipe = {
+  ...CONTRACT_FORMAL_BASE_RECIPE,
+  contractVariant: "standard",
+  density: "balanced",
+  bodyLineHeight: 1.34,
+  paragraphBottomMargin: 7,
+  closingTopMargin: 14,
 };
 
 const CONTRACT_DENSE_RECIPE: PdfVisualRecipe = {
-  ...DEFAULT_CONTRACT_RECIPE,
+  ...CONTRACT_FORMAL_BASE_RECIPE,
   contractVariant: "dense",
   density: "dense",
-  bodyLineHeight: 1.56,
-  paragraphBottomMargin: 8,
+  bodyLineHeight: 1.27,
+  paragraphBottomMargin: 6,
   clauseHeadingTopMargin: 11,
   clauseHeadingBottomMargin: 4,
   closingTopMargin: 13,
 };
 
 const CONTRACT_FORMAL_RECIPE: PdfVisualRecipe = {
-  ...DEFAULT_CONTRACT_RECIPE,
+  ...CONTRACT_FORMAL_BASE_RECIPE,
   contractVariant: "formal",
   density: "dense",
-  pageMarginsCm: [2, 2.3, 2, 2],
-  footerHorizontalInsetCm: 2,
-  bodyFontSize: 10.5,
   bodyLineHeight: 1.26,
-  titleFontSize: 15,
-  titleCharacterSpacing: 0.2,
-  titleBottomMargin: 3,
-  dividerBottomMargin: 8,
-  paragraphBottomMargin: 6,
-  firstLineIndentSpaces: 0,
-  legalQuoteIndent: 0,
-  legalQuoteLineHeight: 1.26,
-  clauseHeadingTopMargin: 10,
-  clauseHeadingBottomMargin: 4,
-  closingTopMargin: 12,
-  bodyColor: "#181818",
-  headerStyle: "formal",
-  showTitleDivider: false,
 };
 
 const CONTRACT_PROPERTY_RECIPE: PdfVisualRecipe = {
-  ...DEFAULT_CONTRACT_RECIPE,
+  ...CONTRACT_FORMAL_BASE_RECIPE,
   contractVariant: "property",
-  bodyLineHeight: 1.61,
-  titleBottomMargin: 6,
-  dividerBottomMargin: 22,
-  clauseHeadingTopMargin: 14,
-  clauseHeadingBottomMargin: 6,
-  closingTopMargin: 18,
+  density: "balanced",
+  bodyLineHeight: 1.32,
+  paragraphBottomMargin: 7,
+  clauseHeadingTopMargin: 12,
+  clauseHeadingBottomMargin: 5,
+  closingTopMargin: 16,
 };
 
 /**

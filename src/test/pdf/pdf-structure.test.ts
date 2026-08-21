@@ -322,6 +322,26 @@ describe("PDF Structure & Layout Protection", () => {
     expect(residencial.bodyLineHeight).toBeLessThan(1.4);
   });
 
+  it("mantém a moldura editorial formal em todos os contratos", () => {
+    for (const slug of [
+      "contrato-locacao",
+      "contrato-locacao-comercial",
+      "contrato-compra-venda-imovel",
+      "comodato",
+      "compra-venda",
+    ]) {
+      const recipe = getPdfVisualRecipe(getModelo(slug)!);
+      const ddo = buildDocDefinition(getModelo(slug)!, {}) as {
+        header?: (currentPage: number) => unknown;
+      };
+
+      expect(recipe.headerStyle).toBe("formal");
+      expect(recipe.pageMarginsCm[0]).toBeLessThan(3);
+      expect(recipe.bodyFontSize).toBeLessThan(11);
+      expect(JSON.stringify(ddo.header?.(1))).toContain("Documentos jurídicos simplificados");
+    }
+  });
+
   it("deriva a largura editorial formal das margens efetivamente usadas", () => {
     const formal = getPdfVisualRecipe(getModelo("contrato-locacao")!);
     const geometry = getPdfLayoutGeometry(formal);
