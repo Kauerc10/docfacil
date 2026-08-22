@@ -100,6 +100,46 @@ describe("reconstructAndValidateResponses", () => {
     expect((cleaned as any).unwanted_extra_key).toBeUndefined();
   });
 
+  it("preserva os dados preenchidos da união estável ao compor o documento", () => {
+    const uniaoEstavel = MODELOS.find((item) => item.slug === "uniao-estavel")!;
+    const respostas = reconstructAndValidateResponses(uniaoEstavel, {
+      pessoa1_nome: "Ana Martins",
+      pessoa1_nacionalidade: "Brasileiro(a)",
+      pessoa1_estado_civil: "solteiro(a)",
+      pessoa1_profissao: "Designer",
+      pessoa1_cpf: "111.444.777-35",
+      pessoa2_nome: "Bruno Costa",
+      pessoa2_nacionalidade: "Brasileiro(a)",
+      pessoa2_estado_civil: "solteiro(a)",
+      pessoa2_profissao: "Professor",
+      pessoa2_cpf: "529.982.247-25",
+      inicio: "15 de março de 2020",
+      regime: "Comunhão parcial de bens (padrão)",
+      endereco_cep: "89062-440",
+      endereco_rua: "Rua Henrique Setter",
+      endereco_numero: "323",
+      endereco_complemento: "Casa",
+      endereco_bairro: "Itoupava Central",
+      endereco_cidade: "Blumenau",
+      endereco_uf: "SC",
+    });
+    const document = fillDocument({
+      titulo: uniaoEstavel.template.titulo,
+      corpo: uniaoEstavel.template.corpo,
+      respostas,
+      modelo: uniaoEstavel,
+    }).join("\n");
+
+    expect(respostas.endereco).toBe(
+      "Rua Henrique Setter, 323, Casa - Itoupava Central - Blumenau/SC - CEP 89062-440"
+    );
+    expect(document).toContain("Ana Martins");
+    expect(document).toContain("Bruno Costa");
+    expect(document).toContain("Rua Henrique Setter, 323, Casa");
+    expect(document).not.toContain("{{pessoa1_nome}}");
+    expect(document).not.toContain("{{endereco}}");
+  });
+
   it("normaliza aliases de estado civil antes de sanitizar", () => {
     const historico = reconstructAndValidateResponses(
       modeloComEstadoCivilHistorico,
