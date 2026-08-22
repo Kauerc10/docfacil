@@ -111,4 +111,69 @@ test.describe("Guest Purchase and Download Flow", () => {
       page.getByRole("button", { name: /^baixar\s/i }).first()
     ).toBeVisible({ timeout: 15000 });
   });
+
+  test("finaliza o pedido uma vez, sobrevive ao reload e aciona o download seguro", async ({
+    page,
+  }) => {
+    let finalizeRequests = 0;
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        new URL(request.url()).pathname === "/api/documents/finalize"
+      ) {
+        finalizeRequests += 1;
+      }
+    });
+
+    await page.route("https://fake-r2.local/download**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        headers: {
+          "Content-Disposition": 'attachment; filename="documento-e2e.pdf"',
+        },
+        body: "%PDF-1.4\n% DocFacil E2E\n",
+      });
+    });
+
+    await page.goto("/?view=criar&slug=declaracao-residencia");
+    await acceptOptionalCookies(page);
+
+    const finalize = await fillDocumentUntilFinalization(page);
+    await finalize.click();
+    await waitForSearchParams(page, { view: "sucesso" });
+
+    await openSinglePurchaseCheckout(page);
+    await completeDemoCheckout(page, {
+      email: "reload.teste@docfacil.com",
+      expectGuestConsent: true,
+    });
+
+    await page.waitForURL(/\/d\/[A-Za-z0-9_-]{20,}/, {
+      timeout: 45000,
+      waitUntil: "domcontentloaded",
+    });
+    await expect.poll(() => finalizeRequests).toBe(1);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("button", { name: /^baixar\s/i }).first()
+    ).toBeVisible({ timeout: 15000 });
+    await expect.poll(() => finalizeRequests).toBe(1);
+
+    const accessResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === "/api/access/download",
+      { timeout: 15000 }
+    );
+    const downloadPromise = page.waitForEvent("download", { timeout: 15000 });
+
+    await page.getByRole("button", { name: /^baixar\s/i }).first().click();
+
+    const accessResponse = await accessResponsePromise;
+    expect(accessResponse.status()).toBe(200);
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toContain("documento");
+  });
 });
