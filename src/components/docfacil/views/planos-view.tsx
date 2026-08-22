@@ -14,6 +14,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { formatPlanPrice } from "@/lib/pricing";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -35,28 +36,29 @@ const PLANOS: Plano[] = [
   {
     id: "gratis",
     nome: "Grátis",
-    preco: "R$ 0",
-    desc: "Para testar e usar de vez em quando",
+    preco: formatPlanPrice("gratis"),
+    desc: "Para conhecer o DocFácil sem compromisso",
     features: [
-      "3 documentos por mês",
-      "Marca d'água no PDF",
-      "Sem necessidade de conta",
+      "1 geração grátis por mês",
+      "Entre modelos selecionados",
+      "Conta DocFácil necessária",
+      "PDF com marca d'água",
     ],
-    cta: "Começar grátis",
+    cta: "Ver modelos grátis",
     ctaVariant: "outline",
     destino: "modelos",
   },
   {
     id: "avulso",
     nome: "Avulso",
-    preco: "R$ 9,90",
+    preco: formatPlanPrice("avulso"),
     precoSub: "por documento",
-    desc: "Para quem precisa de um documento específico",
+    desc: "Para uma necessidade pontual, sem assinatura",
     features: [
       "PDF sem marca d'água",
       "Download imediato",
-      "Validação de estrutura",
-      "Sem assinatura",
+      "Sem assinatura recorrente",
+      "Sem conta obrigatória",
     ],
     cta: "Comprar um documento",
     ctaVariant: "outline",
@@ -66,15 +68,15 @@ const PLANOS: Plano[] = [
   {
     id: "pro",
     nome: "Pro",
-    preco: "R$ 24,90",
+    preco: formatPlanPrice("pro"),
     precoSub: "/mês",
-    desc: "Para quem usa todo mês",
+    desc: "Para quem cria e revisa documentos com frequência",
     features: [
       "Documentos ilimitados",
       "PDF sem marca d'água",
-      "Editar e rebaixar quando quiser",
-      "Prioridade no atendimento WhatsApp",
+      "Editar e gerar novas versões",
       "Histórico salvo",
+      "Prioridade no atendimento WhatsApp",
     ],
     cta: "Assinar Pro",
     ctaVariant: "coral",
@@ -93,19 +95,19 @@ const REASSURANCES = [
 const FAQ = [
   {
     q: "Posso cancelar quando quiser?",
-    a: "Sim. O plano Pro é mês a mês, sem fidelidade. Você cancela com um clique dentro do seu painel e continua usando até o fim do período já pago.",
+    a: "Sim. O plano Pro é mês a mês, sem fidelidade. Quando a cobrança real estiver ativa, o cancelamento preservará o acesso pelo período já pago.",
   },
   {
-    q: "O PDF tem validade jurídica?",
-    a: "O documento gerado segue a estrutura exigida para instrumentos particulares e pode ser assinado digitalmente. Para força executiva, recomendamos reconhecimento de firma ou assinatura eletrônica qualificada — te ajudamos nesse passo.",
+    q: "Como funciona a geração gratuita?",
+    a: "Com uma conta DocFácil, você pode usar 1 geração gratuita por mês entre os modelos identificados como “Grátis este mês”. A seleção pode mudar mensalmente e o PDF gratuito leva marca d'água.",
   },
   {
     q: "Preciso de conta para usar?",
-    a: "Não. No plano Grátis você gera até 3 documentos por mês sem cadastro. Para salvar o histórico e baixar PDFs sem marca d'água, aí sim pedimos uma conta rápida (e-mail e senha).",
+    a: "Para a geração gratuita e para manter histórico e rascunhos, sim. Já o documento avulso pode ser comprado sem criar conta.",
   },
   {
-    q: "E se eu precisar de mais de um documento por mês?",
-    a: "Compensa migrar para o Pro: por menos de R$ 1 por dia você tem documentos ilimitados, edição quando quiser e prioridade no WhatsApp. O Avulso é bom só para uma necessidade pontual.",
+    q: "Avulso ou Pro: qual compensa mais?",
+    a: "Se você precisa de um único documento, o Avulso resolve sem assinatura. Se pretende criar dois ou mais documentos no mês, o Pro já tende a fazer mais sentido e ainda libera histórico, reedição e novas versões.",
   },
 ];
 
@@ -143,10 +145,9 @@ export function PlanosView() {
           align="center"
           eyebrow="Planos"
           title="Escolha o plano que cabe no seu momento"
-          subtitle="Sem letra miúda. Cancele quando quiser."
+          subtitle="Teste com um modelo grátis, compre um avulso ou libere o catálogo inteiro com o Pro."
         />
 
-        {/* Pricing cards */}
         <div
           data-planos-grid
           className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-stretch"
@@ -155,18 +156,22 @@ export function PlanosView() {
             <PlanCard
               key={plano.id}
               plano={plano}
-              onSelect={() => plano.destino === "checkout" ? navigate("checkout", { plan: plano.checkoutPlan }) : navigate(plano.destino)}
+              onSelect={() =>
+                plano.destino === "checkout"
+                  ? navigate("checkout", { plan: plano.checkoutPlan })
+                  : navigate(plano.destino)
+              }
             />
           ))}
         </div>
 
-        {/* Reassurance row */}
+        <p className="mt-6 text-center text-xs text-ink/50">
+          Os modelos disponíveis gratuitamente podem mudar a cada mês.
+        </p>
+
         <div className="mt-10 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-ink/70">
           {REASSURANCES.map(({ icon: Icon, text }) => (
-            <div
-              key={text}
-              className="flex items-center gap-2"
-            >
+            <div key={text} className="flex items-center gap-2">
               <span className="grid place-items-center w-5 h-5 rounded-full bg-[var(--green-tint)] text-[var(--selo-green)]">
                 <Icon className="w-3.5 h-3.5" aria-hidden="true" />
               </span>
@@ -175,11 +180,7 @@ export function PlanosView() {
           ))}
         </div>
 
-        {/* FAQ */}
-        <section
-          aria-labelledby="faq-heading"
-          className="mt-16 sm:mt-20 max-w-3xl mx-auto"
-        >
+        <section aria-labelledby="faq-heading" className="mt-16 sm:mt-20 max-w-3xl mx-auto">
           <h2
             id="faq-heading"
             className="font-[family-name:var(--font-jakarta)] text-2xl sm:text-3xl font-extrabold text-ink tracking-tight text-center"
@@ -187,7 +188,7 @@ export function PlanosView() {
             Perguntas frequentes
           </h2>
           <p className="mt-2 text-ink/60 text-center">
-            Se ficou em dúvida, provavelmente está respondido aqui.
+            O básico para escolher sem ficar fazendo conta de guardanapo.
           </p>
 
           <div className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 sm:px-7">
@@ -214,13 +215,7 @@ export function PlanosView() {
   );
 }
 
-function PlanCard({
-  plano,
-  onSelect,
-}: {
-  plano: Plano;
-  onSelect: () => void;
-}) {
+function PlanCard({ plano, onSelect }: { plano: Plano; onSelect: () => void }) {
   const isCoral = plano.ctaVariant === "coral";
   return (
     <div
@@ -248,14 +243,12 @@ function PlanCard({
         <span className="font-[family-name:var(--font-jakarta)] text-4xl font-extrabold text-ink tracking-tight">
           {plano.preco}
         </span>
-        {plano.precoSub && (
-          <span className="text-sm text-ink/55">{plano.precoSub}</span>
-        )}
+        {plano.precoSub && <span className="text-sm text-ink/55">{plano.precoSub}</span>}
       </div>
 
       <ul className="mt-6 space-y-3 flex-1">
-        {plano.features.map((f) => (
-          <li key={f} className="flex items-start gap-2.5 text-sm text-ink/80">
+        {plano.features.map((feature) => (
+          <li key={feature} className="flex items-start gap-2.5 text-sm text-ink/80">
             <span
               className={[
                 "mt-0.5 grid place-items-center w-5 h-5 shrink-0 rounded-full",
@@ -266,7 +259,7 @@ function PlanCard({
             >
               <Check className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
-            <span>{f}</span>
+            <span>{feature}</span>
           </li>
         ))}
       </ul>
@@ -280,7 +273,7 @@ function PlanCard({
             ? "bg-[var(--coral)] text-white hover:bg-[var(--coral-hover)]"
             : "border border-[var(--blue-royal)] text-[var(--blue-royal)] bg-transparent hover:bg-[var(--blue-soft)]",
         ].join(" ")}
-        aria-label={`${plano.cta} — plano ${plano.nome}`}
+        aria-label={`${plano.cta}, plano ${plano.nome}`}
       >
         {plano.cta}
       </button>

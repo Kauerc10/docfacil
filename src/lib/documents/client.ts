@@ -1,5 +1,10 @@
 import { apiFetch } from "@/lib/auth/api-fetch";
-import { getOrCreateFinalizationRequestId, clearFinalizationRequestId } from "./idempotency";
+import {
+  getOrCreateFinalizationRequestId,
+  clearFinalizationRequestId,
+  clearFinalizationRequestIdByRequestId,
+  shouldPreserveFinalizationRequestId,
+} from "./idempotency";
 export { getOrCreateFinalizationRequestId, clearFinalizationRequestId };
 
 export interface GuestDraftData {
@@ -10,6 +15,19 @@ export interface GuestDraftData {
   clausulasSelecionadas: string[];
   extrasPorClausula: Record<string, Record<string, string>>;
   guestContact?: { email?: string; phone?: string };
+  updatedAt: number;
+}
+
+export interface AccountDraftData {
+  id: string;
+  ownerUserId: string;
+  modeloSlug: string;
+  sourceDocumentId?: string;
+  respostas: Record<string, string>;
+  stepIndex: number;
+  clausulasSelecionadas: string[];
+  extrasPorClausula: Record<string, Record<string, string>>;
+  createdAt: number;
   updatedAt: number;
 }
 
@@ -119,15 +137,9 @@ export async function finalizeDocument(input: {
     const payload = await res.json().catch(() => ({}));
     const code = typeof payload.error?.code === "string" ? payload.error.code : undefined;
     const message = payload.error?.message || "Falha ao gerar documento.";
-
-    // Se o servidor respondeu, sabemos que a tentativa terminou com erro.
-    // Apenas GENERATION_IN_PROGRESS mantém o mesmo requestId para recuperar a
-    // geração que continua rodando. Erros de rede/autenticação não passam por
-    // este bloco e preservam a intenção, evitando duplicidade em uma repetição.
-    if (code !== "GENERATION_IN_PROGRESS") {
+    if (!shouldPreserveFinalizationRequestId(code)) {
       clearFinalizationRequestId(input.modeloSlug);
     }
-
     const error = new Error(message) as Error & { code?: string; status?: number };
     error.code = code;
     error.status = res.status;
@@ -143,16 +155,12 @@ export async function createDocumentVersion(
     requestId?: string;
     respostas: Record<string, string>;
     clausulasSelecionadas?: string[];
+    orderId?: string;
   }
 ): Promise<{
-  document: {
-    id: string;
-    version: number;
-    artifactState: string;
-  };
+  document: { id: string; version: number; artifactState: string };
 }> {
   const requestId = input.requestId || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "req_" + Date.now());
-
   const res = await apiFetch(`/api/documents/${documentId}/versions`, {
     method: "POST",
     headers: JSON_HEADERS,
@@ -160,21 +168,24 @@ export async function createDocumentVersion(
       requestId,
       respostas: input.respostas,
       clausulasSelecionadas: input.clausulasSelecionadas || [],
+      orderId: input.orderId,
     }),
   });
-
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || "Falha ao criar nova versão do documento.");
+    const code = typeof err.error?.code === "string" ? err.error.code : undefined;
+    if (!shouldPreserveFinalizationRequestId(code)) {
+      clearFinalizationRequestIdByRequestId(requestId);
+    }
+    const error = new Error(err.error?.message || "Falha ao criar nova versão do documento.") as Error & { code?: string; status?: number };
+    error.code = code;
+    error.status = res.status;
+    throw error;
   }
-
   return await res.json();
 }
 
-export async function getDocumentDownloadUrl(
-  documentId: string,
-  version?: number
-): Promise<{
+export async function getDocumentDownloadUrl(documentId: string, version?: number): Promise<{
   downloadUrl: string;
   filename: string;
   version: number;
@@ -186,12 +197,10 @@ export async function getDocumentDownloadUrl(
     headers: JSON_HEADERS,
     body: JSON.stringify({ version }),
   });
-
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao obter link de download.");
   }
-
   return await res.json();
 }
 
@@ -201,78 +210,49 @@ export async function shareDocument(documentId: string): Promise<{
   version: number;
   active: boolean;
 }> {
-  const res = await apiFetch(`/api/documents/${documentId}/share`, {
-    method: "POST",
-  });
-
+  const res = await apiFetch(`/api/documents/${documentId}/share`, { method: "POST" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao gerar link de compartilhamento.");
   }
-
   return await res.json();
 }
 
-export async function revokeDocumentShare(documentId: string): Promise<{
-  success: boolean;
-  revokedAt: number;
-}> {
-  const res = await apiFetch(`/api/documents/${documentId}/share/revoke`, {
-    method: "POST",
-  });
-
+export async function revokeDocumentShare(documentId: string): Promise<{ success: boolean; revokedAt: number }> {
+  const res = await apiFetch(`/api/documents/${documentId}/share/revoke`, { method: "POST" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao revogar compartilhamento.");
   }
-
   return await res.json();
 }
 
-export async function deleteDocumentApi(documentId: string): Promise<{
-  success: boolean;
-  deletedDocumentId: string;
-}> {
-  const res = await apiFetch(`/api/documents/${documentId}`, {
-    method: "DELETE",
-  });
-
+export async function deleteDocumentApi(documentId: string): Promise<{ success: boolean; deletedDocumentId: string }> {
+  const res = await apiFetch(`/api/documents/${documentId}`, { method: "DELETE" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao excluir documento.");
   }
-
   return await res.json();
 }
 
 export async function listDocumentsApi(): Promise<import("./dto").DocumentSummaryDto[]> {
-  const res = await apiFetch("/api/documents", {
-    method: "GET",
-  });
-
+  const res = await apiFetch("/api/documents", { method: "GET" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao listar documentos.");
   }
-
   const data = await res.json();
   return data.documents || [];
 }
 
 export async function getDocumentApi(documentId: string): Promise<import("./dto").DocumentDetailDto | null> {
-  const res = await apiFetch(`/api/documents/${documentId}`, {
-    method: "GET",
-  });
-
-  if (res.status === 404) {
-    return null;
-  }
-
+  const res = await apiFetch(`/api/documents/${documentId}`, { method: "GET" });
+  if (res.status === 404) return null;
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao carregar documento.");
   }
-
   const data = await res.json();
   return data.document || null;
 }
@@ -285,14 +265,58 @@ export async function duplicateDocumentApi(documentId: string): Promise<{
     extrasPorClausula: Record<string, Record<string, string>>;
   };
 }> {
-  const res = await apiFetch(`/api/documents/${documentId}/duplicate`, {
-    method: "POST",
-  });
-
+  const res = await apiFetch(`/api/documents/${documentId}/duplicate`, { method: "POST" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || "Falha ao duplicar documento.");
   }
-
   return await res.json();
+}
+
+export async function saveAccountDraft(input: {
+  draftId?: string;
+  modeloSlug: string;
+  sourceDocumentId?: string;
+  respostas: Record<string, string>;
+  stepIndex: number;
+  clausulasSelecionadas: string[];
+  extrasPorClausula: Record<string, Record<string, string>>;
+}): Promise<AccountDraftData> {
+  const res = await apiFetch("/api/drafts", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Falha ao salvar rascunho.");
+  }
+  return (await res.json()).draft;
+}
+
+export async function listAccountDrafts(): Promise<AccountDraftData[]> {
+  const res = await apiFetch("/api/drafts", { method: "GET" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Falha ao listar rascunhos.");
+  }
+  return (await res.json()).drafts || [];
+}
+
+export async function getAccountDraft(draftId: string): Promise<AccountDraftData | null> {
+  const res = await apiFetch(`/api/drafts/${draftId}`, { method: "GET" });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Falha ao carregar rascunho.");
+  }
+  return (await res.json()).draft || null;
+}
+
+export async function deleteAccountDraft(draftId: string): Promise<void> {
+  const res = await apiFetch(`/api/drafts/${draftId}`, { method: "DELETE" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "Falha ao excluir rascunho.");
+  }
 }

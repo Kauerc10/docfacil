@@ -6,6 +6,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { ArrowRight, Clock, Search, Sparkles, X } from "lucide-react";
 import { CATEGORIAS, type Categoria } from "@/lib/modelos";
+import { isMonthlyFreeModel } from "@/lib/document-access-policy";
 import { getModels } from "@/lib/services/models-service";
 import type { Modelo } from "@/lib/types";
 import { useNav } from "@/components/docfacil/nav-context";
@@ -17,19 +18,11 @@ gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 type Filtro = "Todos" | Categoria;
 
-/**
- * ModelosView (spec 4.2) — catálogo completo com busca + filtro por categoria.
- * Reaproveita o .doc-card do design system e os DocIcons do Catalog.
- *
- * Dados vêm do services layer (getModels): Firestore em produção, fallback
- * local em demo mode. A view só sabe que `models` é uma Promise.
- */
 export function ModelosView() {
   const root = useRef<HTMLDivElement>(null);
   const { navigate } = useNav();
   const [query, setQuery] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("Todos");
-
   const [models, setModels] = useState<Modelo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +60,6 @@ export function ModelosView() {
     });
   }, [models, query, filtro]);
 
-  // Refresh ScrollTrigger whenever the list changes so the stagger re-runs.
   useGSAP(
     () => {
       if (loading || filtrados.length === 0) return;
@@ -96,10 +88,18 @@ export function ModelosView() {
         <PageHeader
           eyebrow="Catálogo completo"
           title="Encontre o documento certo para a sua situação"
-          subtitle="Busque por nome, situação ou categoria. Cada modelo é uma conversa curta — não um formulário gigante."
+          subtitle="Busque por nome, situação ou categoria. Cada modelo é uma conversa curta, não um formulário gigante."
         />
 
-        {/* Search bar */}
+        <div className="mt-6 max-w-3xl rounded-2xl border border-[var(--selo-green)]/25 bg-[var(--green-tint)]/45 px-4 py-3 sm:px-5">
+          <p className="text-sm font-semibold text-ink">
+            1 geração grátis por mês com uma conta DocFácil nos modelos selecionados.
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-ink/60">
+            Procure o selo “Grátis este mês”. A seleção de modelos gratuitos pode mudar mensalmente.
+          </p>
+        </div>
+
         <div className="mt-8 max-w-2xl">
           <label htmlFor="modelos-busca" className="sr-only">
             Buscar modelo de documento
@@ -130,30 +130,21 @@ export function ModelosView() {
           </div>
         </div>
 
-        {/* Category chips */}
         <div
           className="mt-6 flex flex-wrap gap-2"
           role="group"
           aria-label="Filtrar por categoria"
         >
-          <ChipButton
-            active={filtro === "Todos"}
-            onClick={() => setFiltro("Todos")}
-          >
+          <ChipButton active={filtro === "Todos"} onClick={() => setFiltro("Todos")}>
             Todos
           </ChipButton>
           {CATEGORIAS.map((cat) => (
-            <ChipButton
-              key={cat}
-              active={filtro === cat}
-              onClick={() => setFiltro(cat)}
-            >
+            <ChipButton key={cat} active={filtro === cat} onClick={() => setFiltro(cat)}>
               {cat}
             </ChipButton>
           ))}
         </div>
 
-        {/* Result count */}
         <p
           className="mt-6 text-sm text-ink/55"
           aria-live="polite"
@@ -168,7 +159,6 @@ export function ModelosView() {
               }`}
         </p>
 
-        {/* Loading / error / grid / empty state */}
         {loading ? (
           <DocGridSkeleton count={6} />
         ) : error ? (
@@ -178,46 +168,61 @@ export function ModelosView() {
             data-modelos="grid"
             className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6"
           >
-            {filtrados.map((d) => (
-              <article
-                key={d.slug}
-                data-modelos="card"
-                className="doc-card group p-6 flex flex-col cursor-pointer focus-within:ring-2 focus-within:ring-[var(--blue-royal)]/40"
-                onClick={() => navigate("modelo-detalhe", { slug: d.slug })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    navigate("modelo-detalhe", { slug: d.slug });
-                  }
-                }}
-                tabIndex={0}
-                role="button"
-                aria-label={`Abrir detalhes do modelo ${d.nome}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="grid place-items-center w-14 h-14 rounded-xl bg-[var(--blue-soft)] text-[var(--blue-royal)] group-hover:bg-[var(--blue-royal)] group-hover:text-white transition-colors duration-300">
-                    {DocIcons[d.icone]}
+            {filtrados.map((d) => {
+              const isFreeThisMonth = isMonthlyFreeModel(d.slug);
+              return (
+                <article
+                  key={d.slug}
+                  data-modelos="card"
+                  className="doc-card group p-6 flex flex-col cursor-pointer focus-within:ring-2 focus-within:ring-[var(--blue-royal)]/40"
+                  onClick={() => navigate("modelo-detalhe", { slug: d.slug })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate("modelo-detalhe", { slug: d.slug });
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Abrir detalhes do modelo ${d.nome}${isFreeThisMonth ? ", grátis este mês" : ""}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="grid place-items-center w-14 h-14 rounded-xl bg-[var(--blue-soft)] text-[var(--blue-royal)] group-hover:bg-[var(--blue-royal)] group-hover:text-white transition-colors duration-300">
+                      {DocIcons[d.icone]}
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5">
+                      {isFreeThisMonth && (
+                        <span className="text-xs font-bold text-[var(--selo-green)] px-2.5 py-1 rounded-full bg-[var(--green-tint)] border border-[var(--selo-green)]/20">
+                          Grátis este mês
+                        </span>
+                      )}
+                      <span className="text-xs font-semibold text-ink/55 px-2.5 py-1 rounded-full bg-[var(--paper)] border border-[var(--border)]">
+                        {d.categoria}
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-xs font-semibold text-ink/55 px-2.5 py-1 rounded-full bg-[var(--paper)] border border-[var(--border)]">
-                    {d.categoria}
-                  </span>
-                </div>
-                <h3 className="mt-5 font-[family-name:var(--font-jakarta)] text-xl font-bold text-ink">
-                  {d.nome}
-                </h3>
-                <p className="mt-1.5 text-ink/65 leading-relaxed">{d.desc}</p>
-                <div className="mt-5 pt-4 border-t border-[var(--border)]/70 flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 text-sm text-ink/55">
-                    <Clock className="w-4 h-4" />
-                    {d.minutos} min
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-[var(--blue-royal)] font-semibold text-sm opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 group-focus-visible:opacity-100 group-focus-visible:translate-x-0 transition-all duration-300">
-                    Preencher agora
-                    <ArrowRight className="w-4 h-4" />
-                  </span>
-                </div>
-              </article>
-            ))}
+                  <h3 className="mt-5 font-[family-name:var(--font-jakarta)] text-xl font-bold text-ink">
+                    {d.nome}
+                  </h3>
+                  <p className="mt-1.5 text-ink/65 leading-relaxed">{d.desc}</p>
+                  {isFreeThisMonth && (
+                    <p className="mt-2 text-xs font-medium text-[var(--selo-green)]">
+                      1 geração grátis/mês com conta DocFácil
+                    </p>
+                  )}
+                  <div className="mt-5 pt-4 border-t border-[var(--border)]/70 flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 text-sm text-ink/55">
+                      <Clock className="w-4 h-4" />
+                      {d.minutos} min
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[var(--blue-royal)] font-semibold text-sm opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 group-focus-visible:opacity-100 group-focus-visible:translate-x-0 transition-all duration-300">
+                      Preencher agora
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         ) : (
           <EmptyState onIA={() => navigate("ia")} />
@@ -252,7 +257,6 @@ function ChipButton({
   );
 }
 
-/** Estado vazio — ilustração SVG própria (lupa + pasta), CTA p/ IA. */
 function EmptyState({ onIA }: { onIA: () => void }) {
   return (
     <div
@@ -265,7 +269,6 @@ function EmptyState({ onIA }: { onIA: () => void }) {
         className="mx-auto w-40 h-30 text-[var(--blue-royal)]"
         aria-hidden="true"
       >
-        {/* Pasta suspensa com abas */}
         <path
           d="M14 38 H58 L66 30 H122 a4 4 0 0 1 4 4 V96 a4 4 0 0 1 -4 4 H18 a4 4 0 0 1 -4 -4 Z"
           stroke="currentColor"
@@ -274,13 +277,7 @@ function EmptyState({ onIA }: { onIA: () => void }) {
           fill="var(--blue-soft)"
           opacity="0.55"
         />
-        <path
-          d="M14 50 H122"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          opacity="0.4"
-        />
-        {/* Folha saindo da pasta */}
+        <path d="M14 50 H122" stroke="currentColor" strokeWidth="1.6" opacity="0.4" />
         <rect
           x="40"
           y="20"
@@ -298,7 +295,6 @@ function EmptyState({ onIA }: { onIA: () => void }) {
           strokeLinecap="round"
           opacity="0.6"
         />
-        {/* Lupa sobre a folha */}
         <circle
           cx="108"
           cy="78"
@@ -307,26 +303,15 @@ function EmptyState({ onIA }: { onIA: () => void }) {
           stroke="var(--selo-green)"
           strokeWidth="2.2"
         />
-        <path
-          d="M120 90 L138 108"
-          stroke="var(--selo-green)"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <path
-          d="M102 78 H114 M108 72 V84"
-          stroke="var(--selo-green)"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
+        <path d="M120 90 L138 108" stroke="var(--selo-green)" strokeWidth="3" strokeLinecap="round" />
+        <path d="M102 78 H114 M108 72 V84" stroke="var(--selo-green)" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
 
       <h3 className="mt-6 font-[family-name:var(--font-jakarta)] text-2xl font-bold text-ink">
         Não achamos esse modelo.
       </h3>
       <p className="mt-2 text-ink/65 text-lg">
-        Que tal tentar com nossa IA? Descreva o que você precisa e a gente
-        monta.
+        Que tal tentar com nossa IA? Descreva o que você precisa e a gente monta.
       </p>
       <button
         type="button"

@@ -58,6 +58,15 @@ export {
 } from "./compose";
 
 export {
+  deserializeMoradoresAutorizados,
+  parseMoradoresAutorizados,
+  serializeMoradoresAutorizados,
+  hasInvalidMoradoresAutorizados,
+  formatMoradoresAutorizadosClause,
+  type MoradorAutorizado,
+} from "./authorized-residents";
+
+export {
   classifyLine,
   classifyLines,
   isTitulo,
@@ -81,3 +90,7 @@ export {
   computeCamposOpcionais,
 } from "./optional-fields";
 
+export {
+  normalizarRespostasLegadasDeContrato,
+  SINAL_LEGADO_SEM_FORMA_KEY,
+} from "./legacy-contract-answers";

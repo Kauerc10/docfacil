@@ -28,7 +28,7 @@ describe("Watermark Enforcement Across Entitlements", () => {
 
   const validAnswers = {
     declarante_nome: "Juliana Silva",
-    declarante_cpf: "123.456.789-00",
+    declarante_cpf: "111.444.777-35",
     declarante_nacionalidade: "Brasileira",
     declarante_estado_civil: "Solteira",
     declarante_profissao: "Advogada",

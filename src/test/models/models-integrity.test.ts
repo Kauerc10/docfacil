@@ -40,4 +40,26 @@ describe("CI Gate: Model Integrity Validator", () => {
     expect(hasUnregistered).toBe(true);
     expect(hasMissingClause).toBe(true);
   });
+
+  it("allows placeholders declaratively resolved by the model's render rules", () => {
+    const modelWithRenderPlaceholders = {
+      slug: "modelo-com-regras-de-renderizacao",
+      nome: "Modelo com regras de renderização",
+      desc: "Desc",
+      quandoUsar: "Quando",
+      categoria: "Pessoal" as const,
+      minutos: 2,
+      icone: "home" as const,
+      campos: [],
+      etapas: [],
+      template: {
+        titulo: "TÍTULO",
+        corpo: ["{{resumo_calculado}}", "{{clausula:condicao_calculada}}"],
+        placeholdersDeRenderizacao: ["resumo_calculado"],
+        clausulasDeRenderizacao: ["condicao_calculada"],
+      },
+    };
+
+    expect(validateModel(modelWithRenderPlaceholders)).toEqual([]);
+  });
 });

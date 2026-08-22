@@ -14,11 +14,16 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import {
   browserLocalPersistence,
+  connectAuthEmulator,
   getAuth,
   setPersistence,
   type Auth,
 } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import {
+  connectFirestoreEmulator,
+  getFirestore,
+  type Firestore,
+} from "firebase/firestore";
 import {
   initializeAppCheck,
   ReCaptchaV3Provider,
@@ -46,12 +51,60 @@ let appCheck: AppCheck | null = null;
 let appCheckInitializationAttempted = false;
 let authPersistenceReady: Promise<void> = Promise.resolve();
 
+type FirebaseEmulatorConnectionState = {
+  auth: boolean;
+  firestore: boolean;
+};
+
+type FirebaseGlobal = typeof globalThis & {
+  __docfacilFirebaseEmulators?: FirebaseEmulatorConnectionState;
+};
+
+function getEmulatorConnectionState(): FirebaseEmulatorConnectionState {
+  const firebaseGlobal = globalThis as FirebaseGlobal;
+  if (!firebaseGlobal.__docfacilFirebaseEmulators) {
+    firebaseGlobal.__docfacilFirebaseEmulators = {
+      auth: false,
+      firestore: false,
+    };
+  }
+  return firebaseGlobal.__docfacilFirebaseEmulators;
+}
+
+function connectClientEmulators(clientAuth: Auth, clientDb: Firestore): void {
+  // Variáveis públicas explícitas são a única chave para o modo emulator.
+  // NODE_ENV não participa da decisão para que nenhum build local/preview seja
+  // redirecionado silenciosamente para um serviço de teste.
+  const authEmulatorUrl = process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL;
+  const firestoreHost = process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST;
+  const firestorePortRaw = process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_PORT;
+  const firestorePort = firestorePortRaw ? Number(firestorePortRaw) : NaN;
+  const state = getEmulatorConnectionState();
+
+  if (authEmulatorUrl && !state.auth) {
+    connectAuthEmulator(clientAuth, authEmulatorUrl, { disableWarnings: true });
+    state.auth = true;
+  }
+
+  if (
+    firestoreHost &&
+    Number.isInteger(firestorePort) &&
+    firestorePort > 0 &&
+    !state.firestore
+  ) {
+    connectFirestoreEmulator(clientDb, firestoreHost, firestorePort);
+    state.firestore = true;
+  }
+}
+
 if (IS_FIREBASE_CONFIGURED && typeof window !== "undefined") {
   // Client-side only — Firebase Auth needs window.
   app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   const clientAuth = getAuth(app);
+  const clientDb = getFirestore(app);
+  connectClientEmulators(clientAuth, clientDb);
   auth = clientAuth;
-  db = getFirestore(app);
+  db = clientDb;
 
   // Torna a política de sessão explícita. Se o navegador impedir o storage,
   // mantemos o Auth utilizável e registramos o problema; o login não deve ficar

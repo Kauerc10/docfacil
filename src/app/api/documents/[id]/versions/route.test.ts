@@ -12,7 +12,7 @@ describe("POST /api/documents/[id]/versions", () => {
 
   const validAnswers = {
     declarante_nome: "Maria Silva",
-    declarante_cpf: "123.456.789-00",
+    declarante_cpf: "111.444.777-35",
     declarante_nacionalidade: "Brasileira",
     declarante_estado_civil: "Solteira",
     declarante_profissao: "Autônoma",
@@ -70,5 +70,70 @@ describe("POST /api/documents/[id]/versions", () => {
     expect(data.document.id).toBe(doc.id);
     expect(data.document.version).toBe(2);
     expect(data.document.artifactState).toBe("ready");
+  });
+
+  it("allows a free owner to buy one new version with a paid avulso order", async () => {
+    (repos.users as any).setUser("usr_single_version", { plano: "gratis" });
+
+    const doc = await repos.documents.createDocument({
+      owner: { type: "user", userId: "usr_single_version" },
+      modeloSlug: "declaracao-residencia",
+      modeloNome: "Declaração de Residência",
+      respostas: validAnswers,
+      entitlement: { type: "free", watermarked: true },
+      artifactState: "ready",
+      currentVersion: 1,
+      targetVersion: 1,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    const order = await repos.orders.createOrder({
+      provider: "demo",
+      product: "avulso",
+      amountCents: 1990,
+      buyer: {
+        type: "user",
+        userId: "usr_single_version",
+        email: "single@example.com",
+      },
+      status: "paid",
+      createdAt: Date.now(),
+    });
+
+    setAdminAuthForTesting({
+      verifyIdToken: async () => ({ uid: "usr_single_version", email: "single@example.com" } as any),
+    } as any);
+
+    const req = new Request(`http://localhost:3000/api/documents/${doc.id}/versions`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer single-version-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        requestId: "550e8400-e29b-41d4-a716-446655440021",
+        respostas: {
+          ...validAnswers,
+          declarante_nome: "Maria Silva Avulso",
+        },
+        orderId: order.id,
+      }),
+    });
+
+    const res = await POST(req, {
+      params: Promise.resolve({ id: doc.id! }),
+    });
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.document.id).toBe(doc.id);
+    expect(data.document.version).toBe(2);
+
+    const consumedOrder = await repos.orders.getOrder(order.id!);
+    expect(consumedOrder?.status).toBe("consumed");
+
+    const artifact = await repos.documents.getArtifact(doc.id!, 2);
+    expect(artifact?.watermarked).toBe(false);
   });
 });
