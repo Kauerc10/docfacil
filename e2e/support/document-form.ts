@@ -20,22 +20,10 @@ function fieldKey(locator: Locator, label: string, fallbackIndex: number) {
     );
 }
 
-async function stepSignature(page: Page) {
-  return page.locator("input:visible, select:visible, textarea:visible, [role='radiogroup']:visible, [role='checkbox']:visible")
-    .evaluateAll((nodes) =>
-      nodes
-        .map((node) => {
-          const el = node as HTMLElement;
-          return [
-            el.tagName,
-            el.id,
-            el.getAttribute("aria-label"),
-            el.getAttribute("role"),
-          ].join(":");
-        })
-        .sort()
-        .join("|")
-    );
+async function currentProgress(page: Page) {
+  const progressbar = page.getByRole("progressbar", { name: "Progresso do documento" });
+  await expect(progressbar).toBeVisible({ timeout: 10000 });
+  return progressbar.getAttribute("aria-valuenow");
 }
 
 async function chooseSelect(locator: Locator, desired?: string) {
@@ -150,10 +138,10 @@ export async function fillDocumentUntilFinalization(
     }
 
     await expect(advance).toBeVisible({ timeout: 10000 });
-    const before = await stepSignature(page);
+    const before = await currentProgress(page);
     await advance.click();
     await expect
-      .poll(() => stepSignature(page), { timeout: 10000 })
+      .poll(() => currentProgress(page), { timeout: 10000 })
       .not.toBe(before);
   }
 
