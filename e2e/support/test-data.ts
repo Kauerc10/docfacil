@@ -26,6 +26,7 @@ export const DEFAULT_FIELD_VALUES: Record<string, string> = {
 
 export function valueForField(key: string, index = 0): string {
   const normalized = key.toLowerCase();
+  const isDateField = /(^|_)(data|nascimento)(_|$)/.test(normalized);
 
   if (normalized.includes("cpf")) {
     return VALID_CPFS[index % VALID_CPFS.length] ?? VALID_CPFS[0];
@@ -52,7 +53,7 @@ export function valueForField(key: string, index = 0): string {
     return DEFAULT_FIELD_VALUES.telefone;
   }
   if (normalized.includes("email")) return DEFAULT_FIELD_VALUES.email;
-  if (normalized.includes("data")) return "01/08/2026";
+  if (isDateField) return "01/08/2026";
   if (normalized.includes("forma_pagamento")) return "PIX";
   if (normalized.includes("finalidade")) return "Comprovação documental para fins administrativos";
   if (normalized.includes("matricula")) return "12.345";
