@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { assertProductionServerConfig } from "@/lib/server/config/assert-production-config";
 import type { ServerEnv } from "@/lib/server/env";
+
+function source(path: string): string {
+  return readFileSync(resolve(process.cwd(), path), "utf8");
+}
 
 describe("Production Server Configuration Assertions (Fail-Closed)", () => {
   const validProductionEnv: ServerEnv = {
@@ -16,6 +22,7 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
     APP_CHECK_ENFORCED: true,
     ALLOW_DEMO_BILLING: false,
     ALLOW_IN_MEMORY_ARTIFACT_STORAGE: false,
+    ALLOW_IN_MEMORY_REPOSITORIES: false,
     NEXT_PUBLIC_APP_URL: "https://docfacil.com",
   };
 
@@ -52,6 +59,31 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
     expect(() => assertProductionServerConfig(invalid)).toThrow(/In-memory artifact storage/i);
   });
 
+  it("fails closed when ALLOW_IN_MEMORY_REPOSITORIES is true in production", () => {
+    const invalid = {
+      ...validProductionEnv,
+      ALLOW_IN_MEMORY_REPOSITORIES: true,
+    };
+
+    expect(() => assertProductionServerConfig(invalid as ServerEnv)).toThrow(
+      /In-memory repositories/i
+    );
+  });
+
+  it("não permite que documents ou drafts contornem a trava de produção", () => {
+    const repositorySources = [
+      source("src/lib/server/firestore/repositories.ts"),
+      source("src/lib/server/drafts/store.ts"),
+    ];
+
+    for (const backendSource of repositorySources) {
+      expect(backendSource).not.toContain(
+        'process.env.ALLOW_IN_MEMORY_REPOSITORIES === "true"'
+      );
+      expect(backendSource).toContain("assertProductionServerConfig(env)");
+    }
+  });
+
   it("does not treat Vercel preview as the final production deployment", () => {
     const previewEnv: ServerEnv = {
       ...validProductionEnv,
@@ -79,6 +111,7 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
       APP_CHECK_ENFORCED: false,
       ALLOW_DEMO_BILLING: true,
       ALLOW_IN_MEMORY_ARTIFACT_STORAGE: true,
+      ALLOW_IN_MEMORY_REPOSITORIES: false,
       NEXT_PUBLIC_APP_URL: "http://localhost:3000",
     };
     expect(() => assertProductionServerConfig(devEnv)).not.toThrow();

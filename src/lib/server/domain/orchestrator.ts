@@ -1,6 +1,6 @@
 import "server-only";
 import type { Principal } from "../security";
-import type { ArtifactState } from "./documents";
+import type { ArtifactState, DocumentRecord } from "./documents";
 import {
   reconstructAndValidateResponses,
   generateAccessToken,
@@ -17,6 +17,8 @@ import { getRepositories } from "../firestore/repositories";
 import type { ArtifactStorage } from "../r2/storage";
 import { getArtifactStorage } from "../r2/storage";
 import { logger } from "../../logger";
+import { FREE_MONTHLY_LIMIT } from "../../document-access-policy";
+import { resolveDocumentWatermark } from "./preview-render-policy";
 
 export interface GenerateDocumentDependencies {
   repositories?: Partial<BackendRepositories>;
@@ -43,6 +45,67 @@ export interface GenerateDocumentResult {
   guestAccessPath?: string;
 }
 
+export const BILLING_TIME_ZONE = "America/Sao_Paulo";
+
+const billingDateTimeFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: BILLING_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+function getBillingZoneParts(date: Date) {
+  const parts = billingDateTimeFormatter.formatToParts(date);
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+
+  return {
+    year: getPart("year"),
+    month: getPart("month"),
+    day: getPart("day"),
+    hour: getPart("hour"),
+    minute: getPart("minute"),
+    second: getPart("second"),
+  };
+}
+
+function getBillingZoneOffsetMs(timestamp: number): number {
+  const parts = getBillingZoneParts(new Date(timestamp));
+  const representedAsUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
+  return representedAsUtc - Math.trunc(timestamp / 1000) * 1000;
+}
+
+/**
+ * Retorna o instante UTC correspondente à meia-noite do primeiro dia do mês
+ * civil vigente em São Paulo. A conversão usa o fuso IANA, sem hardcode de
+ * UTC-3, para continuar correta se as regras de horário civil mudarem.
+ */
+export function getStartOfBillingMonthTimestamp(now = new Date()): number {
+  const { year, month } = getBillingZoneParts(now);
+  const localMidnightAsUtc = Date.UTC(year, month - 1, 1, 0, 0, 0);
+
+  let candidate = localMidnightAsUtc;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const nextCandidate =
+      localMidnightAsUtc - getBillingZoneOffsetMs(candidate);
+    if (nextCandidate === candidate) break;
+    candidate = nextCandidate;
+  }
+
+  return candidate;
+}
+
 export async function generateDocumentArtifact(
   input: GenerateDocumentInput
 ): Promise<GenerateDocumentResult> {
@@ -62,12 +125,16 @@ export async function generateDocumentArtifact(
   const docs = deps?.repositories?.documents || defaultRepos.documents;
   const access = deps?.repositories?.access || defaultRepos.access;
   const orders = deps?.repositories?.orders || defaultRepos.orders;
-  const generationRequests = deps?.repositories?.generationRequests || defaultRepos.generationRequests;
+  const generationRequests =
+    deps?.repositories?.generationRequests || defaultRepos.generationRequests;
   const users = deps?.repositories?.users || defaultRepos.users;
 
-  let generationCommit = deps?.repositories?.generationCommit || defaultRepos.generationCommit;
+  let generationCommit =
+    deps?.repositories?.generationCommit || defaultRepos.generationCommit;
   if (!deps?.repositories?.generationCommit && deps?.repositories) {
-    const { InMemoryGenerationCommitRepository } = await import("../firestore/in-memory-repositories");
+    const { InMemoryGenerationCommitRepository } = await import(
+      "../firestore/in-memory-repositories"
+    );
     generationCommit = new InMemoryGenerationCommitRepository(
       docs as any,
       access as any,
@@ -91,24 +158,22 @@ export async function generateDocumentArtifact(
       ? `guest:${createBuyerFingerprint(guestContact || {})}`
       : `user:${principal.userId}`;
 
-  let expectedTargetVersion = 1;
+  let existingDocument: DocumentRecord | null = null;
   if (existingDocumentId) {
-    const existingDoc = await repos.documents.getDocument(existingDocumentId);
-    if (existingDoc) {
-      expectedTargetVersion = (existingDoc.currentVersion || 0) + 1;
-    }
+    existingDocument = await repos.documents.getDocument(existingDocumentId);
   }
 
-  // 1. Idempotência / Trava de requisição
-  const { request: genReq, isNew } = await repos.generationRequests.getOrCreateRequest(
-    requestId,
-    {
+  const expectedTargetVersion = existingDocument
+    ? (existingDocument.currentVersion || 0) + 1
+    : 1;
+
+  const { request: genReq, isNew } =
+    await repos.generationRequests.getOrCreateRequest(requestId, {
       operation: existingDocumentId ? "pro_regeneration" : "initial",
       principalKey,
       documentId: existingDocumentId || "pending",
       targetVersion: expectedTargetVersion,
-    }
-  );
+    });
 
   if (!isNew) {
     if (genReq.status === "completed") {
@@ -138,14 +203,63 @@ export async function generateDocumentArtifact(
     }
   }
 
-  // 2. Localiza o modelo confiável no catálogo do servidor
-  const modelo = MODELOS.find((m) => m.slug === modeloSlug);
+  const modelo = MODELOS.find((item) => item.slug === modeloSlug);
   if (!modelo) {
     await repos.generationRequests.markFailed(requestId, "INVALID_REQUEST");
-    throw new BackendError("INVALID_REQUEST", 400, `Modelo '${modeloSlug}' não encontrado.`);
+    throw new BackendError(
+      "INVALID_REQUEST",
+      400,
+      `Modelo '${modeloSlug}' não encontrado.`
+    );
   }
 
-  // 3. Resolução de Entitlement e Trava de Documento
+  if (existingDocumentId) {
+    if (!existingDocument) {
+      await repos.generationRequests.markFailed(requestId, "DOCUMENT_NOT_FOUND");
+      throw new BackendError(
+        "DOCUMENT_NOT_FOUND",
+        404,
+        "Documento não encontrado."
+      );
+    }
+
+    if (
+      existingDocument.owner.type !== "user" ||
+      principal.type !== "user" ||
+      existingDocument.owner.userId !== principal.userId
+    ) {
+      await repos.generationRequests.markFailed(requestId, "DOCUMENT_FORBIDDEN");
+      throw new BackendError(
+        "DOCUMENT_FORBIDDEN",
+        403,
+        "Você não tem permissão para alterar este documento."
+      );
+    }
+
+    if (existingDocument.modeloSlug !== modelo.slug) {
+      await repos.generationRequests.markFailed(requestId, "INVALID_REQUEST");
+      throw new BackendError(
+        "INVALID_REQUEST",
+        400,
+        "O modelo informado é incompatível com o documento salvo."
+      );
+    }
+  }
+
+  let sanitizedAnswers: Record<string, string>;
+  try {
+    sanitizedAnswers = reconstructAndValidateResponses(
+      modelo,
+      respostas,
+      clausulasSelecionadas
+    );
+  } catch (err: unknown) {
+    await repos.generationRequests
+      .markFailed(requestId, "INVALID_REQUEST")
+      .catch(() => {});
+    throw err;
+  }
+
   let entitlementDecision: {
     entitlement: "free" | "single_purchase" | "pro";
     watermarked: boolean;
@@ -162,47 +276,76 @@ export async function generateDocumentArtifact(
   let documentId: string;
   let targetVersion: number;
 
-  if (existingDocumentId) {
-    const existingDoc = await repos.documents.getDocument(existingDocumentId);
-    if (!existingDoc) {
-      await repos.generationRequests.markFailed(requestId, "DOCUMENT_NOT_FOUND");
-      throw new BackendError("DOCUMENT_NOT_FOUND", 404, "Documento não encontrado.");
-    }
+  if (existingDocumentId && existingDocument) {
+    const userPrincipal = principal as Extract<Principal, { type: "user" }>;
+    const profile = await repos.users.getUserProfile(userPrincipal.userId);
 
-    if (
-      existingDoc.owner.type !== "user" ||
-      principal.type !== "user" ||
-      existingDoc.owner.userId !== principal.userId
-    ) {
-      await repos.generationRequests.markFailed(requestId, "DOCUMENT_FORBIDDEN");
-      throw new BackendError(
-        "DOCUMENT_FORBIDDEN",
-        403,
-        "Você não tem permissão para alterar este documento."
-      );
-    }
-
-    const profile = await repos.users.getUserProfile(principal.userId);
-    if (profile?.plano !== "pro") {
+    if (profile?.plano === "pro") {
+      entitlementDecision = {
+        entitlement: "pro",
+        watermarked: resolveDocumentWatermark("pro"),
+      };
+    } else if (orderId) {
+      try {
+        const order = await repos.orders.reservePaidOrder({
+          orderId,
+          requestId,
+          principalKey,
+        });
+        entitlementDecision = resolveEntitlement({
+          principal,
+          modeloSlug,
+          orderId,
+          order,
+          userProfile: profile,
+        });
+        entitlementDecision.watermarked = resolveDocumentWatermark(
+          entitlementDecision.entitlement
+        );
+      } catch (err: unknown) {
+        await repos.orders.releaseReservedOrder({ orderId, requestId }).catch(() => {});
+        const errorCode =
+          err instanceof BackendError ? err.code : "GENERATION_FAILED";
+        await repos.generationRequests
+          .markFailed(requestId, errorCode)
+          .catch(() => {});
+        throw err;
+      }
+    } else {
       await repos.generationRequests.markFailed(requestId, "PRO_REQUIRED");
       throw new BackendError(
         "PRO_REQUIRED",
         402,
-        "Apenas assinantes Pro podem editar e gerar novas versões deste documento."
+        "Ative o Pro ou compre esta nova versão como documento avulso."
       );
     }
 
     documentId = existingDocumentId;
     try {
-      targetVersion = await repos.documents.reserveNextVersion(documentId, requestId);
+      targetVersion = await repos.documents.reserveNextVersion(
+        documentId,
+        requestId
+      );
     } catch (err: unknown) {
-      const errorCode = err instanceof BackendError ? err.code : "GENERATION_FAILED";
-      await repos.generationRequests.markFailed(requestId, errorCode).catch(() => {});
+      if (
+        entitlementDecision.entitlement === "single_purchase" &&
+        entitlementDecision.orderId
+      ) {
+        await repos.orders
+          .releaseReservedOrder({
+            orderId: entitlementDecision.orderId,
+            requestId,
+          })
+          .catch(() => {});
+      }
+      const errorCode =
+        err instanceof BackendError ? err.code : "GENERATION_FAILED";
+      await repos.generationRequests
+        .markFailed(requestId, errorCode)
+        .catch(() => {});
       throw err;
     }
-    entitlementDecision = { entitlement: "pro", watermarked: false };
   } else {
-    // Novo documento
     targetVersion = 1;
 
     if (principal.type === "guest") {
@@ -222,43 +365,86 @@ export async function generateDocumentArtifact(
           "Pagamento avulso necessário para guests."
         );
       }
-      const order = await repos.orders.reservePaidOrder({
-        orderId,
-        requestId,
-        principalKey,
-      });
-      entitlementDecision = resolveEntitlement({ principal, orderId, order });
+
+      try {
+        const order = await repos.orders.reservePaidOrder({
+          orderId,
+          requestId,
+          principalKey,
+        });
+        entitlementDecision = resolveEntitlement({
+          principal,
+          modeloSlug,
+          orderId,
+          order,
+        });
+        entitlementDecision.watermarked = resolveDocumentWatermark(
+          entitlementDecision.entitlement
+        );
+      } catch (err: unknown) {
+        await repos.orders.releaseReservedOrder({ orderId, requestId }).catch(() => {});
+        const errorCode =
+          err instanceof BackendError ? err.code : "GENERATION_FAILED";
+        await repos.generationRequests
+          .markFailed(requestId, errorCode)
+          .catch(() => {});
+        throw err;
+      }
     } else {
       const profile = await repos.users.getUserProfile(principal.userId);
-      const startOfMonth = new Date(
-        new Date().getFullYear(),
-        new Date().getMonth(),
-        1
-      ).getTime();
-      const monthlyCount = await repos.documents.countUserMonthlyDocuments(
-        principal.userId,
-        startOfMonth
+      const startOfMonth = getStartOfBillingMonthTimestamp();
+      const userDocuments = await repos.documents.listUserDocuments(
+        principal.userId
       );
-      const order = orderId
-        ? await repos.orders.reservePaidOrder({
-            orderId,
-            requestId,
-            principalKey,
-          })
-        : undefined;
-      entitlementDecision = resolveEntitlement({
-        principal,
-        orderId,
-        order,
-        userProfile: profile,
-        currentMonthlyCount: monthlyCount,
-      });
+      const monthlyCount = userDocuments.filter(
+        (document) =>
+          document.entitlement.type === "free" &&
+          document.createdAt >= startOfMonth &&
+          document.status !== "deleted"
+      ).length;
+
+      let order:
+        | Awaited<ReturnType<typeof repos.orders.reservePaidOrder>>
+        | undefined;
+      try {
+        order = orderId
+          ? await repos.orders.reservePaidOrder({
+              orderId,
+              requestId,
+              principalKey,
+            })
+          : undefined;
+        entitlementDecision = resolveEntitlement({
+          principal,
+          modeloSlug,
+          orderId,
+          order,
+          userProfile: profile,
+          currentMonthlyCount: monthlyCount,
+        });
+        entitlementDecision.watermarked = resolveDocumentWatermark(
+          entitlementDecision.entitlement
+        );
+      } catch (err: unknown) {
+        if (orderId) {
+          await repos.orders
+            .releaseReservedOrder({ orderId, requestId })
+            .catch(() => {});
+        }
+        const errorCode =
+          err instanceof BackendError ? err.code : "GENERATION_FAILED";
+        await repos.generationRequests
+          .markFailed(requestId, errorCode)
+          .catch(() => {});
+        throw err;
+      }
+
       if (entitlementDecision.entitlement === "free") {
         freeQuota = {
           userId: principal.userId,
           startOfMonthTimestamp: startOfMonth,
           initialCount: monthlyCount,
-          limit: 3,
+          limit: FREE_MONTHLY_LIMIT,
         };
       }
     }
@@ -267,54 +453,52 @@ export async function generateDocumentArtifact(
       principal.type === "guest"
         ? {
             type: "guest" as const,
-            contact: { email: guestContact?.email, phone: guestContact?.phone },
+            contact: {
+              email: guestContact?.email,
+              phone: guestContact?.phone,
+            },
           }
         : { type: "user" as const, userId: principal.userId };
 
-    const newDoc = await repos.documents.createDocument({
-      owner,
-      modeloSlug: modelo.slug,
-      modeloNome: modelo.nome,
-      respostas: {},
-      entitlement: {
-        type: entitlementDecision.entitlement,
-        orderId: entitlementDecision.orderId,
-        watermarked: entitlementDecision.watermarked,
-      },
-      artifactState: "generating",
-      currentVersion: null,
-      targetVersion: 1,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
-
-    documentId = newDoc.id!;
-  }
-
-  // 4. Valida e reconstrói respostas canônicas
-  let sanitizedAnswers: Record<string, string>;
-  try {
-    sanitizedAnswers = reconstructAndValidateResponses(
-      modelo,
-      respostas,
-      clausulasSelecionadas
-    );
-  } catch (err: unknown) {
-    if (entitlementDecision?.entitlement === "single_purchase" && entitlementDecision?.orderId) {
-      await repos.orders.releaseReservedOrder({
-        orderId: entitlementDecision.orderId,
-        requestId,
-      }).catch(() => {});
+    try {
+      const newDoc = await repos.documents.createDocument({
+        owner,
+        modeloSlug: modelo.slug,
+        modeloNome: modelo.nome,
+        respostas: sanitizedAnswers,
+        entitlement: {
+          type: entitlementDecision.entitlement,
+          orderId: entitlementDecision.orderId,
+          watermarked: entitlementDecision.watermarked,
+        },
+        artifactState: "generating",
+        currentVersion: null,
+        targetVersion: 1,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      documentId = newDoc.id!;
+    } catch (err: unknown) {
+      if (
+        entitlementDecision.entitlement === "single_purchase" &&
+        entitlementDecision.orderId
+      ) {
+        await repos.orders
+          .releaseReservedOrder({
+            orderId: entitlementDecision.orderId,
+            requestId,
+          })
+          .catch(() => {});
+      }
+      const errorCode =
+        err instanceof BackendError ? err.code : "GENERATION_FAILED";
+      await repos.generationRequests
+        .markFailed(requestId, errorCode)
+        .catch(() => {});
+      throw err;
     }
-    await repos.documents.setArtifactState(documentId, "failed", {
-      code: "INVALID_REQUEST",
-      at: Date.now(),
-    });
-    await repos.generationRequests.markFailed(requestId, "INVALID_REQUEST");
-    throw err;
   }
 
-  // 5. Geração de PDF e Persistência Atômica
   let uploadedObjectKey: string | null = null;
   let firestoreCommitSucceeded = false;
   try {
@@ -394,21 +578,38 @@ export async function generateDocumentArtifact(
       try {
         await storage.deleteArtifact(uploadedObjectKey);
       } catch (cleanupErr) {
-        logger.error("orchestrator", "falha na compensacao r2 apos erro", cleanupErr);
+        logger.error(
+          "orchestrator",
+          "falha na compensacao r2 apos erro",
+          cleanupErr
+        );
       }
     }
-    if (!firestoreCommitSucceeded && entitlementDecision?.entitlement === "single_purchase" && entitlementDecision?.orderId) {
-      await repos.orders.releaseReservedOrder({
-        orderId: entitlementDecision.orderId,
-        requestId,
-      }).catch(() => {});
+
+    if (
+      !firestoreCommitSucceeded &&
+      entitlementDecision.entitlement === "single_purchase" &&
+      entitlementDecision.orderId
+    ) {
+      await repos.orders
+        .releaseReservedOrder({
+          orderId: entitlementDecision.orderId,
+          requestId,
+        })
+        .catch(() => {});
     }
-    const errCode = err instanceof BackendError ? err.code : "GENERATION_FAILED";
-    await repos.documents.setArtifactState(documentId, "failed", {
-      code: errCode,
-      at: Date.now(),
-    }).catch(() => {});
-    await repos.generationRequests.markFailed(requestId, errCode).catch(() => {});
+
+    const errCode =
+      err instanceof BackendError ? err.code : "GENERATION_FAILED";
+    await repos.documents
+      .setArtifactState(documentId, existingDocumentId ? "ready" : "failed", {
+        code: errCode,
+        at: Date.now(),
+      })
+      .catch(() => {});
+    await repos.generationRequests
+      .markFailed(requestId, errCode)
+      .catch(() => {});
     throw err;
   }
 }

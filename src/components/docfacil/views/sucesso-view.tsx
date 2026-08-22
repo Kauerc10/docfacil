@@ -10,17 +10,23 @@ import { Pet } from "../pet";
 import { Confetti } from "../confetti";
 import { PaymentBarrier } from "../payment-barrier";
 import { useNav } from "../nav-context";
+import { PdfDocumentPreview } from "../pdf-document-preview";
 import { useAuth } from "@/lib/auth-context";
 import { getModel } from "@/lib/services/models-service";
 import { getDocument } from "@/lib/services/documents-service";
 import {
   finalizeDocument,
   loadGuestDraft,
+  saveGuestDraft,
   clearGuestDraft,
   clearFinalizationRequestId,
+  getOrCreateFinalizationRequestId,
+  getDocumentApi,
   getDocumentDownloadUrl,
   shareDocument,
 } from "@/lib/documents/client";
+import { shouldPreserveFinalizationRequestId } from "@/lib/documents/idempotency";
+import { shouldStartPaidOrderFinalization } from "@/lib/documents/paid-order-finalization";
 import { buildGuestFinalizationAnswers } from "@/lib/documents/guest-draft";
 import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf/generator";
 import { logger } from "@/lib/logger";
@@ -31,26 +37,12 @@ import { PageShell, PageHeader } from "./page-shell";
 
 gsap.registerPlugin(useGSAP);
 
-/**
- * SucessoView — the standalone success / download screen, shown right after
- * the user finishes a document in CriarView. This is the brand climax:
- * the green DOCFACIL stamp "strikes" the A4 sheet (scale overshoot + small
- * yoyo shake), then the single coral CTA breathes in. Confetti fires on
- * mount (3s).
- *
- * Auth-aware CTA:
- *  - !user (deslogado) → PaymentBarrier (R$ 9,90 avulso ou login) em vez do
- *    botão direto de download. O usuário só baixa o PDF após pagar ou entrar.
- *  - user (logado)    → botão coral "Baixar Documento (PDF)" direto +
- *    share icons + upsell "Crie uma conta Pro" (se grátis).
- *
- * Wiring:
- *  - Modelo vem de `getModel(slug)` (Firestore/local via services).
- *  - `params.id` (passado pela CriarView) carrega o documento salvo via
- *    `getDocument(id)`, pra mostrar as respostas reais na prévia A4.
- *  - O botão coral chama `gerarEBaixarPDF(modelo, respostas, slug)` de
- *    verdade (pdfmake carregado dinamicamente na primeira chamada).
- */
+function getFinalizationErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== "object" || !("code" in error)) return undefined;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
+
 export function SucessoView() {
   const { params, navigate } = useNav();
   const slug = params.slug ?? "";
@@ -58,66 +50,108 @@ export function SucessoView() {
   const { user } = useAuth();
 
   const root = useRef<HTMLDivElement | null>(null);
+  const attemptedPaidOrderId = useRef<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [showConfetti, setShowConfetti] = useState(true);
-  const [finalizingGuest, setFinalizingGuest] = useState(false);
+  const [finalizingPaidOrder, setFinalizingPaidOrder] = useState(false);
 
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [respostas, setRespostas] = useState<Record<string, string>>({});
+  const [clausulasSelecionadas, setClausulasSelecionadas] = useState<string[]>([]);
+  const [extrasPorClausula, setExtrasPorClausula] = useState<Record<string, Record<string, string>>>({});
+  const [documentWatermarked, setDocumentWatermarked] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const orderId = params.orderId;
 
   useEffect(() => {
-    async function processGuestOrder() {
-      if (!user && orderId && slug && !finalizingGuest) {
-        const draft = loadGuestDraft(slug);
-        if (!draft) return;
+    async function processPaidOrder() {
+      if (
+        !shouldStartPaidOrderFinalization({
+          orderId,
+          slug,
+          attemptedOrderId: attemptedPaidOrderId.current,
+        })
+      ) {
+        return;
+      }
 
-        setFinalizingGuest(true);
-        try {
-          const result = await finalizeDocument({
-            requestId: draft.requestId,
-            modeloSlug: draft.modeloSlug || slug,
-            respostas: buildGuestFinalizationAnswers(draft),
-            clausulasSelecionadas: draft.clausulasSelecionadas,
-            guestContact: draft.guestContact,
-            orderId,
-          });
+      const draft = loadGuestDraft(slug);
+      if (!draft || !orderId) return;
 
-          if (!result.document?.guestAccessPath) {
-            throw new Error("Magic link guest ausente após finalização.");
-          }
+      attemptedPaidOrderId.current = orderId;
+      setFinalizingPaidOrder(true);
 
-          clearGuestDraft(slug);
-          clearFinalizationRequestId(slug);
-          if (typeof window !== "undefined") {
-            window.location.assign(result.document.guestAccessPath);
-          }
-        } catch (err) {
-          logger.error("SucessoView", "falha na finalizacao do pedido guest", err);
-          toast.error("Ocorreu uma instabilidade ao gerar seu documento pago. Tente novamente.");
-          setFinalizingGuest(false);
+      try {
+        const result = await finalizeDocument({
+          requestId: draft.requestId,
+          modeloSlug: draft.modeloSlug || slug,
+          respostas: buildGuestFinalizationAnswers(draft),
+          clausulasSelecionadas: draft.clausulasSelecionadas,
+          guestContact: user ? undefined : draft.guestContact,
+          orderId,
+        });
+
+        clearGuestDraft(slug);
+        clearFinalizationRequestId(slug);
+
+        if (user) {
+          setFinalizingPaidOrder(false);
+          navigate("sucesso", { slug, id: result.document.id });
+          return;
         }
+
+        if (!result.document?.guestAccessPath) {
+          throw new Error("Magic link guest ausente após finalização.");
+        }
+
+        if (typeof window !== "undefined") {
+          window.location.assign(result.document.guestAccessPath);
+        }
+      } catch (err) {
+        const errorCode = getFinalizationErrorCode(err);
+
+        if (
+          errorCode &&
+          !shouldPreserveFinalizationRequestId(errorCode)
+        ) {
+          const nextRequestId = getOrCreateFinalizationRequestId(slug);
+          saveGuestDraft(slug, {
+            ...draft,
+            requestId: nextRequestId,
+          });
+        }
+
+        logger.error("SucessoView", "falha na finalizacao do pedido pago", err);
+        toast.error("Ocorreu uma instabilidade ao gerar seu documento pago. Tente novamente.");
+        setFinalizingPaidOrder(false);
       }
     }
 
-    processGuestOrder();
-  }, [user, orderId, slug, finalizingGuest]);
+    void processPaidOrder();
+  }, [user, orderId, slug, navigate]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const m = await getModel(slug);
       setModelo(m);
-      // Se a CriarView passou um id, tentamos carregar as respostas reais.
+
       if (m && docId) {
-        const doc = await getDocument(docId);
-        if (doc) setRespostas(doc.respostas);
+        if (docId.startsWith("demo-")) {
+          const doc = await getDocument(docId);
+          if (doc) setRespostas(doc.respostas);
+        } else {
+          const doc = await getDocumentApi(docId);
+          if (doc) {
+            setRespostas(doc.respostas);
+            setClausulasSelecionadas(doc.clausulasSelecionadas ?? []);
+            setExtrasPorClausula(doc.extrasPorClausula ?? {});
+            setDocumentWatermarked(doc.watermarked);
+          }
+        }
       }
-      // Se não há doc (ex.: veio do SuccessShowcase demo da home), segue
-      // com respostas vazias — a prévia mostra ____________, como antes.
     } catch (e) {
       logger.error("SucessoView", "falha ao carregar", e, { slug, docId });
       setModelo(null);
@@ -131,65 +165,46 @@ export function SucessoView() {
     load();
   }, [load]);
 
-  // Pré-aquece o pdfmake (lazy load do vfs) assim que a tela aparece, pra
-  // o clique no botão coral ser instantâneo na maioria dos casos.
   useEffect(() => {
-    preloadPdfmake().catch(() => {
-      /* silent — o botão ainda vai funcionar, só será mais lento na 1ª vez */
-    });
+    preloadPdfmake().catch(() => {});
   }, []);
 
-  // Confetti: some após 3s (também some automaticamente via Confetti internals,
-  // mas garantimos o unmount pra liberar os 40 elementos do DOM).
   useEffect(() => {
     const t = setTimeout(() => setShowConfetti(false), 3000);
     return () => clearTimeout(t);
   }, []);
 
-  // Stamp strike — fires on mount (no ScrollTrigger needed, user just landed).
   useGSAP(
     () => {
+      if (!root.current || !modelo) return;
+
+      const sheet = root.current.querySelector<HTMLElement>("[data-suc='sheet']");
+      const cta = root.current.querySelector<HTMLElement>("[data-suc='cta']");
+      const secondary = root.current.querySelectorAll<HTMLElement>("[data-suc='secondary']");
+      const upsell = root.current.querySelector<HTMLElement>("[data-suc='upsell']");
+
+      if (!sheet || !cta) return;
+
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (reduce || !modelo) {
-        // No animation — just place the stamp in its final state.
-        gsap.set("[data-suc='stamp']", { scale: 1, opacity: 1, rotation: -8 });
-        return;
-      }
+      if (reduce) return;
 
       const tl = gsap.timeline();
-      tl.set("[data-suc='stamp']", { scale: 0, opacity: 0, rotation: -18 })
-        .to("[data-suc='stamp']", {
-          scale: 1.18,
-          opacity: 1,
-          rotation: -8,
-          duration: 0.34,
-          ease: "power3.in",
-        })
-        .to("[data-suc='stamp']", {
-          scale: 1,
-          duration: 0.28,
-          ease: "back.out(2.2)",
-        })
-        .to(
-          "[data-suc='sheet']",
-          {
-            x: 4,
-            y: -2,
-            duration: 0.05,
-            yoyo: true,
-            repeat: 5,
-          },
-          "-=0.3"
-        )
-        .from("[data-suc='cta']", { y: 16, opacity: 0, duration: 0.5 }, "-=0.1")
-        .from(
-          "[data-suc='secondary']",
-          { y: 10, opacity: 0, duration: 0.4, stagger: 0.08 },
-          "-=0.3"
-        )
-        .from("[data-suc='upsell']", { y: 10, opacity: 0, duration: 0.4 }, "-=0.2");
+      tl.from(sheet, { y: 18, opacity: 0, scale: 0.985, duration: 0.45, ease: "power3.out" })
+        .from(cta, { y: 14, opacity: 0, duration: 0.4 }, "-=0.18");
+
+      if (secondary.length > 0) {
+        tl.from(
+          secondary,
+          { y: 8, opacity: 0, duration: 0.32, stagger: 0.07 },
+          "-=0.22"
+        );
+      }
+
+      if (upsell) {
+        tl.from(upsell, { y: 8, opacity: 0, duration: 0.32 }, "-=0.16");
+      }
     },
-    { scope: root, dependencies: [modelo] }
+    { dependencies: [modelo] }
   );
 
   const handleBaixarPDF = async () => {
@@ -261,8 +276,7 @@ export function SucessoView() {
     window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
   };
 
-  // --- Loading skeleton ---
-  if (finalizingGuest) {
+  if (finalizingPaidOrder) {
     return (
       <PageShell className="bg-[var(--green-tint)]/40 min-h-screen">
         <div className="grid place-items-center min-h-[60vh] px-4">
@@ -272,7 +286,7 @@ export function SucessoView() {
               Gerando seu documento seguro…
             </h2>
             <p className="mt-2 text-sm text-ink/70">
-              Estamos finalizando seu PDF e preparando seu link de acesso permanente.
+              Estamos finalizando seu PDF e preparando seu acesso.
             </p>
           </div>
         </div>
@@ -295,7 +309,7 @@ export function SucessoView() {
           </div>
           <div className="relative mt-10 mx-auto max-w-md animate-pulse">
             <div className="bg-surface rounded-3xl border border-[var(--border)] shadow-[0_30px_60px_-30px_rgba(14,35,64,0.2)] p-6 sm:p-8">
-              <div className="mx-auto w-full max-w-[280px] aspect-[1/1.414] bg-[var(--blue-soft)]/40 rounded-sm" />
+              <div className="mx-auto w-full max-w-[300px] aspect-[1/1.414] bg-[var(--blue-soft)]/40 rounded-sm" />
             </div>
           </div>
           <div className="mt-8 text-center animate-pulse">
@@ -316,8 +330,7 @@ export function SucessoView() {
               Documento não encontrado
             </h2>
             <p className="mt-2 text-ink/65">
-              Não conseguimos localizar esse documento. Que tal explorar o
-              catálogo?
+              Não conseguimos localizar esse documento. Que tal explorar o catálogo?
             </p>
             <button
               type="button"
@@ -332,6 +345,10 @@ export function SucessoView() {
     );
   }
 
+  const previewWatermark = docId && !docId.startsWith("demo-")
+    ? documentWatermarked
+    : shouldWatermark(user);
+
   return (
     <PageShell className="bg-[var(--green-tint)]/40 min-h-screen">
       {showConfetti && <Confetti duration={3000} />}
@@ -339,74 +356,26 @@ export function SucessoView() {
       <div ref={root} className="mx-auto max-w-2xl px-4 sm:px-6 py-10 sm:py-14">
         <PageHeader
           eyebrow="Documento pronto"
-          title={`Pronto! Seu ${modelo.nome} está formatado e com validade legal.`}
+          title={`Pronto! Seu ${modelo.nome} está formatado e pronto para baixar e assinar.`}
           align="center"
         />
 
-        {/* Stage — A4 thumbnail with the striking stamp overlay */}
         <div data-suc="stage" className="relative mt-10 mx-auto max-w-md">
-          <div className="relative bg-surface rounded-3xl border border-[var(--border)] shadow-[0_30px_60px_-30px_rgba(14,35,64,0.3)] p-6 sm:p-8 overflow-hidden">
-            <div
-              data-suc="sheet"
-              className="relative mx-auto w-full max-w-[280px] aspect-[1/1.414] bg-white rounded-sm shadow-[0_18px_36px_-18px_rgba(14,35,64,0.35)] p-5 overflow-hidden"
-            >
-              <Selo variant="watermark" />
-
-              <div className="relative">
-                <p className="font-[family-name:var(--font-jakarta)] text-[0.7rem] font-bold text-ink uppercase tracking-wide text-center">
-                  {modelo.template.titulo}
-                </p>
-                <div className="mt-2 h-px bg-ink/15" />
-                <div className="mt-3 space-y-2">
-                  {modelo.template.corpo.slice(0, 2).map((line, i) => (
-                    <p
-                      key={i}
-                      className="text-[0.58rem] leading-relaxed text-ink/70 text-pretty"
-                    >
-                      {renderFilledLine(line, respostas)}
-                    </p>
-                  ))}
-                </div>
-                <div className="mt-5 flex justify-between items-end">
-                  <div className="text-center">
-                    <div className="w-12 border-b border-ink/40" />
-                    <p className="mt-1 text-[0.45rem] text-ink/50 uppercase tracking-wide">
-                      Parte 1
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-12 border-b border-ink/40" />
-                    <p className="mt-1 text-[0.45rem] text-ink/50 uppercase tracking-wide">
-                      Parte 2
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* The striking DOCFACIL stamp — the brand climax */}
-              <div
-                data-suc="stamp"
-                className="absolute inset-0 grid place-items-center pointer-events-none"
-                aria-hidden="true"
-              >
-                <div className="relative grid place-items-center w-36 h-36">
-                  <div className="absolute inset-0 rounded-full border-[3px] border-[var(--selo-green)]/70" />
-                  <div className="absolute inset-2 rounded-full border-2 border-dashed border-[var(--selo-green)]/50" />
-                  <div className="text-center text-[var(--selo-green)] px-3">
-                    <p className="font-[family-name:var(--font-jakarta)] font-extrabold text-lg leading-none tracking-tight">
-                      DOCFACIL
-                    </p>
-                    <p className="mt-1 text-[0.5rem] font-semibold uppercase tracking-widest opacity-80">
-                      Válido · {new Date().toLocaleDateString("pt-BR")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div
+            data-suc="sheet"
+            className="relative rounded-3xl border border-[var(--border)] bg-surface p-4 sm:p-5 shadow-[0_30px_60px_-30px_rgba(14,35,64,0.3)]"
+          >
+            <PdfDocumentPreview
+              modelo={modelo}
+              respostas={respostas}
+              clausulasSelecionadas={clausulasSelecionadas}
+              extrasPorClausula={extrasPorClausula}
+              watermark={previewWatermark}
+              className="mx-auto max-w-[330px]"
+            />
           </div>
         </div>
 
-        {/* CTA + share + upsell — auth-aware branching */}
         {user ? (
           <div className="mt-8 text-center">
             <button
@@ -498,12 +467,11 @@ export function SucessoView() {
               onLogin={() => navigate("login")}
             />
 
-            {/* Mascote + reassurance abaixo da barreira */}
             <div className="mt-8 flex flex-col items-center text-center gap-3">
               <Pet mood="atencao" size={64} />
               <p className="text-sm text-ink/60 max-w-sm">
-                Você preencheu tudo certinho. Para baixar o PDF sem marca
-                d&apos;água, faça o pagamento único ou entre na sua conta.
+                Você preencheu tudo certinho. Para baixar o PDF sem marca d&apos;água,
+                faça o pagamento único ou entre na sua conta.
               </p>
               <button
                 type="button"
@@ -519,40 +487,4 @@ export function SucessoView() {
       </div>
     </PageShell>
   );
-}
-
-/**
- * Substitui `{{key}}` por:
- *  - o valor real preenchido (destacado em ink/semibold), se existir;
- *  - `____________` caso contrário (mesma aparência de antes do wiring).
- *
- * Espelha a função `fillTemplate` do generator, mas como JSX pra poder
- * estilizar as partes preenchidas (e mantém o contraste com o cinza do
- * placeholder no thumbnail A4).
- */
-function renderFilledLine(
-  line: string,
-  respostas: Record<string, string>
-): React.ReactNode {
-  const parts = line.split(/(\{\{[^}]+\}\})/g);
-  return parts.map((part, i) => {
-    const m = part.match(/^\{\{([^}]+)\}\}$/);
-    if (m) {
-      const key = m[1];
-      const v = respostas[key];
-      if (v && v.trim()) {
-        return (
-          <span key={`${key}-${i}`} className="font-semibold text-ink">
-            {v}
-          </span>
-        );
-      }
-      return (
-        <span key={`${key}-${i}`} className="text-ink/45">
-          ____________
-        </span>
-      );
-    }
-    return <span key={`t-${i}`}>{part}</span>;
-  });
 }

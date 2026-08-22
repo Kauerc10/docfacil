@@ -21,7 +21,7 @@ export interface CheckoutParams {
 export interface CheckoutResult {
   checkoutUrl: string;
   orderId: string;
-  provider: CheckoutProvider;
+  provider: CheckoutProvider | "demo";
   plan: CheckoutPlan;
   amount: number;
 }
@@ -53,12 +53,11 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
       throw new Error("Informe seu e-mail para prosseguir com o pagamento.");
     }
 
-    // apiFetch preserva a identidade quando há usuário autenticado e mantém o
-    // fluxo guest quando não há sessão. App Check também é anexado por ele.
     const res = await apiFetch("/api/checkout/demo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        product: params.plan,
         guestContact: { email: params.userEmail },
         autoPay: true,
       }),
@@ -78,14 +77,12 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
     return {
       checkoutUrl: successUrl,
       orderId: data.order.id,
-      provider: "demo" as CheckoutProvider,
+      provider: "demo",
       plan: params.plan,
       amount,
     };
   }
 
-  // Gateway real em produção. O backend deve derivar a identidade do Bearer,
-  // nunca confiar em userId enviado no JSON para decidir quem é o comprador.
   const res = await apiFetch("/api/checkout/create", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

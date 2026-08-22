@@ -1,10 +1,19 @@
 import "server-only";
 import { z } from "zod";
 import { randomBytes, createHash } from "crypto";
-import type { Modelo } from "../../types";
+import type { CampoModelo, Modelo } from "../../types";
 import { BackendError } from "../errors";
 import { aplicarComposicaoModelo } from "../../document-engine/compose";
+import { normalizeCivilStatus } from "../../document-engine/civil-status";
 import { computeCamposOpcionais } from "../../document-engine/optional-fields";
+import { hasInvalidMoradoresAutorizados } from "../../document-engine/authorized-residents";
+import { DOCUMENT_RENDER_RULES_VERSION } from "../../document-engine/legal-rules";
+import { getPdfVisualRecipe } from "../../pdf/visual-recipes";
+import { validarCampoDocumento } from "../../validation/document-fields";
+import {
+  normalizarRespostasLegadasDeContrato,
+  SINAL_LEGADO_SEM_FORMA_KEY,
+} from "../../document-engine/legacy-contract-answers";
 
 export type DocumentOwner =
   | { type: "guest"; contact: { email?: string; phone?: string } }
@@ -88,7 +97,7 @@ export type OrderStatus =
 export interface OrderRecord {
   id?: string;
   provider: "demo";
-  product: "avulso";
+  product: "avulso" | "pro";
   amountCents: number;
   buyer:
     | { type: "guest"; email?: string; phone?: string }
@@ -135,59 +144,231 @@ export const documentDraftInputSchema = z.object({
 
 export type DocumentDraftInput = z.infer<typeof documentDraftInputSchema>;
 
+const RENTAL_MODEL_SLUGS = new Set([
+  "contrato-locacao",
+  "contrato-locacao-comercial",
+]);
+
+const RENTAL_GUARANTEE_IDS = new Set([
+  "caucao",
+  "fiador",
+  "seguro_fianca",
+  "cessao_fiduciaria",
+]);
+
+/**
+ * Regras de coerência que não cabem em validação de campo isolado.
+ *
+ * O client pode usar uma UX mais simples, mas o servidor continua sendo a
+ * autoridade final antes de persistir/gerar o documento. Essas regras ficam
+ * deliberadamente pequenas e explícitas para a V1, sem criar um AST jurídico.
+ */
+export function validateDocumentSemanticInvariants(
+  modelo: Modelo,
+  rawRespostas: Record<string, string>,
+  clausulasSelecionadas: string[] = []
+): void {
+  if (modelo.slug === "contrato-compra-venda-imovel") {
+    const identificacaoRegistral = [
+      rawRespostas.matricula_imovel,
+      rawRespostas.registro_imoveis,
+      rawRespostas.descricao_registral,
+    ];
+
+    if (identificacaoRegistral.some((value) => !value?.trim())) {
+      throw new BackendError(
+        "INVALID_REQUEST",
+        400,
+        "Atualize esta nova versão com a matrícula, o Registro de Imóveis e a descrição complementar do imóvel."
+      );
+    }
+
+    if (/^sim$/i.test(rawRespostas.possui_sinal?.trim() ?? "")) {
+      if (!rawRespostas.sinal?.trim()) {
+        throw new BackendError(
+          "INVALID_REQUEST",
+          400,
+          "Informe o valor do sinal."
+        );
+      }
+
+      if (!rawRespostas.forma_pagamento_sinal?.trim()) {
+        throw new BackendError(
+          "INVALID_REQUEST",
+          400,
+          "Informe a forma de pagamento do sinal."
+        );
+      }
+    }
+  }
+
+  if (!RENTAL_MODEL_SLUGS.has(modelo.slug)) return;
+
+  if (
+    modelo.slug === "contrato-locacao" &&
+    hasInvalidMoradoresAutorizados(rawRespostas.moradores_autorizados)
+  ) {
+    throw new BackendError(
+      "INVALID_REQUEST",
+      400,
+      "Informe o nome completo de cada morador adicional."
+    );
+  }
+
+  const garantiasSelecionadas = clausulasSelecionadas.filter((id) =>
+    RENTAL_GUARANTEE_IDS.has(id)
+  );
+
+  if (garantiasSelecionadas.length > 1) {
+    throw new BackendError(
+      "INVALID_REQUEST",
+      400,
+      "Escolha apenas uma modalidade de garantia locatícia."
+    );
+  }
+
+  if (garantiasSelecionadas.includes("caucao")) {
+    const mesesRaw = (rawRespostas.caucao_meses ?? "").replace(/\D/g, "");
+    if (mesesRaw) {
+      const meses = Number(mesesRaw);
+      if (Number.isFinite(meses) && meses > 3) {
+        throw new BackendError(
+          "INVALID_REQUEST",
+          400,
+          "A caução em dinheiro não pode ultrapassar três meses de aluguel."
+        );
+      }
+    }
+  }
+}
+
+function registerField(
+  fields: Map<string, CampoModelo>,
+  campo: CampoModelo
+): void {
+  fields.set(campo.key, campo);
+}
+
 export function reconstructAndValidateResponses(
   modelo: Modelo,
   rawRespostas: Record<string, string>,
   clausulasSelecionadas: string[] = []
 ): Record<string, string> {
-  const composed = aplicarComposicaoModelo(rawRespostas, modelo);
-  const optionalSet = new Set(computeCamposOpcionais(modelo, clausulasSelecionadas));
+  const declaredClauseIds = new Set(
+    (modelo.etapas || []).flatMap((etapa) =>
+      etapa.tipo === "clausulas"
+        ? etapa.clausulas.map((clausula) => clausula.id)
+        : []
+    )
+  );
+  const unknownClauseId = clausulasSelecionadas.find(
+    (id) => !declaredClauseIds.has(id)
+  );
+  if (unknownClauseId) {
+    throw new BackendError(
+      "INVALID_REQUEST",
+      400,
+      `Cláusula selecionada não existe neste modelo: ${unknownClauseId}`
+    );
+  }
+
+  const respostasCompativeis = normalizarRespostasLegadasDeContrato(
+    modelo,
+    rawRespostas
+  );
+  const normalizedRawRespostas = Object.fromEntries(
+    Object.entries(respostasCompativeis).map(([key, value]) => {
+      if (key !== "estado_civil" && !key.endsWith("_estado_civil")) {
+        return [key, value];
+      }
+
+      if (value.trim() === "") return [key, value];
+
+      const normalized = normalizeCivilStatus(value);
+      if (normalized === null) {
+        throw new BackendError(
+          "INVALID_REQUEST",
+          400,
+          "Estado civil inválido."
+        );
+      }
+
+      return [key, normalized];
+    })
+  );
+
+  validateDocumentSemanticInvariants(
+    modelo,
+    normalizedRawRespostas,
+    clausulasSelecionadas
+  );
+
+  const composed = aplicarComposicaoModelo(normalizedRawRespostas, modelo);
+  const optionalSet = new Set(
+    computeCamposOpcionais(modelo, clausulasSelecionadas, composed)
+  );
 
   const allowedKeys = new Set<string>();
   const requiredKeys = new Set<{ key: string; label: string }>();
+  const fieldsToValidate = new Map<string, CampoModelo>();
 
-  // Coleta campos principais do modelo
   for (const campo of modelo.campos || []) {
     allowedKeys.add(campo.key);
+    registerField(fieldsToValidate, campo);
     if (!optionalSet.has(campo.key) && campo.obrigatorio !== false) {
       requiredKeys.add({ key: campo.key, label: campo.pergunta || campo.key });
     }
   }
 
-  // Coleta campos virtuais / saídas de endereço configuradas nas etapas
   if (modelo.etapas) {
     for (const etapa of modelo.etapas) {
       if (etapa.tipo === "campo") {
         allowedKeys.add(etapa.campo.key);
-        if (!optionalSet.has(etapa.campo.key) && etapa.campo.obrigatorio !== false) {
-          requiredKeys.add({ key: etapa.campo.key, label: etapa.campo.pergunta || etapa.campo.key });
+        registerField(fieldsToValidate, etapa.campo);
+        if (
+          !optionalSet.has(etapa.campo.key) &&
+          etapa.campo.obrigatorio !== false
+        ) {
+          requiredKeys.add({
+            key: etapa.campo.key,
+            label: etapa.campo.pergunta || etapa.campo.key,
+          });
         }
       } else if (etapa.tipo === "campo_grupo") {
         if (etapa.endereco?.saidaKey) {
           allowedKeys.add(etapa.endereco.saidaKey);
         }
-        for (const c of etapa.campos) {
-          allowedKeys.add(c.key);
-          if (!optionalSet.has(c.key) && c.obrigatorio !== false) {
-            requiredKeys.add({ key: c.key, label: c.pergunta || c.key });
+        for (const campo of etapa.campos) {
+          allowedKeys.add(campo.key);
+          registerField(fieldsToValidate, campo);
+          if (!optionalSet.has(campo.key) && campo.obrigatorio !== false) {
+            requiredKeys.add({
+              key: campo.key,
+              label: campo.pergunta || campo.key,
+            });
           }
-          if (c.key === "rg" || c.key.endsWith("_rg")) {
-            const prefix = c.key === "rg" ? "" : c.key.slice(0, -3);
-            const sepKey = prefix ? `${prefix}_rg_separador` : "rg_separador";
+          if (campo.key === "rg" || campo.key.endsWith("_rg")) {
+            const prefix =
+              campo.key === "rg" ? "" : campo.key.slice(0, -3);
+            const sepKey = prefix
+              ? `${prefix}_rg_separador`
+              : "rg_separador";
             allowedKeys.add(sepKey);
           }
         }
       } else if (etapa.tipo === "clausulas") {
         for (const clausula of etapa.clausulas) {
-          if (clausulasSelecionadas.includes(clausula.id)) {
-            allowedKeys.add(`__clausula_${clausula.id}`);
-            if (clausula.camposExtras) {
-              for (const c of clausula.camposExtras) {
-                allowedKeys.add(c.key);
-                if (!optionalSet.has(c.key) && c.obrigatorio !== false) {
-                  requiredKeys.add({ key: c.key, label: c.pergunta || c.key });
-                }
-              }
+          if (!clausulasSelecionadas.includes(clausula.id)) continue;
+
+          allowedKeys.add(`__clausula_${clausula.id}`);
+          for (const campo of clausula.camposExtras || []) {
+            allowedKeys.add(campo.key);
+            registerField(fieldsToValidate, campo);
+            if (!optionalSet.has(campo.key) && campo.obrigatorio !== false) {
+              requiredKeys.add({
+                key: campo.key,
+                label: campo.pergunta || campo.key,
+              });
             }
           }
         }
@@ -197,10 +378,9 @@ export function reconstructAndValidateResponses(
 
   allowedKeys.add("cidade_data");
 
-  // Valida campos obrigatórios sobre as respostas compostas
   for (const req of requiredKeys) {
-    const val = composed[req.key];
-    if (val === undefined || val === null || val.trim() === "") {
+    const value = composed[req.key];
+    if (value === undefined || value === null || value.trim() === "") {
       throw new BackendError(
         "INVALID_REQUEST",
         400,
@@ -209,16 +389,27 @@ export function reconstructAndValidateResponses(
     }
   }
 
-  const sanitized: Record<string, string> = {};
+  for (const [key, campo] of fieldsToValidate) {
+    const value = composed[key];
+    if (typeof value !== "string" || value.trim() === "") continue;
 
-  // Preenche valores sanitizados (apenas chaves permitidas)
+    const validationError = validarCampoDocumento(campo, value);
+    if (validationError) {
+      throw new BackendError(
+        "INVALID_REQUEST",
+        400,
+        `${campo.pergunta || key} ${validationError}`
+      );
+    }
+  }
+
+  const sanitized: Record<string, string> = {};
   for (const [key, value] of Object.entries(composed)) {
     if (allowedKeys.has(key) && typeof value === "string") {
       sanitized[key] = value.trim();
     }
   }
 
-  // Registra cláusulas selecionadas
   for (const id of clausulasSelecionadas) {
     sanitized[`__clausula_${id}`] = "true";
   }
@@ -237,7 +428,9 @@ export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export function calculateSourceHash(respostas: Record<string, string>): string {
+export function calculateSourceHash(
+  respostas: Record<string, string>
+): string {
   const sortedKeys = Object.keys(respostas).sort();
   const canonical: Record<string, string> = {};
   for (const k of sortedKeys) {
@@ -262,7 +455,16 @@ export function canonicalizeJson(value: unknown): unknown {
   );
 }
 
-export function calculateModelSnapshotHash(modelo: Modelo): string {
+export const PDF_EDITORIAL_IDENTITY_VERSION = "docfacil-formal-v1";
+
+export interface ModelSnapshotTraceabilityOptions {
+  editorialIdentityVersion?: string;
+}
+
+export function calculateModelSnapshotHash(
+  modelo: Modelo,
+  options: ModelSnapshotTraceabilityOptions = {}
+): string {
   const snapshot = {
     slug: modelo.slug,
     nome: modelo.nome,
@@ -273,7 +475,15 @@ export function calculateModelSnapshotHash(modelo: Modelo): string {
       pergunta: c.pergunta,
       tipo: c.tipo,
       obrigatorio: c.obrigatorio,
+      visivelQuando: c.visivelQuando,
+      listaPessoas: c.listaPessoas,
     })),
+    renderRulesVersion: DOCUMENT_RENDER_RULES_VERSION,
+    editorial: {
+      identityVersion:
+        options.editorialIdentityVersion ?? PDF_EDITORIAL_IDENTITY_VERSION,
+      visualRecipe: getPdfVisualRecipe(modelo),
+    },
   };
   const canonical = canonicalizeJson(snapshot);
   return createHash("sha256")
@@ -301,6 +511,13 @@ export function reconstructDuplicateDraft(
     }
   }
 
+  const respostasCompativeis = normalizarRespostasLegadasDeContrato(
+    modelo,
+    respostas
+  );
+  delete respostasCompativeis[SINAL_LEGADO_SEM_FORMA_KEY];
+  Object.assign(respostas, respostasCompativeis);
+
   for (const etapa of modelo.etapas || []) {
     if (etapa.tipo !== "clausulas") continue;
 
@@ -311,10 +528,8 @@ export function reconstructDuplicateDraft(
         clausulasSelecionadas.push(clausula.id);
 
         const extras: Record<string, string> = {};
-
         for (const campo of clausula.camposExtras || []) {
           const value = storedRespostas[campo.key];
-
           if (typeof value === "string") {
             extras[campo.key] = value;
             delete respostas[campo.key];

@@ -36,7 +36,7 @@ describe("Orchestrator Post-Upload R2 Compensation", () => {
 
   const validAnswers = {
     declarante_nome: "Maria Oliveira",
-    declarante_cpf: "123.456.789-00",
+    declarante_cpf: "111.444.777-35",
     declarante_nacionalidade: "Brasileira",
     declarante_estado_civil: "Solteira",
     declarante_profissao: "Desenvolvedora",

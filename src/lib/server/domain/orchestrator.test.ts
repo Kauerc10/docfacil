@@ -37,7 +37,7 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
 
   const validGuestAnswers = {
     declarante_nome: "Maria Silva",
-    declarante_cpf: "123.456.789-00",
+    declarante_cpf: "111.444.777-35",
     declarante_nacionalidade: "Brasileira",
     declarante_estado_civil: "Solteira",
     declarante_profissao: "Autônoma",
@@ -52,7 +52,6 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
   };
 
   it("completes happy path for guest: consumes order, uploads to R2, creates artifact v1, promotes, and issues guest magic link", async () => {
-    // Setup paid order
     const order = await ordersRepo.createOrder({
       provider: "demo",
       product: "avulso",
@@ -88,7 +87,6 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
     expect(result.guestAccessToken).toBeDefined();
     expect(result.guestAccessPath).toBe(`/d/${result.guestAccessToken}`);
 
-    // Verify document record
     const doc = await docsRepo.getDocument(result.documentId);
     expect(doc?.currentVersion).toBe(1);
     expect(doc?.artifactState).toBe("ready");
@@ -97,21 +95,14 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
       contact: { email: "maria@example.com" },
     });
 
-    // Verify order consumed
     const updatedOrder = await ordersRepo.getOrder(order.id!);
     expect(updatedOrder?.status).toBe("consumed");
     expect(updatedOrder?.documentId).toBe(result.documentId);
 
-    // Verify artifact stored in R2
     const artifact = await docsRepo.getArtifact(result.documentId, 1);
     expect(artifact?.version).toBe(1);
     expect(storage.hasObject(artifact!.objectKey)).toBe(true);
 
-    // Verify access link created
-    const accessLink = await accessRepo.getAccessLink(
-      result.guestAccessToken ? result.guestAccessPath!.replace("/d/", "") : ""
-    );
-    // Remember: Access repo stores by tokenHash
     const genReq = await genRequestsRepo.getRequest("550e8400-e29b-41d4-a716-446655440001");
     expect(genReq?.status).toBe("completed");
   });
@@ -161,14 +152,11 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
     expect(first.documentId).toBe(second.documentId);
     expect(first.version).toBe(second.version);
     expect(first.guestAccessPath).toBe(second.guestAccessPath);
-
-    const artifacts = await docsRepo.listArtifacts(first.documentId);
-    expect(artifacts.length).toBe(1);
+    expect((await docsRepo.listArtifacts(first.documentId)).length).toBe(1);
   });
 
   it("supports Pro regeneration: creates v2 while keeping v1 artifact intact", async () => {
     usersRepo.setUser("usr_pro", { plano: "pro" });
-
     const deps = {
       repositories: {
         documents: docsRepo,
@@ -181,7 +169,6 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
       storage,
     };
 
-    // Initial v1 generation
     const v1 = await generateDocumentArtifact({
       requestId: "550e8400-e29b-41d4-a716-446655440003",
       principal: { type: "user", userId: "usr_pro" },
@@ -191,32 +178,21 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
     });
 
     expect(v1.version).toBe(1);
-    const artV1 = await docsRepo.getArtifact(v1.documentId, 1);
-    expect(artV1).toBeDefined();
-
-    // v2 regeneration with updated answers
-    const updatedAnswers = {
-      ...validGuestAnswers,
-      declarante_nome: "Maria Silva Souza",
-    };
+    expect(await docsRepo.getArtifact(v1.documentId, 1)).toBeDefined();
 
     const v2 = await generateDocumentArtifact({
       requestId: "550e8400-e29b-41d4-a716-446655440004",
       principal: { type: "user", userId: "usr_pro" },
       modeloSlug: "declaracao-residencia",
-      respostas: updatedAnswers,
+      respostas: { ...validGuestAnswers, declarante_nome: "Maria Silva Souza" },
       existingDocumentId: v1.documentId,
       deps,
     });
 
     expect(v2.documentId).toBe(v1.documentId);
     expect(v2.version).toBe(2);
-
     const allArtifacts = await docsRepo.listArtifacts(v1.documentId);
-    expect(allArtifacts.length).toBe(2);
-    expect(allArtifacts[0].version).toBe(1);
-    expect(allArtifacts[1].version).toBe(2);
-
+    expect(allArtifacts.map((artifact) => artifact.version)).toEqual([1, 2]);
     const doc = await docsRepo.getDocument(v1.documentId);
     expect(doc?.currentVersion).toBe(2);
     expect(doc?.respostas.declarante_nome).toBe("Maria Silva Souza");
@@ -268,13 +244,10 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
       code: "GENERATION_IN_PROGRESS",
       status: 409,
     });
-    expect((await docsRepo.listArtifacts(initial.documentId)).map((artifact) => artifact.version)).toEqual([
-      1,
-      2,
-    ]);
+    expect((await docsRepo.listArtifacts(initial.documentId)).map((artifact) => artifact.version)).toEqual([1, 2]);
   });
 
-  it("enforces the last free monthly slot atomically across concurrent finalizations", async () => {
+  it("enforces the single free monthly slot atomically across concurrent finalizations", async () => {
     usersRepo.setUser("usr_free", { plano: "gratis" });
     const deps = {
       repositories: {
@@ -296,15 +269,13 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
         deps,
       });
 
-    await generateFreeDocument("550e8400-e29b-41d4-a716-446655440030", "Primeira");
-    await generateFreeDocument("550e8400-e29b-41d4-a716-446655440031", "Segunda");
-
     const attempts = await Promise.allSettled([
-      generateFreeDocument("550e8400-e29b-41d4-a716-446655440032", "Terceira"),
-      generateFreeDocument("550e8400-e29b-41d4-a716-446655440033", "Quarta"),
+      generateFreeDocument("550e8400-e29b-41d4-a716-446655440032", "Primeira"),
+      generateFreeDocument("550e8400-e29b-41d4-a716-446655440033", "Segunda"),
     ]);
 
     expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
+    expect(attempts.filter((attempt) => attempt.status === "rejected")).toHaveLength(1);
     expect(attempts.filter((attempt) => attempt.status === "rejected")[0]?.reason).toMatchObject({
       code: "FREE_LIMIT_REACHED",
       status: 402,
@@ -357,7 +328,6 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
       expect(err.code).toBe("R2_UPLOAD_FAILED");
     }
 
-    // Order remains paid (not consumed)
     const checkOrder = await ordersRepo.getOrder(order.id!);
     expect(checkOrder?.status).toBe("paid");
   });

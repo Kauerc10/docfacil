@@ -4,7 +4,11 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Selo } from "../../selo";
-import { renderDocument } from "@/lib/document-engine";
+import {
+  computeCamposOpcionais,
+  normalizarRespostasLegadasDeContrato,
+  renderDocument,
+} from "@/lib/document-engine";
 import type { LinhaQuebrada } from "@/lib/document-engine";
 import type { Modelo } from "@/lib/types";
 
@@ -56,13 +60,23 @@ export function DetalhePreview({
   showWatermark = true,
 }: DetalhePreviewProps) {
   const [pagina, setPagina] = useState(0);
+  const respostasCompativeis = useMemo(
+    () => modelo ? normalizarRespostasLegadasDeContrato(modelo, respostas) : respostas,
+    [modelo, respostas]
+  );
+  const camposOpcionaisEfetivos = useMemo(
+    () => modelo
+      ? computeCamposOpcionais(modelo, clausulasSelecionadas, respostasCompativeis)
+      : camposOpcionais,
+    [modelo, clausulasSelecionadas, respostasCompativeis, camposOpcionais]
+  );
 
   const paginas = useMemo(() => {
     return renderDocument(
       {
         titulo,
         corpo,
-        respostas,
+        respostas: respostasCompativeis,
         clausulasSelecionadas,
         modelo,
         docId,
@@ -70,10 +84,10 @@ export function DetalhePreview({
       {
         linhasPorPagina: LINHAS_POR_PAGINA,
         charsPorLinha: CHARS_POR_LINHA,
-        camposOpcionais,
+        camposOpcionais: camposOpcionaisEfetivos,
       }
     );
-  }, [titulo, corpo, respostas, clausulasSelecionadas, modelo, camposOpcionais, docId]);
+  }, [titulo, corpo, respostasCompativeis, clausulasSelecionadas, modelo, camposOpcionaisEfetivos, docId]);
 
   const total = paginas.length;
   if (pagina > total - 1) {

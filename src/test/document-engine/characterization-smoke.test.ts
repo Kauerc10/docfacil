@@ -1,13 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import { MODELOS, getModelo } from "@/lib/modelos";
 import { fillDocument, renderDocument } from "@/lib/document-engine";
+import { applyLegalTitleRule } from "@/lib/document-engine/legal-rules";
 
 describe("Fase A: Characterization Smoke Tests (9 Modelos V1)", () => {
   it("renders a valid document for all 9 official platform models", () => {
     expect(MODELOS.length).toBe(9);
 
     const baseAnswers: Record<string, string> = {
-      // Locador / Vendedor / Comodante / Declarante / Outorgante / Pessoa 1
       locador_nome: "Carlos Eduardo Souza",
       locador_nacionalidade: "brasileiro",
       locador_estado_civil: "casado(a)",
@@ -76,7 +76,6 @@ describe("Fase A: Characterization Smoke Tests (9 Modelos V1)", () => {
       endereco_cidade: "Blumenau",
       endereco_uf: "SC",
 
-      // Locatário / Comprador / Comodatário / Residente
       locatario_nome: "Mariana Alves Pereira",
       locatario_nacionalidade: "brasileira",
       locatario_estado_civil: "solteiro(a)",
@@ -106,7 +105,6 @@ describe("Fase A: Characterization Smoke Tests (9 Modelos V1)", () => {
       residente_documento: "RG nº 45.678.910-1 SSP/SC",
       residente_cpf: "999.888.777-66",
 
-      // Imóvel / Venda / Valores
       imovel: "Rua XV de Novembro, nº 500, Apto 302, Centro, Blumenau - SC, CEP 89010-000",
       imovel_cidade: "Blumenau",
       imovel_uf: "SC",
@@ -129,7 +127,7 @@ describe("Fase A: Characterization Smoke Tests (9 Modelos V1)", () => {
       });
 
       expect(linhas.length).toBeGreaterThan(3);
-      expect(linhas[0]).toBe(modelo.template.titulo);
+      expect(linhas[0]).toBe(applyLegalTitleRule(modelo.slug, modelo.template.titulo));
 
       const joined = linhas.join("\n");
       expect(joined).not.toContain("{{locador_nome}}");
@@ -238,5 +236,62 @@ describe("Fase A: Characterization Smoke Tests (9 Modelos V1)", () => {
       expect(joined).toContain("AP-998877");
       expect(joined).not.toContain("SEM QUALQUER MODALIDADE DE GARANTIA");
     });
+  });
+});
+
+describe("Contrato de Locação Residencial — estrutura de referência", () => {
+  const modelo = getModelo("contrato-locacao")!;
+  const answers = {
+    locador_nome: "Carlos Eduardo Souza",
+    locador_nacionalidade: "brasileiro",
+    locador_estado_civil: "casado(a)",
+    locador_profissao: "Engenheiro",
+    locador_cpf: "111.222.333-44",
+    locatario_nome: "Mariana Alves Pereira",
+    locatario_nacionalidade: "brasileira",
+    locatario_estado_civil: "solteira",
+    locatario_profissao: "Advogada",
+    locatario_cpf: "555.666.777-88",
+    imovel: "Rua XV de Novembro, nº 500, Centro, Blumenau - SC",
+    imovel_cidade: "Blumenau",
+    imovel_uf: "SC",
+    valor: "1.500,00",
+    prazo: "12",
+    dia_vencimento: "5",
+    forma_pagamento: "PIX",
+  };
+
+  it("não exige vistoria quando não há anexo a declarar", () => {
+    const etapaValores = (modelo.etapas ?? []).find(
+      (etapa) =>
+        etapa.tipo === "campo_grupo" &&
+        etapa.campos.some((campo) => campo.key === "vistoria_anexa")
+    );
+
+    expect(etapaValores).toBeDefined();
+    if (!etapaValores || etapaValores.tipo !== "campo_grupo") return;
+
+    const vistoria = etapaValores.campos.find((campo) => campo.key === "vistoria_anexa");
+    expect(vistoria?.obrigatorio).toBe(false);
+  });
+
+  it("gera a estrutura contratual de referência sem afirmar anexos não fornecidos", () => {
+    const document = fillDocument({
+      titulo: modelo.template.titulo,
+      corpo: modelo.template.corpo,
+      respostas: answers,
+      clausulasSelecionadas: [],
+      modelo,
+    }).join("\n");
+
+    expect(document).toContain("CLÁUSULA OITAVA – DA MANUTENÇÃO E CONSERVAÇÃO");
+    expect(document).toContain("CLÁUSULA DÉCIMA PRIMEIRA – DA PROTEÇÃO DE DADOS PESSOAIS");
+    expect(document).toContain("CLÁUSULA DÉCIMA SEGUNDA – DAS COMUNICAÇÕES ENTRE AS PARTES");
+    expect(document).toContain("CLÁUSULA DÉCIMA TERCEIRA – DAS DISPOSIÇÕES GERAIS");
+    expect(document).toContain("CLÁUSULA DÉCIMA QUARTA – DO FORO");
+    expect(document).not.toContain("SEGURO CONTRA INCÊNDIO");
+    expect(document).not.toContain("CLÁUSULA DÉCIMA PRIMEIRA – DA VISTORIA");
+    expect(document).not.toContain("Anexo I");
+    expect(document).not.toContain("registro fotográfico anexo");
   });
 });

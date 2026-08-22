@@ -1,9 +1,6 @@
 /**
  * FAQs centralizadas — compartilhadas entre a view SPA (ajuda-view) e a
  * rota file-based (/ajuda) para SEO.
- *
- * Também consumidas pelo JSON-LD `FAQPage` (schema.org) renderizado na rota
- * estática, para rich results no Google.
  */
 
 export type FAQ = { q: string; a: string };
@@ -43,25 +40,21 @@ export const HELP_FAQS: FAQ[] = [
   },
 ];
 
-/**
- * FAQs da página de planos (diferentes das da ajuda).
- * Também usadas para JSON-LD em /planos se desejado.
- */
 export const PRICING_FAQS: FAQ[] = [
   {
     q: "Posso cancelar quando quiser?",
-    a: "Sim. O plano Pro é mês a mês, sem fidelidade. Você cancela com um clique dentro do seu painel e continua usando até o fim do período já pago.",
+    a: "Sim. O plano Pro é mês a mês, sem fidelidade. Quando a cobrança real estiver ativa, o cancelamento preservará o acesso pelo período já pago.",
   },
   {
-    q: "O PDF tem validade jurídica?",
-    a: "O documento gerado segue a estrutura exigida para instrumentos particulares e pode ser assinado digitalmente. Para força executiva, recomendamos reconhecimento de firma ou assinatura eletrônica qualificada — te ajudamos nesse passo.",
+    q: "Como funciona a geração gratuita?",
+    a: "Com uma conta DocFácil, você pode usar 1 geração gratuita por mês entre os modelos identificados como “Grátis este mês”. A seleção pode mudar mensalmente e o PDF gratuito leva marca d'água.",
   },
   {
     q: "Preciso de conta para usar?",
-    a: "Não. No plano Grátis você gera até 3 documentos por mês sem cadastro. Para salvar o histórico e baixar PDFs sem marca d'água, aí sim pedimos uma conta rápida (e-mail e senha).",
+    a: "A geração gratuita e os rascunhos salvos exigem uma conta DocFácil. O documento avulso pode ser comprado sem criar conta.",
   },
   {
-    q: "E se eu precisar de mais de um documento por mês?",
-    a: "Compensa migrar para o Pro: por menos de R$ 1 por dia você tem documentos ilimitados, edição quando quiser e prioridade no WhatsApp. O Avulso é bom só para uma necessidade pontual.",
+    q: "Avulso ou Pro: qual compensa mais?",
+    a: "O Avulso é ideal para uma necessidade pontual. Para uso recorrente, especialmente dois ou mais documentos no mês, o Pro tende a fazer mais sentido e ainda libera histórico, reedição e novas versões.",
   },
 ];

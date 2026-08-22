@@ -11,13 +11,20 @@ import type { CampoModelo } from "@/lib/types";
 
 gsap.registerPlugin(useGSAP);
 
+const RENTAL_GUARANTEE_IDS = new Set([
+  "caucao",
+  "fiador",
+  "seguro_fianca",
+  "cessao_fiduciaria",
+]);
+
 /**
  * ClausulasPergunta — lista de cláusulas dinâmicas opcionais.
  *
- * - Entrada staggered GSAP (cada card fade+slide com delay incremental)
- * - Nenhum selecionado por default — usuário opta-in
- * - Botão "Avançar"/"Finalizar" no rodapé
- * - Respeita prefers-reduced-motion
+ * Para grupos comuns, mantém seleção múltipla. Quando a etapa contém apenas
+ * modalidades de garantia locatícia, a UI muda para escolha única e inclui
+ * "Sem garantia" como opção explícita. Assim a regra jurídica fica protegida
+ * sem acrescentar uma etapa ou obrigar o usuário a desmarcar a escolha anterior.
  */
 export function ClausulasPergunta({
   clausulas,
@@ -30,6 +37,31 @@ export function ClausulasPergunta({
   submitting = false,
 }: ClausulasPerguntaProps) {
   const root = useRef<HTMLDivElement>(null);
+
+  const isRentalGuaranteeGroup =
+    clausulas.length > 0 &&
+    clausulas.every((cl) => RENTAL_GUARANTEE_IDS.has(cl.id));
+
+  const handleToggle = (clausulaId: string, selecionada: boolean) => {
+    if (isRentalGuaranteeGroup && selecionada) {
+      for (const id of selecionadas.filter(
+        (id) => RENTAL_GUARANTEE_IDS.has(id) && id !== clausulaId
+      )) {
+        onToggle(id, false);
+      }
+    }
+    onToggle(clausulaId, selecionada);
+  };
+
+  const handleSemGarantia = () => {
+    for (const id of selecionadas.filter((id) => RENTAL_GUARANTEE_IDS.has(id))) {
+      onToggle(id, false);
+    }
+  };
+
+  const semGarantiaSelecionada =
+    isRentalGuaranteeGroup &&
+    !selecionadas.some((id) => RENTAL_GUARANTEE_IDS.has(id));
 
   useGSAP(
     () => {
@@ -51,14 +83,67 @@ export function ClausulasPergunta({
   );
 
   return (
-    <div ref={root} className="space-y-3">
+    <div
+      ref={root}
+      className="space-y-3"
+      role={isRentalGuaranteeGroup ? "radiogroup" : undefined}
+      aria-label={isRentalGuaranteeGroup ? "Garantia do aluguel" : undefined}
+    >
+      {isRentalGuaranteeGroup && (
+        <div data-cl="card">
+          <div
+            role="radio"
+            aria-checked={semGarantiaSelecionada}
+            aria-label="Sem garantia"
+            tabIndex={0}
+            onClick={handleSemGarantia}
+            onKeyDown={(e) => {
+              if (e.key === " " || e.key === "Enter") {
+                e.preventDefault();
+                handleSemGarantia();
+              }
+            }}
+            className={cn(
+              "group relative rounded-2xl border-2 p-4 cursor-pointer transition-all outline-none",
+              "focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--paper)]",
+              semGarantiaSelecionada
+                ? "border-[var(--selo-green)] bg-[var(--green-tint)]"
+                : "border-[var(--border)] bg-surface hover:border-[var(--blue-royal)]/40 hover:bg-[var(--blue-soft)]/30"
+            )}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "mt-0.5 shrink-0 w-6 h-6 rounded-full border-2 grid place-items-center transition-all",
+                  semGarantiaSelecionada
+                    ? "border-[var(--selo-green)]"
+                    : "border-ink/30 group-hover:border-[var(--blue-royal)]/55"
+                )}
+              >
+                {semGarantiaSelecionada && (
+                  <span className="w-3 h-3 rounded-full bg-[var(--selo-green)]" />
+                )}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-ink leading-snug">Sem garantia</p>
+                <p className="mt-1 text-sm text-ink/65 leading-relaxed">
+                  O contrato será feito sem caução, fiador ou seguro-fiança.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {clausulas.map((cl) => (
         <div data-cl="card" key={cl.id}>
           <ClausulaCard
             clausula={cl}
             selecionada={selecionadas.includes(cl.id)}
             extras={extras[cl.id] ?? {}}
-            onToggle={(sel) => onToggle(cl.id, sel)}
+            singleChoice={isRentalGuaranteeGroup}
+            onToggle={(sel) => handleToggle(cl.id, sel)}
             onExtraChange={(fieldKey, value) => onExtraChange(cl.id, fieldKey, value)}
           />
         </div>
@@ -84,9 +169,11 @@ export function ClausulasPergunta({
           )}
         </button>
         <p className="text-xs text-ink/55">
-          {selecionadas.length === 0
-            ? "Selecione as cláusulas que deseja incluir (opcional)."
-            : `${selecionadas.length} cláusula${selecionadas.length > 1 ? "s" : ""} selecionada${selecionadas.length > 1 ? "s" : ""}.`}
+          {isRentalGuaranteeGroup
+            ? "Escolha uma opção. Você pode trocar antes de finalizar."
+            : selecionadas.length === 0
+              ? "Selecione as cláusulas que deseja incluir (opcional)."
+              : `${selecionadas.length} cláusula${selecionadas.length > 1 ? "s" : ""} selecionada${selecionadas.length > 1 ? "s" : ""}.`}
         </p>
       </div>
     </div>
@@ -94,13 +181,11 @@ export function ClausulasPergunta({
 }
 
 /**
- * ClausulaCard — card clicável com checkbox customizado.
+ * ClausulaCard — card clicável para cláusula opcional.
  *
- * - Card inteiro é clicável (label implícito via onClick)
- * - Checkbox customizado: quadrado com borda dashed quando vazio,
- *   fundo selo-green + Check quando selecionado
- * - Quando selecionado, `camposExtras` aparecem abaixo com transição suave
- * - stopPropagation no container de extras (pra não re-toggle ao clicar num input)
+ * Em grupos comuns funciona como checkbox. Para garantia locatícia, recebe
+ * `singleChoice` e assume semântica/visual de radio, mantendo os campos extras
+ * inline para não criar novas etapas no fluxo.
  */
 export function ClausulaCard({
   clausula,
@@ -108,19 +193,25 @@ export function ClausulaCard({
   extras,
   onToggle,
   onExtraChange,
-}: ClausulaCardProps) {
-  const handleClick = () => onToggle(!selecionada);
+  singleChoice = false,
+}: ClausulaCardProps & { singleChoice?: boolean }) {
+  const handleClick = () => {
+    if (singleChoice && selecionada) return;
+    onToggle(!selecionada);
+  };
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === " " || e.key === "Enter") {
       e.preventDefault();
+      if (singleChoice && selecionada) return;
       onToggle(!selecionada);
     }
   };
 
   return (
     <div
-      role="checkbox"
+      role={singleChoice ? "radio" : "checkbox"}
       aria-checked={selecionada}
+      aria-label={singleChoice ? clausula.titulo : undefined}
       tabIndex={0}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
@@ -133,17 +224,25 @@ export function ClausulaCard({
       )}
     >
       <div className="flex items-start gap-3">
-        {/* Checkbox customizado */}
         <span
           aria-hidden="true"
           className={cn(
-            "mt-0.5 shrink-0 w-6 h-6 rounded-md grid place-items-center transition-all",
-            selecionada
-              ? "bg-[var(--selo-green)] text-white scale-100"
-              : "border-2 border-dashed border-ink/35 group-hover:border-[var(--blue-royal)]/55"
+            "mt-0.5 shrink-0 w-6 h-6 grid place-items-center transition-all",
+            singleChoice ? "rounded-full border-2" : "rounded-md",
+            selecionada && singleChoice
+              ? "border-[var(--selo-green)]"
+              : selecionada
+                ? "bg-[var(--selo-green)] text-white scale-100"
+                : singleChoice
+                  ? "border-ink/30 group-hover:border-[var(--blue-royal)]/55"
+                  : "border-2 border-dashed border-ink/35 group-hover:border-[var(--blue-royal)]/55"
           )}
         >
-          {selecionada && <Check className="w-4 h-4" strokeWidth={3} />}
+          {selecionada && singleChoice ? (
+            <span className="w-3 h-3 rounded-full bg-[var(--selo-green)]" />
+          ) : selecionada ? (
+            <Check className="w-4 h-4" strokeWidth={3} />
+          ) : null}
         </span>
 
         <div className="flex-1 min-w-0">
@@ -159,7 +258,6 @@ export function ClausulaCard({
         </div>
       </div>
 
-      {/* Campos extras — só aparecem quando selecionada */}
       {selecionada && clausula.camposExtras && clausula.camposExtras.length > 0 && (
         <div
           className="mt-4 pt-4 border-t border-[var(--selo-green)]/25 space-y-3"
@@ -182,10 +280,6 @@ export function ClausulaCard({
 
 /**
  * CampoExtra — input de campo extra de cláusula com máscara + validação.
- *
- * Encapsula o hook useCampoValidado para que CPFs, CNPJs, CEPs, telefones
- * e datas em campos extras (ex.: CPF do fiador, telefone da testemunha)
- * sejam formatados e validados igual aos campos principais do GrupoCampos.
  */
 function CampoExtra({
   clausulaId,
@@ -198,8 +292,6 @@ function CampoExtra({
   value: string;
   onExtraChange: (fieldKey: string, value: string) => void;
 }) {
-  // Adaptador: useCampoValidado espera (v: string) => void, mas onExtraChange
-  // precisa de (fieldKey, value). Amarramos o fieldKey aqui.
   const { tipo, erro, handleChange, handleBlur } = useCampoValidado(campo, value, (v) =>
     onExtraChange(campo.key, v)
   );

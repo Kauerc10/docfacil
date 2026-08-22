@@ -47,6 +47,17 @@ describe("document engine", () => {
     );
   });
 
+  test("não deixa abreviação legada de estado civil chegar ao documento", () => {
+    const linhas = fillDocument({
+      titulo: "Contrato",
+      corpo: ["LOCADOR: Ana, {{locador_estado_civil}}, brasileira."],
+      respostas: { locador_estado_civil: "di" },
+    });
+
+    expect(linhas[1]).toBe("LOCADOR: Ana, divorciado(a), brasileira.");
+    expect(linhas[1]).not.toContain(", di,");
+  });
+
   test("persiste e recupera cláusulas selecionadas sem alterar outras respostas", () => {
     const encoded = encodeClausulasSelecionadas(["fiador", "prazo"]);
 
