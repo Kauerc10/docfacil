@@ -132,8 +132,8 @@ export function detectarMascara(campo: CampoModelo): TipoMascara {
   if (/cnpj/.test(key)) return "cnpj";
   if (/cep/.test(key)) return "cep";
   if (/telefone|fone|celular|whats/.test(key)) return "telefone";
-  if (/data|nascimento/.test(key)) return "data";
-  if (/_uf$|^uf$|estado/.test(key)) return "estado";
+  if (/(^|_)(data|nascimento)(_|$)/.test(key)) return "data";
+  if (/_uf$|^uf$/.test(key)) return "estado";
   if (/meses|prazo|dia_vencimento|quantidade|dias/.test(key)) {
     return "numero";
   }
