@@ -40,14 +40,15 @@ test.describe("Free entitlement E2E", () => {
     const secondFinalize = await openAndFill(page, "comodato");
     await secondFinalize.click();
 
+    const monthlyPaywall = page.getByRole("dialog", {
+      name: "Sua geração gratuita deste mês já foi usada.",
+    });
+    await expect(monthlyPaywall).toBeVisible({ timeout: 15000 });
     await expect(
-      page.getByRole("heading", { name: "Geração grátis já utilizada", exact: true })
-    ).toBeVisible({ timeout: 15000 });
-    await expect(
-      page.getByText("Sua geração gratuita deste mês já foi usada.", { exact: false })
+      monthlyPaywall.getByText("Geração grátis já utilizada", { exact: true })
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Comprar documento avulso", exact: true })
+      monthlyPaywall.getByRole("button", { name: "Comprar documento avulso", exact: true })
     ).toBeVisible();
   });
 
@@ -59,9 +60,13 @@ test.describe("Free entitlement E2E", () => {
     const paidModelFinalize = await openAndFill(page, "declaracao-residencia-terceiro");
     await paidModelFinalize.click();
 
+    const modelPaywall = page.getByRole("dialog", {
+      name: /não está entre os modelos gratuitos deste mês\./i,
+    });
+    await expect(modelPaywall).toBeVisible({ timeout: 15000 });
     await expect(
-      page.getByRole("heading", { name: "Modelo fora da seleção grátis", exact: true })
-    ).toBeVisible({ timeout: 15000 });
+      modelPaywall.getByText("Modelo fora da seleção grátis", { exact: true })
+    ).toBeVisible();
 
     const freeFinalize = await openAndFill(page, "declaracao-residencia");
     const freeResponsePromise = page.waitForResponse(
