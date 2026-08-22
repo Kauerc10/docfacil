@@ -80,7 +80,9 @@ test.describe("Free entitlement E2E", () => {
     expect(freeResponse.status()).toBe(200);
     await waitForSearchParams(page, { view: "sucesso", id: null }, 45000);
     await expect(
-      page.getByText("Seu documento está pronto!", { exact: false })
+      page.getByRole("heading", {
+        name: /Pronto! Seu .*Residência.*pronto para baixar e assinar\./i,
+      })
     ).toBeVisible({ timeout: 15000 });
   });
 });
