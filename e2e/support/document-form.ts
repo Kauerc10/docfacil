@@ -13,7 +13,11 @@ export interface FillDocumentOptions {
 function fieldKey(locator: Locator, label: string, fallbackIndex: number) {
   return locator
     .getAttribute("id")
-    .then((id) => id?.replace(/^g-/, "").replace(/^extra-[^-]+-/, "") ?? label || `field-${fallbackIndex}`);
+    .then(
+      (id) =>
+        id?.replace(/^g-/, "").replace(/^extra-[^-]+-/, "") ??
+        (label || `field-${fallbackIndex}`)
+    );
 }
 
 async function stepSignature(page: Page) {
