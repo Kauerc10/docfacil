@@ -54,11 +54,6 @@ export interface ChatStepProps {
   totalEtapas: number;
   respostas: RespostasState;
   onInputChange: (key: string, value: string) => void;
-  onGrupoFieldChange: (
-    grupoKey: string,
-    fieldKey: string,
-    value: string
-  ) => void;
   onClausulaFieldChange: (
     clausulaId: string,
     payload:

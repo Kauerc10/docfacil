@@ -34,7 +34,6 @@ export function ChatStep({
   totalEtapas,
   respostas,
   onInputChange,
-  onGrupoFieldChange,
   onClausulaFieldChange,
   onAvancar,
   isLast,
@@ -134,9 +133,7 @@ export function ChatStep({
             titulo={etapa.titulo}
             campos={etapa.campos}
             values={respostas.campos}
-            onFieldChange={(fieldKey, value) =>
-              onGrupoFieldChange("grupo", fieldKey, value)
-            }
+            onFieldChange={onInputChange}
             onAvancar={onAvancar}
             isLast={isLast}
             submitting={submitting}

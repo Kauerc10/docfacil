@@ -159,15 +159,6 @@ export function CriarView() {
     }
   };
 
-  const handleGrupoFieldChange = (_grupoKey: string, fieldKey: string, value: string) => {
-    setAnswers((prev) => ({ ...prev, [fieldKey]: value }));
-    if (fieldError) {
-      setFieldError(null);
-      setPetOverride(null);
-      setPetMood("falando");
-    }
-  };
-
   const handleClausulaFieldChange = (
     clausulaId: string,
     payload:
@@ -466,7 +457,6 @@ export function CriarView() {
             totalEtapas={totalEtapas}
             respostas={respostas}
             onInputChange={handleInputChange}
-            onGrupoFieldChange={handleGrupoFieldChange}
             onClausulaFieldChange={handleClausulaFieldChange}
             onAvancar={handleAvancar}
             isLast={isLast}
