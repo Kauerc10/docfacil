@@ -123,6 +123,9 @@ export async function fillDocumentUntilFinalization(
   const maxSteps = options.maxSteps ?? 20;
 
   for (let step = 0; step < maxSteps; step += 1) {
+    // A barra só existe depois que a sessão de criação e a etapa atual montaram.
+    // Isso evita preencher/clicar enquanto o AuthContext ainda está hidratando.
+    const before = await currentProgress(page);
     const finalize = page.getByRole("button", { name: /^finalizar$/i }).first();
     const advance = page.getByRole("button", { name: /^avançar$/i }).first();
 
@@ -138,7 +141,6 @@ export async function fillDocumentUntilFinalization(
     }
 
     await expect(advance).toBeVisible({ timeout: 10000 });
-    const before = await currentProgress(page);
     await advance.click();
     await expect
       .poll(() => currentProgress(page), { timeout: 10000 })
