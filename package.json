@@ -43,7 +43,7 @@
     "seed:models": "bun run scripts/seed-models.ts",
     "test:rules": "firebase emulators:exec --only firestore \"RUN_FIRESTORE_RULES=true bun test src/test/rules/firestore.rules.test.ts\"",
     "test:firestore-commit": "firebase emulators:exec --only firestore \"RUN_FIRESTORE_COMMIT_TESTS=true bun test src/test/server/firestore/generation-commit.firestore.test.ts\"",
-    "test:e2e": "firebase emulators:exec --only firestore \"playwright test\"",
+    "test:e2e": "firebase emulators:exec --project demo-docfacil-e2e --only firestore,auth \"playwright test\"",
     "firestore:rules": "firebase deploy --only firestore:rules"
   },
   "engines": {
@@ -120,7 +120,7 @@
     "recharts": "^2.15.4",
     "server-only": "^0.0.1",
     "sharp": "^0.34.3",
-    "sonner": "^2.0.6",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.1.0",
