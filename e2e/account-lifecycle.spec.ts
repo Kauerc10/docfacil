@@ -205,7 +205,7 @@ test.describe("Authenticated document lifecycle E2E", () => {
 
     await page.goto("/?view=dashboard");
     const downloadButton = page.getByRole("button", {
-      name: "Baixar PDF de Declaração de Residência",
+      name: "Baixar PDF de Autodeclaração de Residência",
       exact: true,
     });
     await expect(downloadButton).toBeVisible({ timeout: 15000 });
