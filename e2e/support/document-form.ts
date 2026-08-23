@@ -116,6 +116,16 @@ async function handleClauses(page: Page, options: FillDocumentOptions) {
   return (await checkboxes.count()) > 0;
 }
 
+/** Preenche a etapa atual sem avançar. Útil para testar voltar/retomar rascunhos. */
+export async function fillCurrentDocumentStep(
+  page: Page,
+  options: FillDocumentOptions = {}
+) {
+  await currentProgress(page);
+  await handleClauses(page, options);
+  await fillVisibleFields(page, options);
+}
+
 export async function fillDocumentUntilFinalization(
   page: Page,
   options: FillDocumentOptions = {}
