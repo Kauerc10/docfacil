@@ -1,13 +1,14 @@
 /**
- * Checkout service — integração com gateways de pagamento brasileiros.
+ * Checkout service — integração com a AbacatePay.
  * Demo mode simula via /api/checkout/demo. O checkout real usa a API server-side.
  * Preços e rótulos vêm de `@/lib/pricing` (fonte única de verdade).
  */
 import { apiFetch } from "@/lib/auth/api-fetch";
 import { PLAN_PRICES, PLAN_LABELS, type PaidPlan } from "@/lib/pricing";
 
-export type CheckoutProvider = "kirvano" | "perfectpay" | "stripe";
+export type CheckoutProvider = "abacatepay";
 export type CheckoutPlan = PaidPlan;
+export type CheckoutMethod = "pix" | "card";
 
 export interface CheckoutParams {
   provider?: CheckoutProvider;
@@ -16,6 +17,8 @@ export interface CheckoutParams {
   userEmail?: string;
   documentId?: string;
   successUrl?: string;
+  method?: CheckoutMethod;
+  authenticated?: boolean;
 }
 
 export interface CheckoutResult {
@@ -49,14 +52,22 @@ export interface CheckoutStatusResult {
   };
 }
 
+export interface CheckoutCreatePayloadInput {
+  plan: CheckoutPlan;
+  authenticated: boolean;
+  userEmail?: string;
+  method?: CheckoutMethod;
+  successUrl?: string;
+}
+
 export { PLAN_PRICES, PLAN_LABELS } from "@/lib/pricing";
 
 export const ACTIVE_PROVIDER: CheckoutProvider | "demo" =
-  (process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER as CheckoutProvider | undefined) || "demo";
+  process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER === "abacatepay"
+    ? "abacatepay"
+    : "demo";
 
-const IS_PRODUCTION_CONFIGURED = Boolean(
-  process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER && process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER !== "demo"
-);
+const IS_PRODUCTION_CONFIGURED = ACTIVE_PROVIDER === "abacatepay";
 
 export function buildGuestContact(
   input: GuestContactInput
@@ -69,6 +80,27 @@ export function buildGuestContact(
   return {
     ...(email ? { email } : {}),
     ...(phone ? { phone } : {}),
+  };
+}
+
+export function buildCheckoutCreatePayload(
+  input: CheckoutCreatePayloadInput
+): {
+  product: CheckoutPlan;
+  method: CheckoutMethod;
+  guestContact?: { email?: string; phone?: string };
+  successUrl?: string;
+} {
+  const method: CheckoutMethod = input.plan === "pro" ? "card" : input.method ?? "pix";
+  const guestContact = input.authenticated
+    ? undefined
+    : buildGuestContact({ email: input.userEmail });
+
+  return {
+    product: input.plan,
+    method,
+    ...(guestContact ? { guestContact } : {}),
+    ...(input.successUrl ? { successUrl: input.successUrl } : {}),
   };
 }
 
@@ -134,14 +166,27 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
     };
   }
 
+  const authenticated =
+    params.authenticated ?? Boolean(params.userId && params.userId !== "guest");
+  const payload = buildCheckoutCreatePayload({
+    plan: params.plan,
+    authenticated,
+    userEmail: params.userEmail,
+    method: params.method,
+    successUrl: params.successUrl,
+  });
+
   const res = await apiFetch("/api/checkout/create", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
-    throw new Error(`Falha ao criar checkout: ${res.status}`);
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.error?.message || `Falha ao criar checkout: ${res.status}`
+    );
   }
 
   const data = (await res.json()) as { checkoutUrl: string; orderId: string };
