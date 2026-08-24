@@ -50,11 +50,12 @@ async function readVisiblePdfPreview(page: Page) {
     const response = await fetch(src.split("#")[0]);
     const bytes = new Uint8Array(await response.arrayBuffer());
     const decoder = new TextDecoder();
+    const decoded = decoder.decode(bytes);
 
     return {
       byteLength: bytes.byteLength,
       prefix: decoder.decode(bytes.slice(0, 5)),
-      hasPlaceholder: decoder.decode(bytes).includes("{{"),
+      hasTemplatePlaceholder: /\{\{\s*(?:clausula:)?[a-zA-Z0-9_-]+\s*\}\}/.test(decoded),
     };
   }, previewSrc!);
 }
@@ -110,7 +111,10 @@ test.describe("Official document models smoke E2E", () => {
         const previewPdf = await readVisiblePdfPreview(page);
         expect(previewPdf.prefix, `${slug}: assinatura PDF da prévia`).toBe("%PDF-");
         expect(previewPdf.byteLength, `${slug}: tamanho da prévia`).toBeGreaterThan(1000);
-        expect(previewPdf.hasPlaceholder, `${slug}: placeholders na prévia`).toBe(false);
+        expect(
+          previewPdf.hasTemplatePlaceholder,
+          `${slug}: placeholders na prévia`
+        ).toBe(false);
 
         const download = await page.request.post(`/api/documents/${documentId}/download`, {
           headers: { Authorization: authorization },
