@@ -4,12 +4,14 @@ import type React from "react";
 import { ArrowLeft } from "lucide-react";
 import { Pet } from "@/components/docfacil/pet";
 import type { Modelo } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface CriarLayoutProps {
   modelo?: Modelo;
   step: number;
   total: number;
   progressPct: number;
+  pulseProgress?: boolean;
   onVoltar: () => void;
   onStepClick?: (step: number) => void;
   children: React.ReactNode;
@@ -20,6 +22,7 @@ export function CriarLayout({
   step,
   total,
   progressPct,
+  pulseProgress = false,
   onVoltar,
   onStepClick,
   children,
@@ -65,7 +68,10 @@ export function CriarLayout({
               aria-valuenow={Math.round(pct)}
             >
               <div
-                className="h-full rounded-full bg-[var(--blue-royal)] transition-[width] duration-300"
+                className={cn(
+                  "h-full rounded-full bg-[var(--blue-royal)] transition-[width] duration-300",
+                  pulseProgress && "progress-pulse"
+                )}
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -75,7 +81,7 @@ export function CriarLayout({
 
       <main className="mx-auto max-w-4xl px-4 py-7 sm:px-6 sm:py-10">
         <div className="mb-5 flex items-center gap-2.5 sm:mb-7">
-          <Pet size={38} state="idle" />
+          <Pet size={38} mood="idle" />
           <div>
             <p className="text-sm font-bold text-ink">Assistente DocFacil</p>
             <p className="text-xs text-ink/50">uma etapa por vez</p>
