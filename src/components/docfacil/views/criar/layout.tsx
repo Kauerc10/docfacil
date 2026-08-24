@@ -1,165 +1,95 @@
 "use client";
 
+import type React from "react";
 import { ArrowLeft } from "lucide-react";
+import { Pet } from "@/components/docfacil/pet";
+import type { Modelo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export interface CriarLayoutProps {
-  /** índice atual (0-based) */
+interface CriarLayoutProps {
+  modelo?: Modelo;
   step: number;
-  /** total de etapas */
   total: number;
-  /** % preenchida (0-100) */
   progressPct: number;
-  /** true quando queremos o efeito progress-pulse */
   pulseProgress?: boolean;
-  /** aba ativa no mobile */
-  mobileTab: "perguntas" | "visualizar";
-  onMobileTabChange: (tab: "perguntas" | "visualizar") => void;
-  /** callback do botão Voltar */
   onVoltar: () => void;
-  /** navega para uma etapa anterior (só permite índices <= step atual) */
-  onStepClick?: (targetStep: number) => void;
+  onStepClick?: (step: number) => void;
   children: React.ReactNode;
-  /** conteúdo da coluna direita (preview) */
-  previewSlot: React.ReactNode;
 }
 
-/**
- * CriarLayout — shell do fluxo /criar.
- *
- * - Top bar: Voltar + progress bar + step counter
- * - Mobile tabs: Perguntas / Visualizar
- * - Split screen grid (45% / 55%) no desktop
- *
- * Mobile tabs usam opacity/absolute em vez de `hidden` para evitar problemas
- * de dimensão com o preview (que precisa estar sempre medido pra paginação).
- */
 export function CriarLayout({
+  modelo,
   step,
   total,
   progressPct,
   pulseProgress = false,
-  mobileTab,
-  onMobileTabChange,
   onVoltar,
   onStepClick,
   children,
-  previewSlot,
 }: CriarLayoutProps) {
-  // Stepper dots: apenas para fluxos com 3+ etapas.
-  // Permite clicar em etapas já visitadas (<= step atual) para revisar;
-  // etapas futuras não são clicáveis (não foram preenchidas).
-  const showStepper = total >= 3 && onStepClick;
+  const nome = modelo?.nome ?? "Documento";
+  const pct = Math.max(0, Math.min(100, progressPct));
+
+  const handleVoltar = () => {
+    if (step > 0 && onStepClick) {
+      onStepClick(step - 1);
+      return;
+    }
+
+    onVoltar();
+  };
+
   return (
-    <div className="min-h-screen pt-[72px] flex flex-col bg-paper">
-      {/* === Top bar === */}
-      <div className="px-4 sm:px-6 lg:px-8 py-4 border-b border-[var(--border)] bg-paper">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={onVoltar}
-              className="inline-flex items-center gap-1 text-sm font-semibold text-ink/65 hover:text-[var(--blue-royal)] transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Voltar
-            </button>
-            <span className="ml-auto text-sm font-medium text-ink/60">
-              passo{" "}
-              <span className="text-ink font-bold">
-                {Math.min(step + 1, total)}
-              </span>{" "}
-              de {total}
-            </span>
-          </div>
-          <div className="mt-3 h-2 w-full rounded-full bg-[var(--blue-soft)] overflow-hidden">
-            <div
-              className={cn(
-                "h-full bg-[var(--selo-green)] transition-[width] duration-500 ease-out rounded-full",
-                pulseProgress && "progress-pulse"
-              )}
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-          {showStepper && (
-            <div className="mt-2 flex items-center gap-1.5">
-              {Array.from({ length: total }, (_, i) => {
-                const isCurrent = i === step;
-                const isPast = i < step;
-                const clickable = i <= step;
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    disabled={!clickable}
-                    onClick={() => clickable && onStepClick!(i)}
-                    aria-label={`Ir para a etapa ${i + 1}`}
-                    aria-current={isCurrent ? "step" : undefined}
-                    className={cn(
-                      "h-2 flex-1 max-w-[2.5rem] rounded-full transition-all",
-                      isCurrent
-                        ? "bg-[var(--blue-royal)] scale-y-125"
-                        : isPast
-                        ? "bg-[var(--selo-green)]/70 hover:bg-[var(--selo-green)] cursor-pointer"
-                        : "bg-[var(--border)] cursor-not-allowed"
-                    )}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* === Mobile tabs === */}
-      <div className="lg:hidden flex border-b border-[var(--border)] bg-paper sticky top-[72px] z-10">
-        {(["perguntas", "visualizar"] as const).map((t) => (
+    <div className="min-h-screen bg-paper">
+      <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-surface/95 backdrop-blur-md">
+        <div className="mx-auto flex min-h-16 max-w-4xl items-center gap-3 px-4 py-3 sm:px-6">
           <button
-            key={t}
             type="button"
-            onClick={() => onMobileTabChange(t)}
-            className={cn(
-              "flex-1 py-3 text-sm font-semibold transition-colors border-b-2 capitalize",
-              mobileTab === t
-                ? "text-[var(--blue-royal)] border-[var(--blue-royal)]"
-                : "text-ink/55 border-transparent hover:text-ink"
-            )}
+            onClick={handleVoltar}
+            className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-2.5 text-sm font-semibold text-ink/70 transition-colors hover:bg-[var(--blue-soft)] hover:text-[var(--blue-royal)]"
           >
-            {t === "perguntas" ? "Perguntas" : "Visualizar"}
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Voltar</span>
           </button>
-        ))}
-      </div>
 
-      {/* === Split screen === */}
-      <div className="flex-1 lg:grid lg:grid-cols-[45%_55%] relative">
-        {/* Coluna esquerda — perguntas (mobile: absolute quando inativa, pra manter layout medido) */}
-        <div
-          className={cn(
-            "bg-paper p-6 sm:p-8 lg:p-10 flex flex-col gap-5 min-h-[60vh] lg:min-h-0 overflow-y-auto scroll-fine transition-opacity duration-300",
-            "lg:!opacity-100 lg:!static lg:!flex",
-            mobileTab === "perguntas"
-              ? "opacity-100 static flex"
-              : "lg:opacity-100 opacity-0 absolute inset-0 pointer-events-none"
-          )}
-          aria-hidden={mobileTab !== "perguntas"}
-        >
-          {children}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <p className="truncate text-sm font-bold text-ink sm:text-base">{nome}</p>
+              <span className="shrink-0 text-xs font-semibold text-ink/45">
+                passo {Math.min(step + 1, Math.max(total, 1))} de {Math.max(total, 1)}
+              </span>
+            </div>
+            <div
+              className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--blue-soft)]"
+              role="progressbar"
+              aria-label="Progresso do documento"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(pct)}
+            >
+              <div
+                className={cn(
+                  "h-full rounded-full bg-[var(--blue-royal)] transition-[width] duration-300",
+                  pulseProgress && "progress-pulse"
+                )}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-4xl px-4 py-7 sm:px-6 sm:py-10">
+        <div className="mb-5 flex items-center gap-2.5 sm:mb-7">
+          <Pet size={38} mood="idle" />
+          <div>
+            <p className="text-sm font-bold text-ink">Assistente DocFacil</p>
+            <p className="text-xs text-ink/50">uma etapa por vez</p>
+          </div>
         </div>
 
-        {/* Coluna direita — preview A4 (mobile: absolute quando inativo) */}
-        <div
-          className={cn(
-            "bg-[#efe9dd] p-6 sm:p-8 grid place-items-center min-h-[60vh] lg:min-h-0 relative transition-opacity duration-300",
-            "lg:!opacity-100 lg:!static lg:!grid",
-            mobileTab === "visualizar"
-              ? "opacity-100 static grid"
-              : "lg:opacity-100 opacity-0 absolute inset-0 pointer-events-none"
-          )}
-          aria-hidden={mobileTab !== "visualizar"}
-        >
-          {previewSlot}
-        </div>
-      </div>
+        {children}
+      </main>
     </div>
   );
 }

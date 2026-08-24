@@ -36,7 +36,7 @@ describe("Atomic Generation Commit & Rollback", () => {
 
   const validAnswers = {
     declarante_nome: "Maria Oliveira",
-    declarante_cpf: "123.456.789-00",
+    declarante_cpf: "111.444.777-35",
     declarante_nacionalidade: "Brasileira",
     declarante_estado_civil: "Solteira",
     declarante_profissao: "Desenvolvedora",
@@ -100,9 +100,8 @@ describe("Atomic Generation Commit & Rollback", () => {
     expect(thrownError).toBeDefined();
     expect(deleteArtifactCalledWithKey).toBeDefined();
 
-    // Verify atomic state rollback
     const updatedOrder = await ordersRepo.getOrder(order.id!);
-    expect(updatedOrder?.status).toBe("paid"); // released back to paid
+    expect(updatedOrder?.status).toBe("paid");
 
     const genReq = await genRequestsRepo.getRequest(requestId);
     expect(genReq?.status).toBe("failed");

@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { normalizarEstado } from "@/lib/normalizers";
 import type { CampoPerguntaProps } from "./types";
 import { useCampoValidado } from "./use-campo-validado";
+import { ListaPessoas } from "./lista-pessoas";
+import { getVisibleMicrocopy } from "./microcopy";
 
 gsap.registerPlugin(useGSAP);
 
@@ -17,7 +19,7 @@ gsap.registerPlugin(useGSAP);
  * - Border-2 + shadow on focus (visualmente "eleva" o campo ativo)
  * - Animação `campoIn` (fade + slide-up) ao montar
  * - Enter avança (Shift+Enter quebra linha no textarea)
- * - Microcopy com bullet (•) em pen-note green
+ * - Microcopy somente quando acrescenta contexto útil
  * - Erro visível com shake (GSAP elastic) + borda coral
  * - Auto-normaliza "estado" no blur (SP, São Paulo, sp → SP)
  *
@@ -40,15 +42,10 @@ export function CampoPergunta({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
 
-  // Máscara + validação determinística (CPF/CNPJ/CEP/telefone/data).
-  // erroLocal = erro de formato/dígito (validação interna).
-  // erro (prop) = erro de obrigatório (vindo do CriarView quando tenta avançar vazio).
-  // Exibimos erroLocal primeiro; se não houver, mostramos o erro do parent.
   const { tipo, erro: erroLocal, handleChange, handleBlur } = useCampoValidado(campo, value, onChange);
   const erroExibido = erroLocal ?? erro;
+  const microcopy = getVisibleMicrocopy(campo);
 
-  // Mount: animação de entrada suave (fade + slide-up + scale leve).
-  // Mais amigável que a animação anterior — eased spring-like curve.
   useGSAP(
     () => {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -59,7 +56,6 @@ export function CampoPergunta({
         { y: 18, opacity: 0, scale: 0.98 },
         { y: 0, opacity: 1, scale: 1, duration: 0.42, ease: "power3.out" }
       );
-      // label + input + microcopy entram em stagger sutil
       tl.fromTo(
         root.current.querySelectorAll("[data-campo='el']"),
         { y: 8, opacity: 0 },
@@ -70,7 +66,6 @@ export function CampoPergunta({
     { scope: root }
   );
 
-  // Shake when erro appears/toggles.
   const erroPrev = useRef<string | null>(null);
   useEffect(() => {
     if (erro && erro !== erroPrev.current) {
@@ -82,7 +77,6 @@ export function CampoPergunta({
     erroPrev.current = erro;
   }, [erro]);
 
-  // Auto-focus on mount.
   useEffect(() => {
     const t = window.setTimeout(() => {
       const el = textareaRef.current ?? inputRef.current ?? selectRef.current;
@@ -94,15 +88,12 @@ export function CampoPergunta({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      // Valida antes de avançar — se inválido, shake fica no campo e não avança.
       if (!erroLocal) onAvancar();
     }
   };
 
   const onblurComposto = () => {
-    // 1. validação interna do hook (formato/dígito)
     handleBlur();
-    // 2. auto-normaliza estado no blur (SP, São Paulo, sp → SP)
     if (/estado|uf/i.test(campo.key) || /estado|uf/i.test(campo.pergunta)) {
       const normalizado = normalizarEstado(value);
       if (normalizado !== value) onChange(normalizado);
@@ -111,7 +102,20 @@ export function CampoPergunta({
 
   const isTextarea = campo.tipo === "textarea";
   const isSelect = campo.tipo === "select" && campo.opcoes && campo.opcoes.length > 0;
-  const inputMode = campo.tipo === "number" ? "decimal" : "text";
+  const inputMode = (campo.tipo === "number" || tipo === "moeda") ? "decimal" : "text";
+
+  if (campo.tipo === "lista_pessoas") {
+    return (
+      <ListaPessoas
+        campo={campo}
+        value={value}
+        onChange={onChange}
+        onAvancar={onAvancar}
+        submitting={submitting}
+        erro={erro}
+      />
+    );
+  }
 
   return (
     <div ref={root} className="space-y-2">
@@ -175,7 +179,7 @@ export function CampoPergunta({
         <div data-campo="el" className="relative">
           <input
             ref={inputRef}
-            type={tipo === "numero" ? "text" : "text"}
+            type="text"
             value={value}
             onChange={(e) => handleChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -203,10 +207,10 @@ export function CampoPergunta({
         </p>
       )}
 
-      {campo.microcopy && !erroExibido && (
+      {microcopy && !erroExibido && (
         <p data-campo="el" className="pen-note text-sm pl-1 flex items-start gap-1.5">
           <span aria-hidden="true" className="text-[var(--selo-green)] mt-px">•</span>
-          <span>{campo.microcopy}</span>
+          <span>{microcopy}</span>
         </p>
       )}
 

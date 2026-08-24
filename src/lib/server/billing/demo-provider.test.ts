@@ -46,10 +46,27 @@ describe("DemoBillingProvider", () => {
     ).rejects.toThrow(BackendError);
   });
 
-  it("fails closed in production even if allowDemoBilling is true", async () => {
+  it("allows demo billing in Vercel Preview without depending on a manual flag", async () => {
+    const provider = new DemoBillingProvider(ordersRepo, {
+      allowDemoBilling: false,
+      nodeEnv: "production",
+      vercelEnv: "preview",
+    });
+
+    const order = await provider.createOrder({
+      product: "pro",
+      amountCents: 3990,
+      buyer: { type: "user", userId: "usr_preview", email: "preview@example.com" },
+    });
+
+    expect(order.status).toBe("pending");
+  });
+
+  it("fails closed in final production even if allowDemoBilling is true", async () => {
     const provider = new DemoBillingProvider(ordersRepo, {
       allowDemoBilling: true,
       nodeEnv: "production",
+      vercelEnv: "production",
     });
 
     expect(

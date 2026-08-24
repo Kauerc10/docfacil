@@ -24,6 +24,10 @@ function isReusableIntent(
   return age >= 0 && age < FINALIZATION_INTENT_TTL_MS;
 }
 
+export function shouldPreserveFinalizationRequestId(code?: string): boolean {
+  return code === "GENERATION_IN_PROGRESS";
+}
+
 export function getOrCreateFinalizationRequestId(modeloSlug: string): string {
   const key = getIntentStorageKey(modeloSlug);
 
@@ -88,5 +92,43 @@ export function clearFinalizationRequestId(modeloSlug: string): void {
     } catch {
       // ignore
     }
+  }
+}
+
+export function clearFinalizationRequestIdByRequestId(requestId: string): void {
+  for (const [key, raw] of Object.entries(memoryIntentStorage)) {
+    try {
+      const parsed = JSON.parse(raw) as FinalizationIntent;
+      if (parsed.requestId === requestId) {
+        delete memoryIntentStorage[key];
+      }
+    } catch {
+      delete memoryIntentStorage[key];
+    }
+  }
+
+  if (typeof localStorage === "undefined") return;
+
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("docfacil:intent:v1:")) keys.push(key);
+    }
+
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw) as FinalizationIntent;
+        if (parsed.requestId === requestId) {
+          localStorage.removeItem(key);
+        }
+      } catch {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // ignore
   }
 }

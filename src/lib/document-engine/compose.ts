@@ -8,6 +8,7 @@
  */
 import { normalizarEstado } from "../normalizers";
 import type { EnderecoConfig, Modelo } from "../types";
+import { formatMoradoresAutorizadosClause } from "./authorized-residents";
 
 /**
  * Compõe a string final de endereço a partir dos campos separados.
@@ -76,6 +77,10 @@ export function aplicarComposicaoModelo(
   const next: Record<string, string> = { ...answers };
   if (!modelo.etapas) return next;
   for (const etapa of modelo.etapas) {
+    if (etapa.tipo === "campo" && etapa.campo.tipo === "lista_pessoas") {
+      next[etapa.campo.key] = formatMoradoresAutorizadosClause(next[etapa.campo.key]);
+    }
+
     if (etapa.tipo === "campo_grupo") {
       // composição de endereço (quando configurado)
       if (etapa.endereco) {

@@ -9,7 +9,7 @@ on:
     branches: [main, 24]
 
 # Cancela runs antigas da mesma branch quando um novo push chega.
-# Economiza minutos de CI e evira resultado stale.
+# Economiza minutos de CI e evita resultado stale.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -100,4 +100,20 @@ jobs:
       # Baixar somente o navegador evita depender de apt/mirrors externos em todo run.
       - run: bunx playwright install chromium
 
-      - run: bun run test:e2e
+      - name: 🧭 Playwright E2E
+        shell: bash
+        run: |
+          set -o pipefail
+          bun run test:e2e 2>&1 | tee playwright-output.log
+
+      - name: 📎 Salvar diagnóstico do Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-diagnostics
+          path: |
+            playwright-output.log
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

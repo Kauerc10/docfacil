@@ -44,4 +44,8 @@ export function assertProductionServerConfig(env: ServerEnv): void {
   if (env.ALLOW_IN_MEMORY_ARTIFACT_STORAGE) {
     throw new Error("In-memory artifact storage cannot be enabled in production.");
   }
+
+  if (env.ALLOW_IN_MEMORY_REPOSITORIES) {
+    throw new Error("In-memory repositories cannot be enabled in production.");
+  }
 }

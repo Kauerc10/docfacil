@@ -12,18 +12,19 @@
  *  - Separadores de RG (`<prefix>_rg_separador`)
  *  - Extras de cláusulas NÃO selecionadas (devem virar "" no template)
  */
-import type { Modelo } from "@/lib/types";
+import { campoEstaVisivel, type Modelo } from "@/lib/types";
 
 export function computeCamposOpcionais(
   modelo: Modelo,
-  clausulasSelecionadas: string[] = []
+  clausulasSelecionadas: string[] = [],
+  respostas: Record<string, string> = {}
 ): string[] {
   const out: string[] = [];
   if (!modelo.etapas) return out;
   for (const etapa of modelo.etapas) {
     if (etapa.tipo === "campo_grupo") {
       for (const c of etapa.campos) {
-        if (c.obrigatorio === false) out.push(c.key);
+        if (c.obrigatorio === false || !campoEstaVisivel(c, respostas)) out.push(c.key);
         if (c.key === "rg" || c.key.endsWith("_rg")) {
           const prefix = c.key === "rg" ? "" : c.key.slice(0, -3);
           out.push(prefix ? `${prefix}_rg_separador` : "rg_separador");
@@ -34,7 +35,10 @@ export function computeCamposOpcionais(
         out.push(e.cepKey, e.logradouroKey, e.numeroKey, e.bairroKey, e.cidadeKey, e.ufKey);
         if (e.complementoKey) out.push(e.complementoKey);
       }
-    } else if (etapa.tipo === "campo" && etapa.campo.obrigatorio === false) {
+    } else if (
+      etapa.tipo === "campo" &&
+      (etapa.campo.obrigatorio === false || !campoEstaVisivel(etapa.campo, respostas))
+    ) {
       out.push(etapa.campo.key);
     } else if (etapa.tipo === "clausulas") {
       for (const cl of etapa.clausulas) {

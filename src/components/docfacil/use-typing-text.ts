@@ -32,7 +32,6 @@ export function useTypingText(
   }, [fullText, clearTimer]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setText("");
     setDone(false);
     clearTimer();
@@ -49,7 +48,6 @@ export function useTypingText(
     };
     tick();
     return clearTimer;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullText, speed, clearTimer, ...deps]);
 
   return { text, done, skip };

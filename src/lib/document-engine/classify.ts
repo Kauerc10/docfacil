@@ -15,7 +15,7 @@
  *   - Linha em branco                        → empty
  *   - "1. DAS PARTES" (numeração + MAIÚSC)   → heading1
  *   - "Cláusula Primeira:" / "CLÁUSULA ..."  → heading2
- *   - Linha com 5+ underscores               → signature
+ *   - Linha iniciada por 5+ underscores       → signature
  *   - "OBSERVAÇÃO" / "RECONHECIMENTO" / "TESTEMUNHA" → witness
  *   - Caso contrário                          → paragraph
  */
@@ -76,8 +76,10 @@ export function classifyLine(linha: string): LinhaClassificada {
     return { tipo: "witness", texto: trimmed };
   }
 
-  // Linha de assinatura (underscores)
-  if (/_{5,}/.test(trimmed)) {
+  // Linha de assinatura por heurística: precisa COMEÇAR com o traço de
+  // assinatura. Campos ainda vazios dentro de um parágrafo também usam
+  // underscores e não podem transformar o parágrafo inteiro em assinatura.
+  if (/^_{5,}(?:\s+.*)?$/.test(trimmed)) {
     return { tipo: "signature", texto: trimmed };
   }
 

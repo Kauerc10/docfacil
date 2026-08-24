@@ -28,7 +28,6 @@ import { createOrderBuyerPrincipalKey } from "../billing/order-identity";
  * chamadas.
  */
 declare global {
-  // eslint-disable-next-line no-var
   var __inMemoryStore: {
     docs: Map<string, DocumentRecord>;
     artifacts: Map<string, Map<number, DocumentArtifactRecord>>;
