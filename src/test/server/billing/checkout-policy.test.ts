@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { BackendError } from "@/lib/server/errors";
+import { BackendError, type BackendErrorCode } from "@/lib/server/errors";
 import { validateCheckoutSelection } from "@/lib/server/billing/checkout-policy";
 
-function expectBackendCode(fn: () => void, code: string) {
+function expectBackendCode(fn: () => void, code: BackendErrorCode) {
   try {
     fn();
     throw new Error("expected checkout policy to reject");
