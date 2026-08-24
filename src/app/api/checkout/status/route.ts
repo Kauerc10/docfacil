@@ -92,6 +92,7 @@ export async function POST(req: Request) {
         method: order.method,
         amountCents: order.amountCents,
         pix: order.status === "pending" ? order.pix : undefined,
+        documentId: order.status === "consumed" ? order.documentId : undefined,
       },
       {
         status: 200,
