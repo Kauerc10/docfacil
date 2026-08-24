@@ -18,6 +18,7 @@ import {
   IS_FIREBASE_CONFIGURED,
 } from "./firebase";
 import { resolveInitialProfileName } from "./auth/profile-bootstrap";
+import { getAccountBillingState, type AccountBillingState } from "./services/billing-service";
 import { MODELOS } from "./modelos";
 import type { AppUser, PerfilUsuario } from "./types";
 
@@ -36,6 +37,10 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 const DEMO_USER_KEY = "docfacil:demo-user";
+const FREE_BILLING_STATE: AccountBillingState = {
+  plan: "gratis",
+  subscription: null,
+};
 
 function loadDemoUser(): AppUser | null {
   if (typeof window === "undefined") return null;
@@ -55,6 +60,18 @@ function saveDemoUser(u: AppUser | null) {
 
 function firebaseErrorCode(error: unknown): string {
   return (error as { code?: string })?.code || "";
+}
+
+async function loadBillingStateFailClosed(): Promise<AccountBillingState> {
+  try {
+    return await getAccountBillingState();
+  } catch (err) {
+    console.warn(
+      "[AuthContext] Não foi possível sincronizar o estado da assinatura:",
+      err
+    );
+    return FREE_BILLING_STATE;
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -108,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      const billingState = await loadBillingStateFailClosed();
       if (cancelled) return;
       setUser({
         uid: fbUser.uid,
@@ -117,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }),
         email: fbUser.email || "",
         fotoUrl: perfil?.fotoUrl || fbUser.photoURL || undefined,
-        plano: perfil?.plano || "gratis",
+        plano: billingState.plan,
       });
       pendingSignupNameRef.current = null;
       setLoading(false);
@@ -240,12 +258,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!snap.exists()) return;
 
     const perfil = snap.data() as PerfilUsuario;
+    const billingState = await loadBillingStateFailClosed();
     setUser({
       uid: fbUser.uid,
       nome: perfil.nome || fbUser.displayName || user.nome,
       email: fbUser.email || user.email,
       fotoUrl: perfil.fotoUrl || fbUser.photoURL || undefined,
-      plano: perfil.plano || "gratis",
+      plano: billingState.plan,
     });
   }, [user]);
 
