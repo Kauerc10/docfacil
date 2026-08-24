@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Ban,
@@ -23,10 +23,12 @@ import {
   PLAN_PRICES,
   PLAN_LABELS,
   ACTIVE_PROVIDER,
+  checkOrderStatus,
   createCheckout,
   type CheckoutMethod,
   type CheckoutPlan,
   type CheckoutResult,
+  type CheckoutStatusResult,
 } from "@/lib/services/checkout-service";
 import { TermsConsentModal } from "@/components/docfacil/terms-consent-modal";
 import {
@@ -41,6 +43,9 @@ import {
 } from "@/lib/documents/client";
 import { buildAccountDraftFinalizationAnswers } from "@/lib/documents/account-draft";
 
+const PAYMENT_POLL_INTERVAL_MS = 1500;
+const PAYMENT_POLL_MAX_ATTEMPTS = 120;
+
 export function CheckoutView() {
   const { params, navigate } = useNav();
   const { user, loading, refreshProfile } = useAuth();
@@ -54,12 +59,176 @@ export function CheckoutView() {
   const [submitting, setSubmitting] = useState(false);
   const [guestEmail, setGuestEmail] = useState("");
   const [method, setMethod] = useState<CheckoutMethod>("pix");
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [pixCheckout, setPixCheckout] = useState<
     Extract<CheckoutResult, { kind: "pix" }> | null
   >(null);
+  const handledPaidOrderId = useRef<string | null>(null);
 
   const userId = user?.uid ?? "guest";
   const userEmail = user?.email ?? guestEmail.trim();
+
+  const continueAfterPaidOrder = useCallback(
+    async (status: CheckoutStatusResult) => {
+      if (handledPaidOrderId.current === status.orderId) return;
+      handledPaidOrderId.current = status.orderId;
+
+      try {
+        const slug = params.slug;
+        const draftId = params.draftId;
+
+        if (status.status === "consumed") {
+          if (!status.documentId || !slug) {
+            throw new Error("Pedido consumido sem documento associado.");
+          }
+          navigate("sucesso", { slug, id: status.documentId });
+          return;
+        }
+
+        if (status.status !== "paid") return;
+
+        if (status.product === "pro") {
+          if (slug) clearFinalizationRequestId(slug);
+          await refreshProfile();
+          toast.success("Pagamento confirmado. Seu plano Pro está ativo.");
+
+          if (slug && draftId) {
+            navigate("criar", { slug, draftId });
+          } else {
+            navigate("perfil");
+          }
+          return;
+        }
+
+        if (user && draftId) {
+          const draft = await getAccountDraft(draftId);
+          if (!draft) {
+            throw new Error("O rascunho associado ao checkout não foi encontrado.");
+          }
+
+          clearFinalizationRequestId(draft.modeloSlug);
+          const requestId = getOrCreateFinalizationRequestId(draft.modeloSlug);
+          const respostas = buildAccountDraftFinalizationAnswers(draft);
+          const finalized = draft.sourceDocumentId
+            ? await createDocumentVersion(draft.sourceDocumentId, {
+                requestId,
+                respostas,
+                clausulasSelecionadas: draft.clausulasSelecionadas,
+                orderId: status.orderId,
+              })
+            : await finalizeDocument({
+                requestId,
+                modeloSlug: draft.modeloSlug,
+                respostas,
+                clausulasSelecionadas: draft.clausulasSelecionadas,
+                orderId: status.orderId,
+              });
+
+          await deleteAccountDraft(draft.id);
+          clearFinalizationRequestId(draft.modeloSlug);
+          toast.success(
+            draft.sourceDocumentId
+              ? "Pagamento confirmado e nova versão liberada."
+              : "Pagamento confirmado e documento liberado."
+          );
+          navigate("sucesso", {
+            slug: draft.modeloSlug,
+            id: finalized.document.id,
+          });
+          return;
+        }
+
+        if (slug) {
+          navigate("sucesso", { slug, orderId: status.orderId });
+          return;
+        }
+
+        throw new Error("Não foi possível retomar o documento deste pagamento.");
+      } catch (error) {
+        handledPaidOrderId.current = null;
+        throw error;
+      }
+    },
+    [navigate, params.draftId, params.slug, refreshProfile, user]
+  );
+
+  const returnOrderId = params.billingReturn === "1" ? params.orderId : undefined;
+  const watchedOrderId = pixCheckout?.orderId ?? returnOrderId;
+
+  useEffect(() => {
+    if (!watchedOrderId || loading) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+
+    const poll = async () => {
+      if (cancelled) return;
+      attempts += 1;
+      setVerifyingPayment(true);
+
+      try {
+        const guestDraft = params.slug ? loadGuestDraft(params.slug) : null;
+        const status = await checkOrderStatus({
+          orderId: watchedOrderId,
+          authenticated: Boolean(user),
+          email: user?.email ?? (guestEmail.trim() || guestDraft?.guestContact?.email),
+          phone: guestDraft?.guestContact?.phone,
+        });
+
+        if (cancelled) return;
+
+        if (status.status === "paid" || status.status === "consumed") {
+          await continueAfterPaidOrder(status);
+          if (!cancelled) setVerifyingPayment(false);
+          return;
+        }
+
+        if (status.status === "failed" || status.status === "refunded") {
+          setVerifyingPayment(false);
+          toast.error(
+            status.status === "refunded"
+              ? "Este pagamento foi estornado."
+              : "O pagamento não foi aprovado. Você pode tentar novamente."
+          );
+          return;
+        }
+      } catch (error) {
+        if (attempts >= PAYMENT_POLL_MAX_ATTEMPTS) {
+          console.error("[CheckoutView] falha ao confirmar pagamento:", error);
+          setVerifyingPayment(false);
+          toast.error(
+            "Não conseguimos confirmar o pagamento agora. Seu pedido continua salvo e pode ser consultado novamente."
+          );
+          return;
+        }
+      }
+
+      if (attempts >= PAYMENT_POLL_MAX_ATTEMPTS) {
+        setVerifyingPayment(false);
+        toast.info(
+          "A confirmação ainda não chegou. Seu pedido continua salvo e você pode manter esta tela aberta ou voltar depois."
+        );
+        return;
+      }
+
+      timer = setTimeout(() => void poll(), PAYMENT_POLL_INTERVAL_MS);
+    };
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [
+    continueAfterPaidOrder,
+    guestEmail,
+    loading,
+    params.slug,
+    user,
+    watchedOrderId,
+  ]);
 
   const handleAcceptConsent = useCallback(async () => {
     setConsentOpen(false);
@@ -81,7 +250,8 @@ export function CheckoutView() {
       let successUrl: string | undefined;
       if (typeof window !== "undefined") {
         const success = new URL(window.location.origin);
-        success.searchParams.set("view", "sucesso");
+        success.searchParams.set("view", "checkout");
+        success.searchParams.set("plan", plan);
         if (slug) success.searchParams.set("slug", slug);
         if (draftId) success.searchParams.set("draftId", draftId);
         successUrl = success.toString();
@@ -149,6 +319,12 @@ export function CheckoutView() {
           slug: draft.modeloSlug,
           id: finalized.document.id,
         });
+        return;
+      }
+
+      if (result.provider === "demo" && plan === "avulso" && !user && slug) {
+        setSubmitting(false);
+        navigate("sucesso", { slug, orderId: result.orderId });
         return;
       }
 
@@ -277,7 +453,7 @@ export function CheckoutView() {
               </span>
             </div>
 
-            {isAvulso && !user && (
+            {isAvulso && !user && !returnOrderId && (
               <label className="block pt-3 border-t border-[var(--border)]">
                 <span className="block text-sm font-semibold text-ink mb-1.5">
                   Seu e-mail (para receber o documento)
@@ -294,11 +470,13 @@ export function CheckoutView() {
               </label>
             )}
 
-            <PaymentMethodSelector
-              plan={plan}
-              method={plan === "pro" ? "card" : method}
-              onChange={handleMethodChange}
-            />
+            {!returnOrderId && (
+              <PaymentMethodSelector
+                plan={plan}
+                method={plan === "pro" ? "card" : method}
+                onChange={handleMethodChange}
+              />
+            )}
           </div>
 
           <div className="px-6 sm:px-7 py-4 border-t border-[var(--border)] bg-[var(--green-tint)]/40">
@@ -311,8 +489,10 @@ export function CheckoutView() {
           </div>
 
           <div className="px-6 sm:px-7 py-5">
-            {pixCheckout ? (
-              <PixCheckoutPanel checkout={pixCheckout} />
+            {returnOrderId ? (
+              <PaymentVerificationPanel verifying={verifyingPayment} />
+            ) : pixCheckout ? (
+              <PixCheckoutPanel checkout={pixCheckout} checking={verifyingPayment} />
             ) : (
               <button
                 type="button"
@@ -511,10 +691,30 @@ function PaymentMethodSelector({
   );
 }
 
+function PaymentVerificationPanel({ verifying }: { verifying: boolean }) {
+  return (
+    <div className="rounded-xl border border-[var(--blue-royal)]/20 bg-[var(--blue-soft)]/30 p-5 text-center">
+      <span className="mx-auto grid place-items-center w-10 h-10 rounded-full bg-surface text-[var(--blue-royal)]">
+        {verifying ? (
+          <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+        ) : (
+          <ShieldCheck className="w-5 h-5" aria-hidden="true" />
+        )}
+      </span>
+      <p className="mt-3 font-semibold text-ink">Confirmando seu pagamento</p>
+      <p className="mt-1 text-sm text-ink/60">
+        Estamos consultando o pedido no servidor. O documento só será liberado depois da confirmação do pagamento.
+      </p>
+    </div>
+  );
+}
+
 function PixCheckoutPanel({
   checkout,
+  checking,
 }: {
   checkout: Extract<CheckoutResult, { kind: "pix" }>;
+  checking: boolean;
 }) {
   const copyPixCode = async () => {
     try {
@@ -561,7 +761,11 @@ function PixCheckoutPanel({
       </button>
 
       <div className="mt-3 flex items-center justify-center gap-2 text-xs text-ink/55">
-        <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+        {checking ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+        )}
         Aguardando confirmação do pagamento
       </div>
     </div>
