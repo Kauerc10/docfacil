@@ -4,6 +4,8 @@ import { requireUser } from "../security";
 import type { BillingProvider } from "./demo-provider";
 import { getDemoBillingProvider } from "./demo-provider";
 import { setServerUserPlan } from "./account-plan";
+import { activateProSubscription } from "./subscription-lifecycle";
+import { getBillingRepositories } from "../firestore/billing-repositories";
 import { BackendError } from "../errors";
 import { planPriceToCents, type PurchaseProduct } from "@/lib/pricing";
 import type { OrderRecord } from "../domain/documents";
@@ -14,7 +16,28 @@ export interface CompleteDemoCheckoutInput {
   guestContact?: { email?: string; phone?: string };
   autoPay?: boolean;
   provider?: BillingProvider;
-  activatePro?: (userId: string) => Promise<void>;
+  activatePro?: (userId: string, order: OrderRecord) => Promise<void>;
+}
+
+async function activateDemoPro(
+  userId: string,
+  order: OrderRecord
+): Promise<void> {
+  await setServerUserPlan(userId, "pro");
+
+  const paidAt = order.paidAt ?? Date.now();
+  const orderId = order.id ?? `demo-${userId}`;
+  await getBillingRepositories().subscriptions.upsert(
+    activateProSubscription({
+      userId,
+      providerSubscriptionId: `demo-sub-${orderId}`,
+      providerCheckoutId: `demo-checkout-${orderId}`,
+      providerProductId: "demo-pro",
+      paymentId: `demo-payment-${orderId}`,
+      amountCents: 3990,
+      paidAt,
+    })
+  );
 }
 
 export async function completeDemoCheckout(
@@ -26,7 +49,7 @@ export async function completeDemoCheckout(
     guestContact,
     autoPay = true,
     provider = getDemoBillingProvider(),
-    activatePro = (userId) => setServerUserPlan(userId, "pro"),
+    activatePro = activateDemoPro,
   } = input;
 
   let buyer: OrderRecord["buyer"];
@@ -69,7 +92,7 @@ export async function completeDemoCheckout(
 
   if (product === "pro" && finalOrder.status === "paid") {
     const user = requireUser(principal);
-    await activatePro(user.userId);
+    await activatePro(user.userId, finalOrder);
   }
 
   return finalOrder;
