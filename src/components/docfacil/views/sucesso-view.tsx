@@ -12,6 +12,7 @@ import { PaymentBarrier } from "../payment-barrier";
 import { useNav } from "../nav-context";
 import { PdfDocumentPreview } from "../pdf-document-preview";
 import { useAuth } from "@/lib/auth-context";
+import { checkOrderStatus } from "@/lib/services/checkout-service";
 import { getModel } from "@/lib/services/models-service";
 import { getDocument } from "@/lib/services/documents-service";
 import {
@@ -84,6 +85,49 @@ export function SucessoView() {
       setFinalizingPaidOrder(true);
 
       try {
+        const paymentStatus = await checkOrderStatus({
+          orderId,
+          authenticated: Boolean(user),
+          email: user?.email ?? draft.guestContact?.email,
+          phone: draft.guestContact?.phone,
+        });
+
+        if (paymentStatus.status === "consumed") {
+          if (user && paymentStatus.documentId) {
+            clearGuestDraft(slug);
+            clearFinalizationRequestId(slug);
+            setFinalizingPaidOrder(false);
+            navigate("sucesso", { slug, id: paymentStatus.documentId });
+            return;
+          }
+
+          toast.info("Este pedido já foi usado para gerar o documento.");
+          setFinalizingPaidOrder(false);
+          return;
+        }
+
+        if (paymentStatus.status !== "paid") {
+          attemptedPaidOrderId.current = null;
+          setFinalizingPaidOrder(false);
+
+          if (paymentStatus.status === "pending" || paymentStatus.status === "reserved") {
+            navigate("checkout", {
+              plan: paymentStatus.product,
+              slug,
+              orderId,
+              billingReturn: "1",
+            });
+            return;
+          }
+
+          toast.error(
+            paymentStatus.status === "refunded"
+              ? "Este pagamento foi estornado."
+              : "O pagamento não foi aprovado."
+          );
+          return;
+        }
+
         const result = await finalizeDocument({
           requestId: draft.requestId,
           modeloSlug: draft.modeloSlug || slug,
@@ -110,6 +154,7 @@ export function SucessoView() {
           window.location.assign(result.document.guestAccessPath);
         }
       } catch (err) {
+        attemptedPaidOrderId.current = null;
         const errorCode = getFinalizationErrorCode(err);
 
         if (
