@@ -1,10 +1,12 @@
 import { describe, expect, it, beforeEach } from "bun:test";
 import { POST } from "./route";
 import { getRepositories } from "@/lib/server/firestore/repositories";
+import { getBillingRepositories } from "@/lib/server/firestore/billing-repositories";
 import { setAdminAuthForTesting } from "@/lib/server/firebase-admin";
 
 describe("POST /api/documents/[id]/versions", () => {
   const repos = getRepositories();
+  const billingRepos = getBillingRepositories();
 
   beforeEach(() => {
     setAdminAuthForTesting(null);
@@ -28,6 +30,24 @@ describe("POST /api/documents/[id]/versions", () => {
 
   it("creates a new version for Pro owner", async () => {
     (repos.users as any).setUser("usr_pro_owner", { plano: "pro" });
+    const now = Date.now();
+    await billingRepos.subscriptions.upsert({
+      userId: "usr_pro_owner",
+      provider: "abacatepay",
+      providerSubscriptionId: "sub_route_pro_owner",
+      providerCheckoutId: "checkout_route_pro_owner",
+      providerProductId: "prod_pro",
+      product: "pro",
+      method: "card",
+      status: "active",
+      autoRenew: true,
+      amountCents: 3990,
+      paidThrough: now + 24 * 60 * 60 * 1000,
+      lastPaidAt: now,
+      lastPaymentId: "pay_route_pro_owner",
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const doc = await repos.documents.createDocument({
       owner: { type: "user", userId: "usr_pro_owner" },
