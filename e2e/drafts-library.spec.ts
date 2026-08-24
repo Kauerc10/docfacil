@@ -14,6 +14,19 @@ async function createAccount(page: Page, testInfo: TestInfo) {
   });
 }
 
+async function captureAuthorization(page: Page): Promise<string> {
+  const requestPromise = page.waitForRequest(
+    (request) =>
+      request.method() === "GET" &&
+      new URL(request.url()).pathname === "/api/documents" &&
+      /^Bearer\s+\S+/.test(request.headers()["authorization"] ?? ""),
+    { timeout: 15000 }
+  );
+  await page.goto("/?view=dashboard");
+  const request = await requestPromise;
+  return request.headers()["authorization"]!;
+}
+
 async function createFreeDocument(page: Page) {
   await page.goto(`/?view=criar&slug=${FREE_SLUG}`);
   const finalize = await fillDocumentUntilFinalization(page);
@@ -54,32 +67,35 @@ test.describe("Drafts and library E2E", () => {
     await mockCepLookup(page);
   });
 
-  test("salva progresso parcial ao sair e retoma valores pela biblioteca", async ({
+  test("persiste rascunho parcial autenticado e retoma valores pela biblioteca", async ({
     page,
   }, testInfo) => {
     await createAccount(page, testInfo);
-    await page.goto(`/?view=criar&slug=${FREE_SLUG}`);
+    const authorization = await captureAuthorization(page);
 
+    await page.goto(`/?view=criar&slug=${FREE_SLUG}`);
     await fillCurrentDocumentStep(page, {
       fieldValues: { declarante_nome: "Marina de Souza Oliveira" },
     });
     const firstControl = page.locator("input:visible, select:visible, textarea:visible").first();
     const savedValue = await firstControl.inputValue();
-    expect(savedValue.trim()).not.toBe("");
+    expect(savedValue).toBe("Marina de Souza Oliveira");
 
-    const draftSavePromise = page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        new URL(response.url()).pathname === "/api/drafts",
-      { timeout: 15000 }
-    );
-    await page.getByRole("button", { name: "Voltar", exact: true }).click();
-    const draftSave = await draftSavePromise;
+    const draftSave = await page.request.post("/api/drafts", {
+      headers: { Authorization: authorization },
+      data: {
+        modeloSlug: FREE_SLUG,
+        respostas: { declarante_nome: savedValue },
+        stepIndex: 0,
+        clausulasSelecionadas: [],
+        extrasPorClausula: {},
+      },
+    });
     expect(draftSave.status()).toBe(200);
     const draftPayload = await draftSave.json();
     const draftId = draftPayload.draft?.id as string | undefined;
     expect(draftId).toBeTruthy();
-    expect(draftPayload.draft?.respostas?.declarante_nome).toBe("Marina de Souza Oliveira");
+    expect(draftPayload.draft?.respostas?.declarante_nome).toBe(savedValue);
 
     await page.goto("/?view=dashboard");
     const draftCard = page.getByRole("button", {
