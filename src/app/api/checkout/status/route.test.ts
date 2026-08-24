@@ -95,4 +95,32 @@ describe("POST /api/checkout/status", () => {
     expect(response.status).toBe(403);
     expect(body.error.code).toBe("ORDER_FORBIDDEN");
   });
+
+  it("devolve o documento já criado quando o pedido foi consumido", async () => {
+    const orders = installRepos();
+    const order = await orders.createOrder({
+      provider: "abacatepay",
+      product: "avulso",
+      amountCents: 1990,
+      buyer: { type: "guest", email: "guest@example.com" },
+      status: "paid",
+      method: "card",
+      createdAt: Date.now(),
+      paidAt: Date.now(),
+    });
+
+    await orders.consumeOrder(order.id!, "doc-ja-gerado");
+
+    const response = await POST(
+      request({
+        orderId: order.id,
+        guestContact: { email: "guest@example.com" },
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("consumed");
+    expect(body.documentId).toBe("doc-ja-gerado");
+  });
 });
