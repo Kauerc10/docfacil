@@ -7,6 +7,7 @@ import type {
   OrderRecord,
   ArtifactState,
 } from "../domain/documents";
+import type { BillingSubscriptionRecord } from "../billing/subscription";
 
 export interface IDocumentsRepository {
   createDocument(data: Omit<DocumentRecord, "id">): Promise<DocumentRecord>;
@@ -66,6 +67,35 @@ export interface IOrdersRepository {
     orderId: string;
     requestId: string;
   }): Promise<void>;
+}
+
+export interface IBillingOrdersRepository extends IOrdersRepository {
+  updateProviderRefs(
+    orderId: string,
+    refs: Partial<
+      Pick<
+        OrderRecord,
+        | "method"
+        | "providerPaymentId"
+        | "providerCheckoutId"
+        | "providerSubscriptionId"
+        | "providerStatus"
+        | "providerDevMode"
+        | "pix"
+      >
+    >
+  ): Promise<OrderRecord>;
+  findByProviderCheckoutId(providerCheckoutId: string): Promise<OrderRecord | null>;
+}
+
+export interface IBillingSubscriptionsRepository {
+  getByUserId(userId: string): Promise<BillingSubscriptionRecord | null>;
+  getByProviderSubscriptionId(id: string): Promise<BillingSubscriptionRecord | null>;
+  upsert(record: BillingSubscriptionRecord): Promise<void>;
+}
+
+export interface IBillingWebhookEventsRepository {
+  exists(eventId: string): Promise<boolean>;
 }
 
 export interface IGenerationRequestsRepository {
