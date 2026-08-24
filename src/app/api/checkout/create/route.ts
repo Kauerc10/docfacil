@@ -1,7 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { PLAN_PRICES_CENTS } from "@/lib/pricing";
+import { planPriceToCents } from "@/lib/pricing";
 import { BackendError } from "@/lib/server/errors";
 import { requireAppCheck, resolvePrincipal } from "@/lib/server/security";
 import { validateCheckoutSelection } from "@/lib/server/billing/checkout-policy";
@@ -102,8 +102,7 @@ export async function POST(req: Request) {
             ...(guestContact?.phone ? { phone: guestContact.phone } : {}),
           };
 
-    const amountCents =
-      product === "pro" ? PLAN_PRICES_CENTS.pro : PLAN_PRICES_CENTS.avulso;
+    const amountCents = planPriceToCents(product);
     const repos = getBillingRepositories();
     const order = await repos.orders.createOrder({
       provider: "abacatepay",
