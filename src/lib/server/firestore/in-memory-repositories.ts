@@ -735,6 +735,20 @@ export class InMemoryBillingWebhookEventsRepository
     return this.events.has(eventId);
   }
 
+  public async claim(eventId: string, _now: number): Promise<boolean> {
+    if (this.events.has(eventId)) return false;
+    this.events.add(eventId);
+    return true;
+  }
+
+  public async complete(eventId: string, _now: number): Promise<void> {
+    this.events.add(eventId);
+  }
+
+  public async release(eventId: string): Promise<void> {
+    this.events.delete(eventId);
+  }
+
   public record(eventId: string): void {
     this.events.add(eventId);
   }
