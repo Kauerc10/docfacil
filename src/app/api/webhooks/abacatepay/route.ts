@@ -149,7 +149,6 @@ async function requireProOrder(
   if (
     order.provider !== "abacatepay" ||
     order.product !== "pro" ||
-    order.buyer.type !== "user" ||
     order.amountCents !== 3990 ||
     (order.method && order.method !== "card")
   ) {
@@ -159,8 +158,15 @@ async function requireProOrder(
       "O evento não corresponde à assinatura contratada."
     );
   }
+  if (order.buyer.type !== "user") {
+    throw new BackendError(
+      "INVALID_REQUEST",
+      409,
+      "A assinatura Pro precisa pertencer a uma conta autenticada."
+    );
+  }
 
-  return { order, providerCheckoutId };
+  return { order, providerCheckoutId, userId: order.buyer.userId };
 }
 
 function requireMonthlyCardSubscription(
@@ -317,7 +323,7 @@ async function processSubscriptionCompleted(
     );
   }
 
-  const { order, providerCheckoutId } = await requireProOrder(
+  const { order, providerCheckoutId, userId } = await requireProOrder(
     repos,
     payment,
     checkout
@@ -335,7 +341,7 @@ async function processSubscriptionCompleted(
   const paidAt = parseEventTimestamp(payment, "createdAt", now);
 
   const record = activateProSubscription({
-    userId: order.buyer.userId,
+    userId,
     providerSubscriptionId,
     providerCheckoutId,
     providerProductId,
