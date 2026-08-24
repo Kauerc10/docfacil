@@ -29,6 +29,10 @@ const serverEnvSchema = z.object({
   ALLOW_IN_MEMORY_ARTIFACT_STORAGE: booleanString.default(false),
   ALLOW_IN_MEMORY_REPOSITORIES: booleanString.default(false),
   APP_CHECK_ENFORCED: booleanString.default(false),
+  ABACATEPAY_API_KEY: z.string().min(1).optional(),
+  ABACATEPAY_WEBHOOK_SECRET: z.string().min(16).optional(),
+  ABACATEPAY_AVULSO_PRODUCT_ID: z.string().min(1).optional(),
+  ABACATEPAY_PRO_PRODUCT_ID: z.string().min(1).optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().optional().default("http://localhost:3000"),
 });
 
@@ -38,7 +42,10 @@ export type ServerEnv = z.infer<typeof serverEnvSchema> & {
 
 export function parseServerEnv(raw: Record<string, unknown> = process.env): ServerEnv {
   const parsed = serverEnvSchema.parse(raw);
-  const projectId = parsed.FIREBASE_PROJECT_ID || parsed.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "docfacil-dev";
+  const projectId =
+    parsed.FIREBASE_PROJECT_ID ||
+    parsed.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+    "docfacil-dev";
 
   return {
     ...parsed,

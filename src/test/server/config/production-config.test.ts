@@ -14,7 +14,8 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
     VERCEL_ENV: "production",
     FIREBASE_PROJECT_ID: "docfacil-prod",
     FIREBASE_CLIENT_EMAIL: "admin@docfacil-prod.iam.gserviceaccount.com",
-    FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----",
+    FIREBASE_PRIVATE_KEY:
+      "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----",
     R2_ACCOUNT_ID: "cf_account_123",
     R2_ACCESS_KEY_ID: "r2_key_123",
     R2_SECRET_ACCESS_KEY: "r2_secret_123",
@@ -23,6 +24,10 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
     ALLOW_DEMO_BILLING: false,
     ALLOW_IN_MEMORY_ARTIFACT_STORAGE: false,
     ALLOW_IN_MEMORY_REPOSITORIES: false,
+    ABACATEPAY_API_KEY: "dev_prod_key",
+    ABACATEPAY_WEBHOOK_SECRET: "webhook_secret_123456",
+    ABACATEPAY_AVULSO_PRODUCT_ID: "prod_avulso",
+    ABACATEPAY_PRO_PRODUCT_ID: "prod_pro_monthly",
     NEXT_PUBLIC_APP_URL: "https://docfacil.com",
   };
 
@@ -32,15 +37,22 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
 
   it("fails closed when Firebase credentials are missing in production", () => {
     const invalid = { ...validProductionEnv, FIREBASE_PRIVATE_KEY: undefined };
-    expect(() => assertProductionServerConfig(invalid as any)).toThrow(
+    expect(() => assertProductionServerConfig(invalid as ServerEnv)).toThrow(
       /production backend configuration incomplete/i
     );
   });
 
   it("fails closed when R2 credentials are missing in production", () => {
     const invalid = { ...validProductionEnv, R2_BUCKET_NAME: undefined };
-    expect(() => assertProductionServerConfig(invalid as any)).toThrow(
+    expect(() => assertProductionServerConfig(invalid as ServerEnv)).toThrow(
       /production backend configuration incomplete/i
+    );
+  });
+
+  it("fails closed when real billing credentials are missing in production", () => {
+    const invalid = { ...validProductionEnv, ABACATEPAY_API_KEY: undefined };
+    expect(() => assertProductionServerConfig(invalid as ServerEnv)).toThrow(
+      /ABACATEPAY_API_KEY/i
     );
   });
 
@@ -65,14 +77,15 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
       ALLOW_IN_MEMORY_REPOSITORIES: true,
     };
 
-    expect(() => assertProductionServerConfig(invalid as ServerEnv)).toThrow(
+    expect(() => assertProductionServerConfig(invalid)).toThrow(
       /In-memory repositories/i
     );
   });
 
-  it("não permite que documents ou drafts contornem a trava de produção", () => {
+  it("não permite que documents, drafts ou billing contornem a trava de produção", () => {
     const repositorySources = [
       source("src/lib/server/firestore/repositories.ts"),
+      source("src/lib/server/firestore/billing-repositories.ts"),
       source("src/lib/server/drafts/store.ts"),
     ];
 
@@ -92,6 +105,8 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
       R2_ACCOUNT_ID: undefined,
       R2_ACCESS_KEY_ID: undefined,
       R2_SECRET_ACCESS_KEY: undefined,
+      ABACATEPAY_API_KEY: undefined,
+      ABACATEPAY_WEBHOOK_SECRET: undefined,
     };
 
     expect(() => assertProductionServerConfig(previewEnv)).not.toThrow();
