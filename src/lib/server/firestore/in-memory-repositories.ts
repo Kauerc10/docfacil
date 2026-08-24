@@ -315,6 +315,21 @@ export class InMemoryOrdersRepository implements IOrdersRepository {
     return order ? JSON.parse(JSON.stringify(order)) : null;
   }
 
+  public async updateProviderRefs(
+    orderId: string,
+    refs: {
+      providerPaymentId?: string;
+      providerCheckoutId?: string;
+      providerDevMode?: boolean;
+    }
+  ): Promise<void> {
+    const order = this.orders.get(orderId);
+    if (!order) {
+      throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido de compra não encontrado.");
+    }
+    Object.assign(order, refs);
+  }
+
   public async markOrderPaid(orderId: string): Promise<OrderRecord> {
     const order = this.orders.get(orderId);
     if (!order) throw new Error("Order not found");
