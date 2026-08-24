@@ -123,9 +123,46 @@ export class FirestoreBillingWebhookEventsRepository
     this.db = db;
   }
 
+  private eventRef(eventId: string) {
+    return this.db.collection("billing_webhook_events").doc(eventId);
+  }
+
   public async exists(eventId: string): Promise<boolean> {
-    const snap = await this.db.collection("billing_webhook_events").doc(eventId).get();
+    const snap = await this.eventRef(eventId).get();
     return snap.exists;
+  }
+
+  public async claim(eventId: string, now: number): Promise<boolean> {
+    const ref = this.eventRef(eventId);
+    return await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.exists) return false;
+
+      tx.create(ref, {
+        status: "processing",
+        claimedAt: now,
+      });
+      return true;
+    });
+  }
+
+  public async complete(eventId: string, now: number): Promise<void> {
+    await this.eventRef(eventId).set(
+      {
+        status: "completed",
+        completedAt: now,
+      },
+      { merge: true }
+    );
+  }
+
+  public async release(eventId: string): Promise<void> {
+    const ref = this.eventRef(eventId);
+    await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists || snap.data()?.status !== "processing") return;
+      tx.delete(ref);
+    });
   }
 }
 
