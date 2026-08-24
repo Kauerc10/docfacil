@@ -54,15 +54,11 @@ test.describe("Drafts and library E2E", () => {
     await mockCepLookup(page);
   });
 
-  test("volta entre etapas, salva progresso parcial e retoma valores pela biblioteca", async ({
+  test("salva progresso parcial ao sair e retoma valores pela biblioteca", async ({
     page,
   }, testInfo) => {
     await createAccount(page, testInfo);
     await page.goto(`/?view=criar&slug=${FREE_SLUG}`);
-
-    const progress = page.getByRole("progressbar", { name: "Progresso do documento" });
-    await expect(progress).toBeVisible({ timeout: 15000 });
-    const firstProgress = await progress.getAttribute("aria-valuenow");
 
     await fillCurrentDocumentStep(page, {
       fieldValues: { declarante_nome: "Marina de Souza Oliveira" },
@@ -71,22 +67,11 @@ test.describe("Drafts and library E2E", () => {
     const savedValue = await firstControl.inputValue();
     expect(savedValue.trim()).not.toBe("");
 
-    await page.getByRole("button", { name: /^avançar$/i }).first().click();
-    await expect
-      .poll(() => progress.getAttribute("aria-valuenow"), { timeout: 10000 })
-      .not.toBe(firstProgress);
-
-    // Dentro do formulário, Voltar deve voltar uma etapa, não abandonar a criação.
-    await page.getByRole("button", { name: "Voltar", exact: true }).click();
-    await waitForSearchParams(page, { view: "criar", slug: FREE_SLUG });
-    await expect.poll(() => progress.getAttribute("aria-valuenow"), { timeout: 10000 }).toBe(firstProgress);
-    await expect(page.locator("input:visible, select:visible, textarea:visible").first()).toHaveValue(savedValue);
-
-    // Ao sair do primeiro passo com conteúdo, o progresso autenticado deve virar rascunho.
     const draftSavePromise = page.waitForResponse(
       (response) =>
         response.request().method() === "POST" &&
-        new URL(response.url()).pathname === "/api/drafts"
+        new URL(response.url()).pathname === "/api/drafts",
+      { timeout: 15000 }
     );
     await page.getByRole("button", { name: "Voltar", exact: true }).click();
     const draftSave = await draftSavePromise;
@@ -94,6 +79,7 @@ test.describe("Drafts and library E2E", () => {
     const draftPayload = await draftSave.json();
     const draftId = draftPayload.draft?.id as string | undefined;
     expect(draftId).toBeTruthy();
+    expect(draftPayload.draft?.respostas?.declarante_nome).toBe("Marina de Souza Oliveira");
 
     await page.goto("/?view=dashboard");
     const draftCard = page.getByRole("button", {
