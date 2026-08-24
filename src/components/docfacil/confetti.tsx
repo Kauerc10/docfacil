@@ -28,7 +28,11 @@ export function Confetti({ duration = 3000 }: { duration?: number }) {
   }));
 
   return (
-    <div ref={container} className="fixed inset-0 pointer-events-none z-[100]" aria-hidden="true">
+    <div
+      ref={container}
+      className="fixed inset-0 overflow-hidden pointer-events-none z-[100]"
+      aria-hidden="true"
+    >
       {confetes.map((c) => (
         <div key={c.i} className="absolute top-0" style={{
           left: `${c.left}%`, width: c.tamanho, height: c.tamanho,
