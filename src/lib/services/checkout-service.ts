@@ -21,13 +21,41 @@ export interface CheckoutParams {
   authenticated?: boolean;
 }
 
-export interface CheckoutResult {
-  checkoutUrl: string;
+export interface CheckoutPixPayload {
+  brCode: string;
+  brCodeBase64: string;
+  expiresAt: number;
+}
+
+export type CheckoutApiResponse =
+  | {
+      kind: "redirect";
+      orderId: string;
+      checkoutUrl: string;
+    }
+  | {
+      kind: "pix";
+      orderId: string;
+      pix: CheckoutPixPayload;
+    };
+
+interface CheckoutResultBase {
   orderId: string;
   provider: CheckoutProvider | "demo";
   plan: CheckoutPlan;
   amount: number;
 }
+
+export type CheckoutResult =
+  | (CheckoutResultBase & {
+      kind: "redirect";
+      checkoutUrl: string;
+    })
+  | (CheckoutResultBase & {
+      kind: "pix";
+      provider: CheckoutProvider;
+      pix: CheckoutPixPayload;
+    });
 
 export interface GuestContactInput {
   email?: string;
@@ -45,11 +73,7 @@ export interface CheckoutStatusResult {
   product: "avulso" | "pro";
   method?: "pix" | "card";
   amountCents: number;
-  pix?: {
-    brCode: string;
-    brCodeBase64: string;
-    expiresAt: number;
-  };
+  pix?: CheckoutPixPayload;
 }
 
 export interface CheckoutCreatePayloadInput {
@@ -68,6 +92,59 @@ export const ACTIVE_PROVIDER: CheckoutProvider | "demo" =
     : "demo";
 
 const IS_PRODUCTION_CONFIGURED = ACTIVE_PROVIDER === "abacatepay";
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+export function parseCheckoutApiResponse(value: unknown): CheckoutApiResponse {
+  const record = asRecord(value);
+  const kind = nonEmptyString(record?.kind);
+  const orderId = nonEmptyString(record?.orderId);
+
+  if (!record || !orderId) {
+    throw new Error("Resposta de checkout inválida");
+  }
+
+  if (kind === "redirect") {
+    const checkoutUrl = nonEmptyString(record.checkoutUrl);
+    if (!checkoutUrl) {
+      throw new Error("Resposta de checkout inválida");
+    }
+    return { kind: "redirect", orderId, checkoutUrl };
+  }
+
+  if (kind === "pix") {
+    const pix = asRecord(record.pix);
+    const brCode = nonEmptyString(pix?.brCode);
+    const brCodeBase64 = nonEmptyString(pix?.brCodeBase64);
+    const expiresAt = pix?.expiresAt;
+
+    if (
+      !pix ||
+      !brCode ||
+      !brCodeBase64 ||
+      typeof expiresAt !== "number" ||
+      !Number.isFinite(expiresAt)
+    ) {
+      throw new Error("Resposta de checkout inválida");
+    }
+
+    return {
+      kind: "pix",
+      orderId,
+      pix: { brCode, brCodeBase64, expiresAt },
+    };
+  }
+
+  throw new Error("Resposta de checkout inválida");
+}
 
 export function buildGuestContact(
   input: GuestContactInput
@@ -158,6 +235,7 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
     const successUrl = buildCheckoutReturnUrl(baseSuccessUrl, data.order.id);
 
     return {
+      kind: "redirect",
       checkoutUrl: successUrl,
       orderId: data.order.id,
       provider: "demo",
@@ -189,10 +267,18 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
     );
   }
 
-  const data = (await res.json()) as { checkoutUrl: string; orderId: string };
+  const response = parseCheckoutApiResponse(await res.json());
+  if (response.kind === "redirect") {
+    return {
+      ...response,
+      provider,
+      plan: params.plan,
+      amount,
+    };
+  }
+
   return {
-    checkoutUrl: data.checkoutUrl,
-    orderId: data.orderId,
+    ...response,
     provider,
     plan: params.plan,
     amount,
