@@ -1,3 +1,5 @@
+import type { FillDocumentOptions } from "./document-form";
+
 export const OFFICIAL_MODEL_SLUGS = [
   "declaracao-residencia",
   "declaracao-residencia-terceiro",
@@ -12,11 +14,8 @@ export const OFFICIAL_MODEL_SLUGS = [
 
 export type OfficialModelSlug = (typeof OFFICIAL_MODEL_SLUGS)[number];
 
-export interface OfficialModelFixture {
+export interface OfficialModelFixture extends FillDocumentOptions {
   fieldValues: Record<string, string>;
-  residents?: Array<{ nome: string; cpf: string }>;
-  rentalGuarantee?: string;
-  clauseExtras?: Record<string, string>;
 }
 
 export const OFFICIAL_MODEL_FIXTURES: Record<OfficialModelSlug, OfficialModelFixture> = {
