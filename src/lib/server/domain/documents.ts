@@ -94,6 +94,14 @@ export type OrderStatus =
   | "failed"
   | "refunded";
 
+export type PaymentMethod = "pix" | "card";
+
+export interface OrderPixPayload {
+  brCode: string;
+  brCodeBase64: string;
+  expiresAt: number;
+}
+
 export interface OrderRecord {
   id?: string;
   provider: "demo" | "abacatepay";
@@ -103,6 +111,13 @@ export interface OrderRecord {
     | { type: "guest"; email?: string; phone?: string }
     | { type: "user"; userId: string; email?: string };
   status: OrderStatus;
+  method?: PaymentMethod;
+  providerPaymentId?: string;
+  providerCheckoutId?: string;
+  providerSubscriptionId?: string;
+  providerStatus?: string;
+  providerDevMode?: boolean;
+  pix?: OrderPixPayload;
   documentId?: string;
   reservedByRequestId?: string;
   reservedAt?: number;
