@@ -96,6 +96,9 @@ export interface IBillingSubscriptionsRepository {
 
 export interface IBillingWebhookEventsRepository {
   exists(eventId: string): Promise<boolean>;
+  claim(eventId: string, now: number): Promise<boolean>;
+  complete(eventId: string, now: number): Promise<void>;
+  release(eventId: string): Promise<void>;
 }
 
 export interface IGenerationRequestsRepository {
