@@ -4,7 +4,7 @@ import {
   fillCurrentDocumentStep,
   fillDocumentUntilFinalization,
 } from "./support/document-form";
-import { mockCepLookup } from "./support/navigation";
+import { mockCepLookup, waitForSearchParams } from "./support/navigation";
 import { VALID_CPFS } from "./support/test-data";
 
 const PURCHASE_SLUG = "contrato-compra-venda-imovel";
@@ -13,6 +13,32 @@ const RENTAL_SLUG = "contrato-locacao";
 async function createAccount(page: Page, testInfo: TestInfo) {
   return createAuthenticatedAccount(page, testInfo, {
     name: "Condicionais E2E",
+  });
+}
+
+async function captureAuthorization(page: Page): Promise<string> {
+  const requestPromise = page.waitForRequest(
+    (request) =>
+      request.method() === "GET" &&
+      new URL(request.url()).pathname === "/api/documents" &&
+      /^Bearer\s+\S+/.test(request.headers()["authorization"] ?? ""),
+    { timeout: 15000 }
+  );
+  await page.goto("/?view=dashboard");
+  const request = await requestPromise;
+  return request.headers()["authorization"]!;
+}
+
+async function activatePro(page: Page, authorization: string) {
+  const response = await page.request.post("/api/checkout/demo", {
+    headers: { Authorization: authorization },
+    data: { product: "pro", autoPay: true },
+  });
+  expect(response.status()).toBe(200);
+
+  await page.goto("/?view=perfil");
+  await expect(page.getByRole("heading", { name: "Plano Pro", exact: true })).toBeVisible({
+    timeout: 15000,
   });
 }
 
@@ -45,10 +71,12 @@ test.describe("Conditional fields and residents E2E", () => {
     await mockCepLookup(page);
   });
 
-  test("Sim → preencher → Não remove sinal oculto antes da finalização", async ({
+  test("Sim → preencher → Não não persiste sinal oculto no documento final", async ({
     page,
   }, testInfo) => {
     await createAccount(page, testInfo);
+    const authorization = await captureAuthorization(page);
+    await activatePro(page, authorization);
     await page.goto(`/?view=criar&slug=${PURCHASE_SLUG}`);
 
     const possuiSinal = await advanceUntilVisible(page, "#g-possui_sinal");
@@ -70,21 +98,35 @@ test.describe("Conditional fields and residents E2E", () => {
     const finalize = await fillDocumentUntilFinalization(page, {
       fieldValues: { possui_sinal: "Não" },
     });
-
-    const finalizeRequestPromise = page.waitForRequest(
-      (request) =>
-        request.method() === "POST" &&
-        new URL(request.url()).pathname === "/api/documents/finalize"
+    const finalResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === "/api/documents/finalize"
     );
     await finalize.click();
-    const finalizeRequest = await finalizeRequestPromise;
-    const body = finalizeRequest.postDataJSON() as {
+    const finalResponse = await finalResponsePromise;
+    expect(finalResponse.status()).toBe(200);
+
+    const payload = await finalResponse.json();
+    const documentId = payload.document?.id as string | undefined;
+    expect(documentId).toBeTruthy();
+    await waitForSearchParams(
+      page,
+      { view: "sucesso", slug: PURCHASE_SLUG, id: documentId! },
+      45000
+    );
+
+    const detail = await page.request.get(`/api/documents/${documentId}`, {
+      headers: { Authorization: authorization },
+    });
+    expect(detail.status()).toBe(200);
+    const document = (await detail.json()).document as {
       respostas?: Record<string, string>;
     };
 
-    expect(body.respostas?.possui_sinal).toBe("Não");
-    expect(body.respostas?.sinal).toBeUndefined();
-    expect(body.respostas?.forma_pagamento_sinal).toBeUndefined();
+    expect(document.respostas?.possui_sinal).toBe("Não");
+    expect(document.respostas?.sinal).toBeUndefined();
+    expect(document.respostas?.forma_pagamento_sinal).toBeUndefined();
   });
 
   test("moradores adicionais preservam nomes com espaços ao voltar e avançar", async ({
