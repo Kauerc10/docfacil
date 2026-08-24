@@ -39,6 +39,26 @@ async function activatePro(page: Page, authorization: string) {
   });
 }
 
+async function readVisiblePdfPreview(page: Page) {
+  const previewFrame = page.locator('iframe[title^="Prévia em PDF"]').first();
+  await expect(previewFrame).toBeVisible({ timeout: 30000 });
+
+  const previewSrc = await previewFrame.getAttribute("src");
+  expect(previewSrc).toMatch(/^blob:/);
+
+  return page.evaluate(async (src) => {
+    const response = await fetch(src.split("#")[0]);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const decoder = new TextDecoder();
+
+    return {
+      byteLength: bytes.byteLength,
+      prefix: decoder.decode(bytes.slice(0, 5)),
+      hasPlaceholder: decoder.decode(bytes).includes("{{"),
+    };
+  }, previewSrc!);
+}
+
 test.describe("Official document models smoke E2E", () => {
   test.setTimeout(600000);
 
@@ -84,28 +104,21 @@ test.describe("Official document models smoke E2E", () => {
         expect(detailResponse.status(), `${slug}: detalhe`).toBe(200);
         const document = (await detailResponse.json()).document as {
           respostas?: Record<string, string>;
-          clausulasSelecionadas?: string[];
         };
         expect(JSON.stringify(document.respostas ?? {}), `${slug}: respostas`).not.toContain("{{");
 
-        const preview = await page.request.post("/api/documents/preview", {
-          headers: { Authorization: authorization },
-          data: {
-            modeloSlug: slug,
-            respostas: document.respostas ?? {},
-            clausulasSelecionadas: document.clausulasSelecionadas ?? [],
-          },
-        });
-        expect(preview.status(), `${slug}: preview PDF`).toBe(200);
-        expect(preview.headers()["content-type"]).toContain("application/pdf");
-        const previewBytes = await preview.body();
-        expect(previewBytes.byteLength, `${slug}: tamanho do preview`).toBeGreaterThan(1000);
-        expect(new TextDecoder().decode(previewBytes), `${slug}: placeholders no PDF`).not.toContain("{{");
+        const previewPdf = await readVisiblePdfPreview(page);
+        expect(previewPdf.prefix, `${slug}: assinatura PDF da prévia`).toBe("%PDF-");
+        expect(previewPdf.byteLength, `${slug}: tamanho da prévia`).toBeGreaterThan(1000);
+        expect(previewPdf.hasPlaceholder, `${slug}: placeholders na prévia`).toBe(false);
 
         const download = await page.request.post(`/api/documents/${documentId}/download`, {
           headers: { Authorization: authorization },
         });
         expect(download.status(), `${slug}: download seguro`).toBe(200);
+        const downloadPayload = await download.json();
+        expect(downloadPayload.downloadUrl, `${slug}: URL assinada`).toBeTruthy();
+        expect(downloadPayload.sha256, `${slug}: hash do artefato`).toMatch(/^[a-f0-9]{64}$/);
       });
     }
   });
