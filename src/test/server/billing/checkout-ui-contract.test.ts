@@ -40,7 +40,8 @@ describe("checkout real na interface", () => {
   it("PIX consulta o mesmo status autoritativo enquanto aguarda confirmação", async () => {
     const source = await checkoutSource();
 
-    expect(source).toContain("pixCheckout.orderId");
+    expect(source).toContain("const watchedOrderId = pixCheckout?.orderId ?? returnOrderId");
+    expect(source).toContain("orderId: watchedOrderId");
     expect(source).toContain("checkOrderStatus");
     expect(source).toContain("Aguardando confirmação do pagamento");
   });
