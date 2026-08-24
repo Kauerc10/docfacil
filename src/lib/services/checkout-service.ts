@@ -74,6 +74,7 @@ export interface CheckoutStatusResult {
   method?: "pix" | "card";
   amountCents: number;
   pix?: CheckoutPixPayload;
+  documentId?: string;
 }
 
 export interface CheckoutCreatePayloadInput {
