@@ -114,6 +114,32 @@ describe("AbacatePayClient v2", () => {
     }
   });
 
+  it("maps store-level CARD capability errors to a safe actionable response", async () => {
+    const mockFetch = mock(async () =>
+      new Response(
+        JSON.stringify({
+          success: false,
+          data: null,
+          error: "CARD is not available for this store",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    const client = new AbacatePayClient(
+      "dev_real_secret",
+      mockFetch as unknown as typeof fetch
+    );
+
+    await expect(
+      client.request("/checkouts/create", { method: "POST" })
+    ).rejects.toMatchObject({
+      code: "BILLING_METHOD_UNAVAILABLE",
+      status: 503,
+      message: "Pagamento com cartão ainda não está habilitado nesta loja. Use Pix por enquanto.",
+    });
+  });
+
   it("treats a 200 error envelope as provider failure", async () => {
     const mockFetch = mock(async () =>
       new Response(
