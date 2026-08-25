@@ -1,5 +1,13 @@
 import type { CheckoutPixPayload } from "@/lib/services/checkout-service";
 
+export type PixPaymentState =
+  | "loading"
+  | "pending"
+  | "paid"
+  | "failed"
+  | "expired"
+  | "error";
+
 export interface PixPaymentSession {
   orderId: string;
   authenticated: boolean;
@@ -26,6 +34,10 @@ function nonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : null;
+}
+
+export function shouldPollPixPayment(state: PixPaymentState): boolean {
+  return state === "loading" || state === "pending";
 }
 
 export function pixPaymentSessionStorageKey(orderId: string): string {
