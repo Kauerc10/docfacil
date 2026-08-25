@@ -5,6 +5,10 @@
  */
 import { apiFetch } from "@/lib/auth/api-fetch";
 import { PLAN_PRICES, PLAN_LABELS, type PaidPlan } from "@/lib/pricing";
+import {
+  pixPaymentSessionStorageKey,
+  preparePixPaymentNavigation,
+} from "@/lib/services/pix-payment-session";
 
 export type CheckoutProvider = "abacatepay";
 export type CheckoutPlan = PaidPlan;
@@ -276,6 +280,31 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
       plan: params.plan,
       amount,
     };
+  }
+
+  if (
+    typeof window !== "undefined" &&
+    params.successUrl &&
+    params.plan === "avulso"
+  ) {
+    const { paymentUrl, session } = preparePixPaymentNavigation({
+      successUrl: params.successUrl,
+      orderId: response.orderId,
+      authenticated,
+      guestEmail: params.userEmail,
+      pix: response.pix,
+    });
+
+    try {
+      window.sessionStorage.setItem(
+        pixPaymentSessionStorageKey(response.orderId),
+        JSON.stringify(session)
+      );
+    } catch {
+      // A página ainda consegue recuperar o payload PIX via /checkout/status.
+    }
+
+    window.location.assign(paymentUrl);
   }
 
   return {
