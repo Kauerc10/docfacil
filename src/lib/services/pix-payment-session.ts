@@ -8,6 +8,14 @@ export interface PixPaymentSession {
   pix: CheckoutPixPayload;
 }
 
+export interface PreparePixPaymentNavigationInput {
+  successUrl: string;
+  orderId: string;
+  authenticated: boolean;
+  guestEmail?: string;
+  pix: CheckoutPixPayload;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -20,12 +28,45 @@ function nonEmptyString(value: unknown): string | null {
     : null;
 }
 
+export function pixPaymentSessionStorageKey(orderId: string): string {
+  return `docfacil:pix-payment:${orderId}`;
+}
+
 export function buildPixPaymentUrl(successUrl: string, orderId: string): string {
   const url = new URL(successUrl);
   url.searchParams.set("view", "pagamento-pix");
   url.searchParams.set("orderId", orderId);
   url.searchParams.delete("billingReturn");
   return url.toString();
+}
+
+export function buildPixCheckoutReturnUrl(
+  returnUrl: string,
+  orderId: string
+): string {
+  const url = new URL(returnUrl);
+  url.searchParams.set("view", "checkout");
+  url.searchParams.set("billingReturn", "1");
+  url.searchParams.set("orderId", orderId);
+  return url.toString();
+}
+
+export function preparePixPaymentNavigation(
+  input: PreparePixPaymentNavigationInput
+): { paymentUrl: string; session: PixPaymentSession } {
+  const guestEmail = input.guestEmail?.trim();
+  const session: PixPaymentSession = {
+    orderId: input.orderId,
+    authenticated: input.authenticated,
+    ...(guestEmail ? { guestEmail } : {}),
+    returnUrl: input.successUrl,
+    pix: input.pix,
+  };
+
+  return {
+    paymentUrl: buildPixPaymentUrl(input.successUrl, input.orderId),
+    session,
+  };
 }
 
 export function parsePixPaymentSession(raw: string | null): PixPaymentSession | null {
