@@ -16,6 +16,65 @@ export interface AbacatePayClientOptions {
   timeoutMs?: number;
 }
 
+export interface ProviderErrorDetails {
+  code?: string;
+  message?: string;
+  field?: string;
+  reason?: string;
+}
+
+const SENSITIVE_TEXT = /bearer|token|secret|api[-_ ]?key|authorization|sql\s+trace/i;
+
+function safeDiagnosticText(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text || text.length > maxLength || SENSITIVE_TEXT.test(text)) return null;
+  return text;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+export function extractProviderErrorDetails(value: unknown): ProviderErrorDetails | null {
+  const record = asRecord(value);
+  if (!record) return null;
+
+  const code = safeDiagnosticText(record.code, 80);
+  const message = safeDiagnosticText(record.message, 240);
+
+  const details = asRecord(record.details);
+  const directField = safeDiagnosticText(details?.field, 120);
+
+  let field = directField;
+  let reason: string | null = null;
+  const errors = asRecord(record.errors);
+  if (!field && errors) {
+    for (const [key, candidate] of Object.entries(errors)) {
+      const safeField = safeDiagnosticText(key, 120);
+      if (!safeField || !Array.isArray(candidate)) continue;
+      const safeReason = candidate
+        .map((item) => safeDiagnosticText(item, 200))
+        .find((item): item is string => Boolean(item));
+      if (!safeReason) continue;
+      field = safeField;
+      reason = safeReason;
+      break;
+    }
+  }
+
+  const result: ProviderErrorDetails = {
+    ...(code ? { code } : {}),
+    ...(message ? { message } : {}),
+    ...(field ? { field } : {}),
+    ...(reason ? { reason } : {}),
+  };
+
+  return Object.keys(result).length > 0 ? result : null;
+}
+
 function providerFailure(): BackendError {
   return new BackendError(
     "BILLING_PROVIDER_FAILED",
@@ -93,6 +152,7 @@ export class AbacatePayClient {
         path,
         status: response.status,
         providerSuccess: body?.success ?? null,
+        providerError: extractProviderErrorDetails(body?.error),
       });
       throw providerFailure();
     }
