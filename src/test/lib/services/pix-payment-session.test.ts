@@ -4,6 +4,7 @@ import {
   buildPixPaymentUrl,
   parsePixPaymentSession,
   preparePixPaymentNavigation,
+  shouldPollPixPayment,
   type PixPaymentSession,
 } from "@/lib/services/pix-payment-session";
 
@@ -78,5 +79,14 @@ describe("Pix payment session", () => {
     expect(parsePixPaymentSession(JSON.stringify(session))).toEqual(session);
     expect(parsePixPaymentSession("{}")).toBeNull();
     expect(parsePixPaymentSession("not-json")).toBeNull();
+  });
+
+  it("polls only while the Pix can still transition", () => {
+    expect(shouldPollPixPayment("loading")).toBe(true);
+    expect(shouldPollPixPayment("pending")).toBe(true);
+    expect(shouldPollPixPayment("paid")).toBe(false);
+    expect(shouldPollPixPayment("failed")).toBe(false);
+    expect(shouldPollPixPayment("expired")).toBe(false);
+    expect(shouldPollPixPayment("error")).toBe(false);
   });
 });
