@@ -79,7 +79,7 @@ test.describe("Mobile critical flow E2E", () => {
     });
     await expectNoHorizontalOverflow(page);
 
-    const pay = page.getByRole("button", { name: /Pagar.*19,90/i });
+    const pay = page.getByRole("button", { name: /Gerar Pix de.*19,90/i });
     await expect(pay).toBeVisible({ timeout: 15000 });
     await expect(pay).toBeEnabled();
 
