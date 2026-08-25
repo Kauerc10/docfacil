@@ -25,6 +25,7 @@ export type View =
   | "ia"
   | "planos"
   | "checkout"
+  | "pagamento-pix"
   | "dashboard"
   | "documento-detalhe"
   | "perfil"
@@ -56,6 +57,7 @@ const VALID_VIEWS = new Set<View>([
   "ia",
   "planos",
   "checkout",
+  "pagamento-pix",
   "dashboard",
   "documento-detalhe",
   "perfil",
@@ -112,9 +114,6 @@ function subscribeToLocation(onStoreChange: () => void) {
 }
 
 export function NavProvider({ children }: { children: React.ReactNode }) {
-  // getServerSnapshot mantém o primeiro render do browser idêntico ao SSR.
-  // Depois da hidratação, o React lê a URL real e atualiza a view sem o
-  // mismatch que gerava o erro #418 ao abrir ?view=login/criar diretamente.
   const snapshot = useSyncExternalStore(
     subscribeToLocation,
     readLocationSnapshot,
