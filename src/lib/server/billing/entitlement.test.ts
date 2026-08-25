@@ -3,9 +3,34 @@ import { resolveEntitlement } from "./entitlement";
 import { FREE_MONTHLY_LIMIT } from "@/lib/document-access-policy";
 import { BackendError } from "../errors";
 import type { OrderRecord } from "../domain/documents";
+import type { BillingSubscriptionRecord } from "./subscription";
 
 const ELIGIBLE_MODEL = "declaracao-residencia";
 const NON_ELIGIBLE_MODEL = "contrato-locacao";
+
+function proSubscription(
+  overrides: Partial<BillingSubscriptionRecord> = {}
+): BillingSubscriptionRecord {
+  const now = Date.UTC(2026, 7, 24, 19, 0, 0);
+  return {
+    userId: "usr_pro",
+    provider: "abacatepay",
+    providerSubscriptionId: "sub_pro",
+    providerCheckoutId: "bill_pro",
+    providerProductId: "prod_pro",
+    product: "pro",
+    method: "card",
+    status: "active",
+    autoRenew: true,
+    amountCents: 3990,
+    paidThrough: Date.UTC(2026, 8, 24, 19, 0, 0),
+    lastPaidAt: now,
+    lastPaymentId: "pay_pro",
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
 
 describe("resolveEntitlement", () => {
   it("resolves guest with paid order as single_purchase without watermark", () => {
@@ -103,11 +128,14 @@ describe("resolveEntitlement", () => {
     }
   });
 
-  it("resolves Pro user as pro without watermark regardless of quota or model", () => {
+  it("resolves Pro only from a currently paid subscription", () => {
+    const now = Date.UTC(2026, 8, 1, 12, 0, 0);
     const decision = resolveEntitlement({
       principal: { type: "user", userId: "usr_pro" },
       modeloSlug: NON_ELIGIBLE_MODEL,
-      userProfile: { plano: "pro" },
+      userProfile: { plano: "gratis" },
+      subscription: proSubscription(),
+      now,
       currentMonthlyCount: 50,
     });
 
@@ -115,6 +143,32 @@ describe("resolveEntitlement", () => {
       entitlement: "pro",
       watermarked: false,
     });
+  });
+
+  it("keeps Pro after cancellation while paidThrough is still in the future", () => {
+    const now = Date.UTC(2026, 8, 10, 12, 0, 0);
+    const decision = resolveEntitlement({
+      principal: { type: "user", userId: "usr_pro" },
+      modeloSlug: NON_ELIGIBLE_MODEL,
+      subscription: proSubscription({ status: "cancelled", autoRenew: false }),
+      now,
+      currentMonthlyCount: 50,
+    });
+
+    expect(decision.entitlement).toBe("pro");
+    expect(decision.watermarked).toBe(false);
+  });
+
+  it("does not treat legacy plano pro as payment authority", () => {
+    const decision = resolveEntitlement({
+      principal: { type: "user", userId: "usr_legacy_pro" },
+      modeloSlug: ELIGIBLE_MODEL,
+      userProfile: { plano: "pro" },
+      currentMonthlyCount: 0,
+    });
+
+    expect(decision.entitlement).toBe("free");
+    expect(decision.watermarked).toBe(true);
   });
 
   it("resolves Free user below limit only for an eligible model", () => {

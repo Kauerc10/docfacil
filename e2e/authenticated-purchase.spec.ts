@@ -100,7 +100,7 @@ test.describe("Authenticated single purchase E2E", () => {
         response.request().method() === "POST" &&
         new URL(response.url()).pathname === "/api/documents/finalize"
     );
-    await page.getByRole("button", { name: /Pagar.*19,90/i }).click();
+    await page.getByRole("button", { name: /Gerar Pix de.*19,90/i }).click();
 
     await expect(page.locator("#consent-terms")).toHaveCount(0);
 
@@ -145,7 +145,7 @@ test.describe("Authenticated single purchase E2E", () => {
         response.request().method() === "POST" &&
         new URL(response.url()).pathname === `/api/documents/${documentId}/versions`
     );
-    await page.getByRole("button", { name: /Pagar.*19,90/i }).click();
+    await page.getByRole("button", { name: /Gerar Pix de.*19,90/i }).click();
     const versionResponse = await versionResponsePromise;
     expect(versionResponse.status()).toBe(200);
 

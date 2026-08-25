@@ -28,6 +28,7 @@ import { TermosView } from "@/components/docfacil/views/termos-view";
 import { PrivacidadeView } from "@/components/docfacil/views/privacidade-view";
 import { CookiesView } from "@/components/docfacil/views/cookies-view";
 import { CheckoutView } from "@/components/docfacil/views/checkout-view";
+import { PixPaymentView } from "@/components/docfacil/views/pix-payment-view";
 import { CookieBanner } from "@/components/docfacil/cookie-banner";
 import { useAnalyticsInit } from "@/hooks/use-analytics-init";
 
@@ -81,6 +82,8 @@ function CurrentView() {
       return <CookiesView />;
     case "checkout":
       return <CheckoutView />;
+    case "pagamento-pix":
+      return <PixPaymentView />;
     default:
       return <HomeView />;
   }

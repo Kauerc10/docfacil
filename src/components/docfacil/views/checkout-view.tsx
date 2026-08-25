@@ -1,16 +1,19 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
+  Ban,
+  CheckCircle2,
+  Copy,
   CreditCard,
+  FileText,
   Loader2,
   Lock,
   LogIn,
-  ShieldCheck,
-  Ban,
+  QrCode,
   RotateCcw,
-  FileText,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNav } from "@/components/docfacil/nav-context";
@@ -20,8 +23,12 @@ import {
   PLAN_PRICES,
   PLAN_LABELS,
   ACTIVE_PROVIDER,
+  checkOrderStatus,
   createCheckout,
+  type CheckoutMethod,
   type CheckoutPlan,
+  type CheckoutResult,
+  type CheckoutStatusResult,
 } from "@/lib/services/checkout-service";
 import { TermsConsentModal } from "@/components/docfacil/terms-consent-modal";
 import {
@@ -36,6 +43,9 @@ import {
 } from "@/lib/documents/client";
 import { buildAccountDraftFinalizationAnswers } from "@/lib/documents/account-draft";
 
+const PAYMENT_POLL_INTERVAL_MS = 1500;
+const PAYMENT_POLL_MAX_ATTEMPTS = 120;
+
 export function CheckoutView() {
   const { params, navigate } = useNav();
   const { user, loading, refreshProfile } = useAuth();
@@ -48,9 +58,177 @@ export function CheckoutView() {
   const [consentOpen, setConsentOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [guestEmail, setGuestEmail] = useState("");
+  const [method, setMethod] = useState<CheckoutMethod>("pix");
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
+  const [pixCheckout, setPixCheckout] = useState<
+    Extract<CheckoutResult, { kind: "pix" }> | null
+  >(null);
+  const handledPaidOrderId = useRef<string | null>(null);
 
   const userId = user?.uid ?? "guest";
   const userEmail = user?.email ?? guestEmail.trim();
+
+  const continueAfterPaidOrder = useCallback(
+    async (status: CheckoutStatusResult) => {
+      if (handledPaidOrderId.current === status.orderId) return;
+      handledPaidOrderId.current = status.orderId;
+
+      try {
+        const slug = params.slug;
+        const draftId = params.draftId;
+
+        if (status.status === "consumed") {
+          if (!status.documentId || !slug) {
+            throw new Error("Pedido consumido sem documento associado.");
+          }
+          navigate("sucesso", { slug, id: status.documentId });
+          return;
+        }
+
+        if (status.status !== "paid") return;
+
+        if (status.product === "pro") {
+          if (slug) clearFinalizationRequestId(slug);
+          await refreshProfile();
+          toast.success("Pagamento confirmado. Seu plano Pro está ativo.");
+
+          if (slug && draftId) {
+            navigate("criar", { slug, draftId });
+          } else {
+            navigate("perfil");
+          }
+          return;
+        }
+
+        if (user && draftId) {
+          const draft = await getAccountDraft(draftId);
+          if (!draft) {
+            throw new Error("O rascunho associado ao checkout não foi encontrado.");
+          }
+
+          clearFinalizationRequestId(draft.modeloSlug);
+          const requestId = getOrCreateFinalizationRequestId(draft.modeloSlug);
+          const respostas = buildAccountDraftFinalizationAnswers(draft);
+          const finalized = draft.sourceDocumentId
+            ? await createDocumentVersion(draft.sourceDocumentId, {
+                requestId,
+                respostas,
+                clausulasSelecionadas: draft.clausulasSelecionadas,
+                orderId: status.orderId,
+              })
+            : await finalizeDocument({
+                requestId,
+                modeloSlug: draft.modeloSlug,
+                respostas,
+                clausulasSelecionadas: draft.clausulasSelecionadas,
+                orderId: status.orderId,
+              });
+
+          await deleteAccountDraft(draft.id);
+          clearFinalizationRequestId(draft.modeloSlug);
+          toast.success(
+            draft.sourceDocumentId
+              ? "Pagamento confirmado e nova versão liberada."
+              : "Pagamento confirmado e documento liberado."
+          );
+          navigate("sucesso", {
+            slug: draft.modeloSlug,
+            id: finalized.document.id,
+          });
+          return;
+        }
+
+        if (slug) {
+          navigate("sucesso", { slug, orderId: status.orderId });
+          return;
+        }
+
+        throw new Error("Não foi possível retomar o documento deste pagamento.");
+      } catch (error) {
+        handledPaidOrderId.current = null;
+        throw error;
+      }
+    },
+    [navigate, params.draftId, params.slug, refreshProfile, user]
+  );
+
+  const returnOrderId = params.billingReturn === "1" ? params.orderId : undefined;
+  const watchedOrderId = pixCheckout?.orderId ?? returnOrderId;
+
+  useEffect(() => {
+    if (!watchedOrderId || loading) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+
+    const poll = async () => {
+      if (cancelled) return;
+      attempts += 1;
+      setVerifyingPayment(true);
+
+      try {
+        const guestDraft = params.slug ? loadGuestDraft(params.slug) : null;
+        const status = await checkOrderStatus({
+          orderId: watchedOrderId,
+          authenticated: Boolean(user),
+          email: user?.email ?? (guestEmail.trim() || guestDraft?.guestContact?.email),
+          phone: guestDraft?.guestContact?.phone,
+        });
+
+        if (cancelled) return;
+
+        if (status.status === "paid" || status.status === "consumed") {
+          await continueAfterPaidOrder(status);
+          if (!cancelled) setVerifyingPayment(false);
+          return;
+        }
+
+        if (status.status === "failed" || status.status === "refunded") {
+          setVerifyingPayment(false);
+          toast.error(
+            status.status === "refunded"
+              ? "Este pagamento foi estornado."
+              : "O pagamento não foi aprovado. Você pode tentar novamente."
+          );
+          return;
+        }
+      } catch (error) {
+        if (attempts >= PAYMENT_POLL_MAX_ATTEMPTS) {
+          console.error("[CheckoutView] falha ao confirmar pagamento:", error);
+          setVerifyingPayment(false);
+          toast.error(
+            "Não conseguimos confirmar o pagamento agora. Seu pedido continua salvo e pode ser consultado novamente."
+          );
+          return;
+        }
+      }
+
+      if (attempts >= PAYMENT_POLL_MAX_ATTEMPTS) {
+        setVerifyingPayment(false);
+        toast.info(
+          "A confirmação ainda não chegou. Seu pedido continua salvo e você pode manter esta tela aberta ou voltar depois."
+        );
+        return;
+      }
+
+      timer = setTimeout(() => void poll(), PAYMENT_POLL_INTERVAL_MS);
+    };
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [
+    continueAfterPaidOrder,
+    guestEmail,
+    loading,
+    params.slug,
+    user,
+    watchedOrderId,
+  ]);
 
   const handleAcceptConsent = useCallback(async () => {
     setConsentOpen(false);
@@ -72,7 +250,8 @@ export function CheckoutView() {
       let successUrl: string | undefined;
       if (typeof window !== "undefined") {
         const success = new URL(window.location.origin);
-        success.searchParams.set("view", "sucesso");
+        success.searchParams.set("view", "checkout");
+        success.searchParams.set("plan", plan);
         if (slug) success.searchParams.set("slug", slug);
         if (draftId) success.searchParams.set("draftId", draftId);
         successUrl = success.toString();
@@ -82,6 +261,8 @@ export function CheckoutView() {
         plan,
         userId,
         userEmail,
+        authenticated: Boolean(user),
+        method: plan === "pro" ? "card" : method,
         documentId: params.docId,
         successUrl,
       });
@@ -141,16 +322,31 @@ export function CheckoutView() {
         return;
       }
 
-      toast.success(
-        result.provider === "demo"
-          ? "Pagamento demo aprovado. Finalizando seu documento…"
-          : "Redirecionando para o pagamento…"
-      );
-      setTimeout(() => {
-        if (typeof window !== "undefined") {
-          window.location.href = result.checkoutUrl;
-        }
-      }, 600);
+      if (result.provider === "demo" && plan === "avulso" && !user && slug) {
+        setSubmitting(false);
+        navigate("sucesso", { slug, orderId: result.orderId });
+        return;
+      }
+
+      if (result.kind === "pix") {
+        setPixCheckout(result);
+        setSubmitting(false);
+        toast.success("Pix gerado. Agora é só pagar e aguardar a confirmação.");
+        return;
+      }
+
+      if (result.kind === "redirect") {
+        toast.success(
+          result.provider === "demo"
+            ? "Pagamento demo aprovado. Finalizando seu documento…"
+            : "Redirecionando para o pagamento seguro…"
+        );
+        setTimeout(() => {
+          if (typeof window !== "undefined") {
+            window.location.href = result.checkoutUrl;
+          }
+        }, 600);
+      }
     } catch (e) {
       console.error("[CheckoutView] falha ao criar checkout:", e);
       toast.error("Não foi possível concluir o pagamento. Seu preenchimento continua salvo.");
@@ -160,6 +356,7 @@ export function CheckoutView() {
     plan,
     userId,
     userEmail,
+    method,
     params.docId,
     params.slug,
     params.draftId,
@@ -191,12 +388,19 @@ export function CheckoutView() {
     setConsentOpen(true);
   }
 
+  const handleMethodChange = (nextMethod: CheckoutMethod) => {
+    setMethod(nextMethod);
+    setPixCheckout(null);
+  };
+
   const isAvulso = plan === "avulso";
   const ctaText = submitting
     ? plan === "pro" && ACTIVE_PROVIDER === "demo"
       ? "Ativando Pro…"
       : "Processando…"
-    : `Pagar ${formatBRL(price)}`;
+    : method === "pix" && isAvulso
+      ? `Gerar Pix de ${formatBRL(price)}`
+      : `Pagar ${formatBRL(price)}`;
 
   return (
     <section className="pt-[72px] pb-16 min-h-[calc(100vh-72px)] bg-paper">
@@ -234,7 +438,7 @@ export function CheckoutView() {
             </p>
           </div>
 
-          <div className="px-6 sm:px-7 py-5 space-y-3">
+          <div className="px-6 sm:px-7 py-5 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-semibold text-ink">{label}</p>
@@ -249,7 +453,7 @@ export function CheckoutView() {
               </span>
             </div>
 
-            {isAvulso && !user && (
+            {isAvulso && !user && !returnOrderId && (
               <label className="block pt-3 border-t border-[var(--border)]">
                 <span className="block text-sm font-semibold text-ink mb-1.5">
                   Seu e-mail (para receber o documento)
@@ -265,6 +469,14 @@ export function CheckoutView() {
                 />
               </label>
             )}
+
+            {!returnOrderId && (
+              <PaymentMethodSelector
+                plan={plan}
+                method={plan === "pro" ? "card" : method}
+                onChange={handleMethodChange}
+              />
+            )}
           </div>
 
           <div className="px-6 sm:px-7 py-4 border-t border-[var(--border)] bg-[var(--green-tint)]/40">
@@ -277,28 +489,40 @@ export function CheckoutView() {
           </div>
 
           <div className="px-6 sm:px-7 py-5">
-            <button
-              type="button"
-              onClick={handlePayClick}
-              disabled={submitting}
-              className="w-full h-13 inline-flex items-center justify-center gap-2.5 rounded-xl bg-[var(--coral)] px-6 py-3.5 text-white font-bold text-base hover:bg-[var(--coral-hover)] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--coral)]/30 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
-                  {ctaText}
-                </>
-              ) : (
-                <>
-                  <CreditCard className="w-5 h-5" aria-hidden="true" />
-                  {ctaText}
-                </>
-              )}
-            </button>
+            {returnOrderId ? (
+              <PaymentVerificationPanel verifying={verifyingPayment} />
+            ) : pixCheckout ? (
+              <PixCheckoutPanel checkout={pixCheckout} checking={verifyingPayment} />
+            ) : (
+              <button
+                type="button"
+                onClick={handlePayClick}
+                disabled={submitting}
+                className="w-full h-13 inline-flex items-center justify-center gap-2.5 rounded-xl bg-[var(--coral)] px-6 py-3.5 text-white font-bold text-base hover:bg-[var(--coral-hover)] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--coral)]/30 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                    {ctaText}
+                  </>
+                ) : (
+                  <>
+                    {isAvulso && method === "pix" ? (
+                      <QrCode className="w-5 h-5" aria-hidden="true" />
+                    ) : (
+                      <CreditCard className="w-5 h-5" aria-hidden="true" />
+                    )}
+                    {ctaText}
+                  </>
+                )}
+              </button>
+            )}
 
             <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-ink/50">
               <Lock className="w-3.5 h-3.5" aria-hidden="true" />
-              Pagamento criptografado · Cartão, Pix ou boleto
+              {isAvulso
+                ? "Pagamento criptografado · Pix ou cartão"
+                : "Pagamento criptografado · Cartão recorrente"}
             </p>
           </div>
         </div>
@@ -365,6 +589,186 @@ export function CheckoutView() {
         userEmail={userEmail}
       />
     </section>
+  );
+}
+
+function PaymentMethodSelector({
+  plan,
+  method,
+  onChange,
+}: {
+  plan: CheckoutPlan;
+  method: CheckoutMethod;
+  onChange: (method: CheckoutMethod) => void;
+}) {
+  if (plan === "pro") {
+    return (
+      <div className="pt-3 border-t border-[var(--border)]">
+        <p className="text-xs uppercase tracking-wider text-ink/50 font-semibold mb-2">
+          Forma de pagamento
+        </p>
+        <div className="flex items-center gap-3 rounded-xl border border-[var(--blue-royal)]/25 bg-[var(--blue-soft)]/35 px-4 py-3">
+          <span className="grid place-items-center w-9 h-9 rounded-full bg-surface text-[var(--blue-royal)] shrink-0">
+            <CreditCard className="w-4 h-4" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-ink">Cartão recorrente</p>
+            <p className="text-xs text-ink/55 mt-0.5">
+              Cobrança mensal de {PLAN_PRICES.pro.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const methods: Array<{
+    id: CheckoutMethod;
+    title: string;
+    description: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }> = [
+    {
+      id: "pix",
+      title: "Pagar com Pix",
+      description: "Código gerado na hora e confirmação automática.",
+      icon: QrCode,
+    },
+    {
+      id: "card",
+      title: "Pagar com cartão",
+      description: "Pagamento único em ambiente seguro.",
+      icon: CreditCard,
+    },
+  ];
+
+  return (
+    <fieldset className="pt-3 border-t border-[var(--border)]">
+      <legend className="text-xs uppercase tracking-wider text-ink/50 font-semibold mb-2">
+        Como você quer pagar?
+      </legend>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        {methods.map((option) => {
+          const Icon = option.icon;
+          const selected = method === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(option.id)}
+              className={`text-left rounded-xl border px-4 py-3 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)] ${
+                selected
+                  ? "border-[var(--blue-royal)] bg-[var(--blue-soft)]/35"
+                  : "border-[var(--border)] bg-paper hover:bg-[var(--blue-soft)]/15"
+              }`}
+            >
+              <span className="flex items-start gap-3">
+                <span
+                  className={`grid place-items-center w-9 h-9 rounded-full shrink-0 ${
+                    selected
+                      ? "bg-[var(--blue-royal)] text-white"
+                      : "bg-surface text-ink/55"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" aria-hidden="true" />
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold text-ink">
+                    {option.title}
+                  </span>
+                  <span className="block text-xs text-ink/55 mt-0.5 leading-snug">
+                    {option.description}
+                  </span>
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+function PaymentVerificationPanel({ verifying }: { verifying: boolean }) {
+  return (
+    <div className="rounded-xl border border-[var(--blue-royal)]/20 bg-[var(--blue-soft)]/30 p-5 text-center">
+      <span className="mx-auto grid place-items-center w-10 h-10 rounded-full bg-surface text-[var(--blue-royal)]">
+        {verifying ? (
+          <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+        ) : (
+          <ShieldCheck className="w-5 h-5" aria-hidden="true" />
+        )}
+      </span>
+      <p className="mt-3 font-semibold text-ink">Confirmando seu pagamento</p>
+      <p className="mt-1 text-sm text-ink/60">
+        Estamos consultando o pedido no servidor. O documento só será liberado depois da confirmação do pagamento.
+      </p>
+    </div>
+  );
+}
+
+function PixCheckoutPanel({
+  checkout,
+  checking,
+}: {
+  checkout: Extract<CheckoutResult, { kind: "pix" }>;
+  checking: boolean;
+}) {
+  const copyPixCode = async () => {
+    try {
+      await navigator.clipboard.writeText(checkout.pix.brCode);
+      toast.success("Código Pix copiado.");
+    } catch {
+      toast.error("Não foi possível copiar automaticamente. Selecione o código abaixo.");
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-[var(--selo-green)]/25 bg-[var(--green-tint)]/35 p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <span className="grid place-items-center w-10 h-10 rounded-full bg-surface text-[var(--selo-green)] shrink-0">
+          <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
+        </span>
+        <div>
+          <p className="font-semibold text-ink">Pix gerado</p>
+          <p className="text-sm text-ink/60 mt-0.5">
+            Copie o código, pague no seu banco e mantenha esta tela aberta enquanto confirmamos.
+          </p>
+        </div>
+      </div>
+
+      <label className="block mt-4">
+        <span className="block text-xs font-semibold uppercase tracking-wider text-ink/50 mb-1.5">
+          Pix copia e cola
+        </span>
+        <textarea
+          readOnly
+          value={checkout.pix.brCode}
+          rows={3}
+          className="w-full resize-none rounded-lg border border-[var(--border)] bg-surface px-3 py-2.5 text-xs text-ink/75 font-mono outline-none"
+        />
+      </label>
+
+      <button
+        type="button"
+        onClick={() => void copyPixCode()}
+        className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--blue-royal)] px-4 py-3 text-sm font-semibold text-white hover:bg-[var(--navy)] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--blue-soft)]"
+      >
+        <Copy className="w-4 h-4" aria-hidden="true" />
+        Copiar código Pix
+      </button>
+
+      <div className="mt-3 flex items-center justify-center gap-2 text-xs text-ink/55">
+        {checking ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+        )}
+        Aguardando confirmação do pagamento
+      </div>
+    </div>
   );
 }
 

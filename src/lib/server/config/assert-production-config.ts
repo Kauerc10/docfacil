@@ -15,10 +15,14 @@ export function assertProductionServerConfig(env: ServerEnv): void {
     ["R2_ACCESS_KEY_ID", env.R2_ACCESS_KEY_ID],
     ["R2_SECRET_ACCESS_KEY", env.R2_SECRET_ACCESS_KEY],
     ["R2_BUCKET_NAME", env.R2_BUCKET_NAME],
+    ["ABACATEPAY_API_KEY", env.ABACATEPAY_API_KEY],
+    ["ABACATEPAY_WEBHOOK_SECRET", env.ABACATEPAY_WEBHOOK_SECRET],
+    ["ABACATEPAY_AVULSO_PRODUCT_ID", env.ABACATEPAY_AVULSO_PRODUCT_ID],
+    ["ABACATEPAY_PRO_PRODUCT_ID", env.ABACATEPAY_PRO_PRODUCT_ID],
   ].filter(([, value]) => !value);
 
   if (missing.length) {
-    const missingKeys = missing.map(([k]) => k).join(", ");
+    const missingKeys = missing.map(([key]) => key).join(", ");
     throw new Error(
       `DocFacil production backend configuration incomplete. Missing required environment variables: ${missingKeys}`
     );

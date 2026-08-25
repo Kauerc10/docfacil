@@ -7,6 +7,7 @@ import {
   InMemoryGenerationRequestsRepository,
   InMemoryUsersRepository,
   InMemoryGenerationCommitRepository,
+  InMemoryBillingSubscriptionsRepository,
 } from "../firestore/in-memory-repositories";
 import { InMemoryArtifactStorage } from "../r2/storage";
 import { BackendError } from "../errors";
@@ -50,6 +51,30 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
     finalidade: "Comprovante de residência para matrícula",
     cidade_data: "São Paulo, 14 de agosto de 2026",
   };
+
+  async function createPaidProSubscription(
+    subscriptions: InMemoryBillingSubscriptionsRepository,
+    userId: string
+  ) {
+    const now = Date.now();
+    await subscriptions.upsert({
+      userId,
+      provider: "abacatepay",
+      providerSubscriptionId: `sub_${userId}`,
+      providerCheckoutId: `checkout_${userId}`,
+      providerProductId: "prod_pro",
+      product: "pro",
+      method: "card",
+      status: "active",
+      autoRenew: true,
+      amountCents: 3990,
+      paidThrough: now + 24 * 60 * 60 * 1000,
+      lastPaidAt: now,
+      lastPaymentId: `pay_${userId}`,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
 
   it("completes happy path for guest: consumes order, uploads to R2, creates artifact v1, promotes, and issues guest magic link", async () => {
     const order = await ordersRepo.createOrder({
@@ -157,6 +182,8 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
 
   it("supports Pro regeneration: creates v2 while keeping v1 artifact intact", async () => {
     usersRepo.setUser("usr_pro", { plano: "pro" });
+    const subscriptionsRepo = new InMemoryBillingSubscriptionsRepository();
+    await createPaidProSubscription(subscriptionsRepo, "usr_pro");
     const deps = {
       repositories: {
         documents: docsRepo,
@@ -166,6 +193,7 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
         users: usersRepo,
         generationCommit: commitRepo,
       },
+      billingSubscriptions: subscriptionsRepo,
       storage,
     };
 
@@ -200,6 +228,8 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
 
   it("serializes concurrent Pro regenerations before they can both write version 2", async () => {
     usersRepo.setUser("usr_pro", { plano: "pro" });
+    const subscriptionsRepo = new InMemoryBillingSubscriptionsRepository();
+    await createPaidProSubscription(subscriptionsRepo, "usr_pro");
     const deps = {
       repositories: {
         documents: docsRepo,
@@ -209,6 +239,7 @@ describe("generateDocumentArtifact (Orchestrator)", () => {
         users: usersRepo,
         generationCommit: commitRepo,
       },
+      billingSubscriptions: subscriptionsRepo,
       storage,
     };
 

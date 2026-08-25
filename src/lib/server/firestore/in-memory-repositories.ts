@@ -7,6 +7,8 @@ import type {
   IGenerationRequestsRepository,
   IUsersRepository,
   IGenerationCommitRepository,
+  IBillingSubscriptionsRepository,
+  IBillingWebhookEventsRepository,
   CommitGeneratedArtifactInput,
 } from "./interfaces";
 import type {
@@ -17,6 +19,7 @@ import type {
   OrderRecord,
   ArtifactState,
 } from "../domain/documents";
+import type { BillingSubscriptionRecord } from "../billing/subscription";
 import { BackendError } from "../errors";
 import { createOrderBuyerPrincipalKey } from "../billing/order-identity";
 
@@ -35,6 +38,8 @@ declare global {
     orders: Map<string, OrderRecord>;
     generationRequests: Map<string, GenerationRequestRecord>;
     users: Map<string, { plano?: string; email?: string; nome?: string }>;
+    subscriptions: Map<string, BillingSubscriptionRecord>;
+    webhookEvents: Set<string>;
   } | undefined;
 }
 
@@ -47,6 +52,8 @@ function getStore() {
       orders: new Map(),
       generationRequests: new Map(),
       users: new Map(),
+      subscriptions: new Map(),
+      webhookEvents: new Set(),
     };
   }
   return globalThis.__inMemoryStore;
@@ -409,6 +416,38 @@ export class InMemoryOrdersRepository implements IOrdersRepository {
       delete order.reservedAt;
     }
   }
+
+  public async updateProviderRefs(
+    orderId: string,
+    refs: Partial<
+      Pick<
+        OrderRecord,
+        | "method"
+        | "providerPaymentId"
+        | "providerCheckoutId"
+        | "providerSubscriptionId"
+        | "providerStatus"
+        | "providerDevMode"
+        | "pix"
+      >
+    >
+  ): Promise<OrderRecord> {
+    const order = this.orders.get(orderId);
+    if (!order) {
+      throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido de compra não encontrado.");
+    }
+    Object.assign(order, refs);
+    return JSON.parse(JSON.stringify(order));
+  }
+
+  public async findByProviderCheckoutId(providerCheckoutId: string): Promise<OrderRecord | null> {
+    for (const order of this.orders.values()) {
+      if (order.providerCheckoutId === providerCheckoutId) {
+        return JSON.parse(JSON.stringify(order));
+      }
+    }
+    return null;
+  }
 }
 
 export class InMemoryGenerationRequestsRepository
@@ -642,5 +681,75 @@ export class InMemoryGenerationCommitRepository implements IGenerationCommitRepo
       targetVersion: input.targetVersion,
       guestAccessPath: input.guestAccessPath,
     });
+  }
+}
+
+export class InMemoryBillingSubscriptionsRepository
+  implements IBillingSubscriptionsRepository
+{
+  private readonly _subs: Map<string, BillingSubscriptionRecord> | null;
+
+  constructor(isolated = true) {
+    this._subs = isolated ? new Map() : null;
+  }
+
+  private get subs() {
+    return this._subs ?? getStore().subscriptions;
+  }
+
+  public async getByUserId(userId: string): Promise<BillingSubscriptionRecord | null> {
+    const sub = this.subs.get(userId);
+    return sub ? JSON.parse(JSON.stringify(sub)) : null;
+  }
+
+  public async getByProviderSubscriptionId(
+    id: string
+  ): Promise<BillingSubscriptionRecord | null> {
+    for (const sub of this.subs.values()) {
+      if (sub.providerSubscriptionId === id) {
+        return JSON.parse(JSON.stringify(sub));
+      }
+    }
+    return null;
+  }
+
+  public async upsert(record: BillingSubscriptionRecord): Promise<void> {
+    this.subs.set(record.userId, JSON.parse(JSON.stringify(record)));
+  }
+}
+
+export class InMemoryBillingWebhookEventsRepository
+  implements IBillingWebhookEventsRepository
+{
+  private readonly _events: Set<string> | null;
+
+  constructor(isolated = true) {
+    this._events = isolated ? new Set() : null;
+  }
+
+  private get events() {
+    return this._events ?? getStore().webhookEvents;
+  }
+
+  public async exists(eventId: string): Promise<boolean> {
+    return this.events.has(eventId);
+  }
+
+  public async claim(eventId: string, _now: number): Promise<boolean> {
+    if (this.events.has(eventId)) return false;
+    this.events.add(eventId);
+    return true;
+  }
+
+  public async complete(eventId: string, _now: number): Promise<void> {
+    this.events.add(eventId);
+  }
+
+  public async release(eventId: string): Promise<void> {
+    this.events.delete(eventId);
+  }
+
+  public record(eventId: string): void {
+    this.events.add(eventId);
   }
 }

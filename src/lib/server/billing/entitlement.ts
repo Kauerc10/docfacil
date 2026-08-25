@@ -3,6 +3,10 @@ import type { Principal } from "../security";
 import type { OrderRecord, DocumentEntitlement } from "../domain/documents";
 import { BackendError } from "../errors";
 import { FREE_MONTHLY_LIMIT, isMonthlyFreeModel } from "@/lib/document-access-policy";
+import {
+  hasCurrentProAccess,
+  type BillingSubscriptionRecord,
+} from "./subscription";
 
 export type AccountPlan = "gratis" | "pro";
 export type PurchaseProduct = "avulso" | "pro";
@@ -13,6 +17,8 @@ export interface ResolveEntitlementParams {
   orderId?: string;
   order?: OrderRecord | null;
   userProfile?: { plano?: string } | null;
+  subscription?: BillingSubscriptionRecord | null;
+  now?: number;
   currentMonthlyCount?: number;
 }
 
@@ -23,7 +29,15 @@ export interface EntitlementDecision {
 }
 
 export function resolveEntitlement(params: ResolveEntitlementParams): EntitlementDecision {
-  const { principal, modeloSlug, orderId, order, userProfile, currentMonthlyCount = 0 } = params;
+  const {
+    principal,
+    modeloSlug,
+    orderId,
+    order,
+    subscription,
+    now = Date.now(),
+    currentMonthlyCount = 0,
+  } = params;
 
   if (orderId) {
     if (!order) {
@@ -56,7 +70,7 @@ export function resolveEntitlement(params: ResolveEntitlementParams): Entitlemen
     );
   }
 
-  if (userProfile?.plano === "pro") {
+  if (hasCurrentProAccess(subscription, now)) {
     return { entitlement: "pro", watermarked: false };
   }
 

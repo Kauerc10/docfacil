@@ -10,10 +10,13 @@ import {
 import { BackendError } from "../errors";
 import { MODELOS } from "../../modelos";
 import { resolveEntitlement } from "../billing/entitlement";
+import { hasCurrentProAccess } from "../billing/subscription";
 import { createBuyerFingerprint } from "../billing/order-identity";
 import { generatePdfServer } from "../../pdf/server/generator";
 import type { BackendRepositories } from "../firestore/repositories";
 import { getRepositories } from "../firestore/repositories";
+import type { IBillingSubscriptionsRepository } from "../firestore/interfaces";
+import { getBillingRepositories } from "../firestore/billing-repositories";
 import type { ArtifactStorage } from "../r2/storage";
 import { getArtifactStorage } from "../r2/storage";
 import { logger } from "../../logger";
@@ -22,6 +25,7 @@ import { resolveDocumentWatermark } from "./preview-render-policy";
 
 export interface GenerateDocumentDependencies {
   repositories?: Partial<BackendRepositories>;
+  billingSubscriptions?: IBillingSubscriptionsRepository;
   storage?: ArtifactStorage;
 }
 
@@ -128,6 +132,8 @@ export async function generateDocumentArtifact(
   const generationRequests =
     deps?.repositories?.generationRequests || defaultRepos.generationRequests;
   const users = deps?.repositories?.users || defaultRepos.users;
+  const billingSubscriptions =
+    deps?.billingSubscriptions || getBillingRepositories().subscriptions;
 
   let generationCommit =
     deps?.repositories?.generationCommit || defaultRepos.generationCommit;
@@ -279,12 +285,20 @@ export async function generateDocumentArtifact(
   if (existingDocumentId && existingDocument) {
     const userPrincipal = principal as Extract<Principal, { type: "user" }>;
     const profile = await repos.users.getUserProfile(userPrincipal.userId);
+    const subscription = await billingSubscriptions.getByUserId(
+      userPrincipal.userId
+    );
 
-    if (profile?.plano === "pro") {
-      entitlementDecision = {
-        entitlement: "pro",
-        watermarked: resolveDocumentWatermark("pro"),
-      };
+    if (hasCurrentProAccess(subscription)) {
+      entitlementDecision = resolveEntitlement({
+        principal,
+        modeloSlug,
+        subscription,
+        userProfile: profile,
+      });
+      entitlementDecision.watermarked = resolveDocumentWatermark(
+        entitlementDecision.entitlement
+      );
     } else if (orderId) {
       try {
         const order = await repos.orders.reservePaidOrder({
@@ -298,6 +312,7 @@ export async function generateDocumentArtifact(
           orderId,
           order,
           userProfile: profile,
+          subscription,
         });
         entitlementDecision.watermarked = resolveDocumentWatermark(
           entitlementDecision.entitlement
@@ -392,6 +407,9 @@ export async function generateDocumentArtifact(
       }
     } else {
       const profile = await repos.users.getUserProfile(principal.userId);
+      const subscription = await billingSubscriptions.getByUserId(
+        principal.userId
+      );
       const startOfMonth = getStartOfBillingMonthTimestamp();
       const userDocuments = await repos.documents.listUserDocuments(
         principal.userId
@@ -420,6 +438,7 @@ export async function generateDocumentArtifact(
           orderId,
           order,
           userProfile: profile,
+          subscription,
           currentMonthlyCount: monthlyCount,
         });
         entitlementDecision.watermarked = resolveDocumentWatermark(

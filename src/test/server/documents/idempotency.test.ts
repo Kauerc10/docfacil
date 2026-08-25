@@ -5,7 +5,13 @@ import {
   clearFinalizationRequestId,
 } from "@/lib/documents/idempotency";
 import { generateDocumentArtifact } from "@/lib/server/domain/orchestrator";
-import { InMemoryDocumentsRepository, InMemoryGenerationRequestsRepository, InMemoryOrdersRepository, InMemoryUsersRepository } from "@/lib/server/firestore/in-memory-repositories";
+import {
+  InMemoryBillingSubscriptionsRepository,
+  InMemoryDocumentsRepository,
+  InMemoryGenerationRequestsRepository,
+  InMemoryOrdersRepository,
+  InMemoryUsersRepository,
+} from "@/lib/server/firestore/in-memory-repositories";
 import { InMemoryArtifactStorage } from "@/lib/server/r2/storage";
 
 describe("Document Idempotency Management", () => {
@@ -126,6 +132,7 @@ describe("Document Idempotency Management", () => {
     const genRequestsRepo = new InMemoryGenerationRequestsRepository();
     const ordersRepo = new InMemoryOrdersRepository();
     const usersRepo = new InMemoryUsersRepository();
+    const subscriptionsRepo = new InMemoryBillingSubscriptionsRepository();
     const storage = new InMemoryArtifactStorage();
 
     const deps = {
@@ -136,10 +143,29 @@ describe("Document Idempotency Management", () => {
         access: {} as any,
         users: usersRepo,
       },
+      billingSubscriptions: subscriptionsRepo,
       storage,
     };
 
     await usersRepo.setUserProfile("user_pro", { plano: "pro" });
+    const now = Date.now();
+    await subscriptionsRepo.upsert({
+      userId: "user_pro",
+      provider: "abacatepay",
+      providerSubscriptionId: "sub_idempotency_pro",
+      providerCheckoutId: "checkout_idempotency_pro",
+      providerProductId: "prod_pro",
+      product: "pro",
+      method: "card",
+      status: "active",
+      autoRenew: true,
+      amountCents: 3990,
+      paidThrough: now + 24 * 60 * 60 * 1000,
+      lastPaidAt: now,
+      lastPaymentId: "pay_idempotency_pro",
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const doc = await docsRepo.createDocument({
       owner: { type: "user", userId: "user_pro" },

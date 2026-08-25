@@ -6,6 +6,7 @@ import {
   InMemoryAccessRepository,
   InMemoryGenerationRequestsRepository,
   InMemoryUsersRepository,
+  InMemoryBillingSubscriptionsRepository,
 } from "@/lib/server/firestore/in-memory-repositories";
 import { InMemoryArtifactStorage } from "@/lib/server/r2/storage";
 
@@ -15,6 +16,7 @@ describe("Watermark Enforcement Across Entitlements", () => {
   let accessRepo: InMemoryAccessRepository;
   let genRequestsRepo: InMemoryGenerationRequestsRepository;
   let usersRepo: InMemoryUsersRepository;
+  let subscriptionsRepo: InMemoryBillingSubscriptionsRepository;
   let storage: InMemoryArtifactStorage;
 
   beforeEach(() => {
@@ -23,6 +25,7 @@ describe("Watermark Enforcement Across Entitlements", () => {
     accessRepo = new InMemoryAccessRepository();
     genRequestsRepo = new InMemoryGenerationRequestsRepository();
     usersRepo = new InMemoryUsersRepository();
+    subscriptionsRepo = new InMemoryBillingSubscriptionsRepository();
     storage = new InMemoryArtifactStorage();
   });
 
@@ -50,6 +53,7 @@ describe("Watermark Enforcement Across Entitlements", () => {
       generationRequests: genRequestsRepo,
       users: usersRepo,
     },
+    billingSubscriptions: subscriptionsRepo,
     storage,
   });
 
@@ -106,13 +110,31 @@ describe("Watermark Enforcement Across Entitlements", () => {
     expect(artifact?.watermarked).toBe(false);
   });
 
-  it("pro tier authenticated user gets unwatermarked clean artifact", async () => {
+  it("paid Pro subscription gets unwatermarked clean artifact", async () => {
     const userId = "user_pro_clean";
     const userEmail = "juliana_pro@example.com";
+    const now = Date.now();
     usersRepo.setUser(userId, {
       plano: "pro",
       email: userEmail,
       nome: "Juliana Pro",
+    });
+    await subscriptionsRepo.upsert({
+      userId,
+      provider: "abacatepay",
+      providerSubscriptionId: "sub_pro_clean",
+      providerCheckoutId: "checkout_pro_clean",
+      providerProductId: "prod_pro",
+      product: "pro",
+      method: "card",
+      status: "active",
+      autoRenew: true,
+      amountCents: 3990,
+      paidThrough: now + 24 * 60 * 60 * 1000,
+      lastPaidAt: now,
+      lastPaymentId: "pay_pro_clean",
+      createdAt: now,
+      updatedAt: now,
     });
 
     const res = await generateDocumentArtifact({
@@ -129,5 +151,28 @@ describe("Watermark Enforcement Across Entitlements", () => {
 
     const artifact = await docsRepo.getArtifact(res.documentId, res.version);
     expect(artifact?.watermarked).toBe(false);
+  });
+
+  it("legacy plano pro without a paid subscription stays on free entitlement", async () => {
+    const userId = "user_legacy_pro";
+    const userEmail = "legacy_pro@example.com";
+    usersRepo.setUser(userId, {
+      plano: "pro",
+      email: userEmail,
+      nome: "Legacy Pro",
+    });
+
+    const res = await generateDocumentArtifact({
+      requestId: crypto.randomUUID(),
+      principal: { type: "user", userId, email: userEmail },
+      modeloSlug: "declaracao-residencia",
+      respostas: validAnswers,
+      clausulasSelecionadas: [],
+      deps: getDeps(),
+    });
+
+    const doc = await docsRepo.getDocument(res.documentId);
+    expect(doc?.entitlement.type).toBe("free");
+    expect(doc?.entitlement.watermarked).toBe(true);
   });
 });
