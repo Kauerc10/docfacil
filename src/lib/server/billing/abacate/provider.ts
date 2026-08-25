@@ -1,6 +1,7 @@
 import "server-only";
 import { BackendError } from "../../errors";
 import { getServerEnv } from "../../env";
+import { logger } from "../../../logger";
 import type {
   BillingProvider,
   CreateOneTimePaymentInput,
@@ -31,15 +32,18 @@ interface HostedCheckoutResponse {
   devMode: boolean;
 }
 
+const PRODUCT_ID_PATTERN = /^prod_[A-Za-z0-9_-]+$/;
+
 function requiredProductId(value: string | undefined, product: string): string {
-  if (!value) {
+  const normalized = value?.trim();
+  if (!normalized || !PRODUCT_ID_PATTERN.test(normalized)) {
     throw new BackendError(
       "BILLING_NOT_CONFIGURED",
       503,
       `Pagamento ${product} temporariamente indisponível.`
     );
   }
-  return value;
+  return normalized;
 }
 
 export class AbacatePayBillingProvider implements BillingProvider {
@@ -87,23 +91,32 @@ export class AbacatePayBillingProvider implements BillingProvider {
       this.config.avulsoProductId,
       "avulso"
     );
-    const response = await this.client.request<HostedCheckoutResponse>(
-      "/checkouts/create",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          items: [{ id: productId, quantity: 1 }],
-          methods: ["CARD"],
-          externalId: input.orderId,
-          completionUrl: input.completionUrl,
-          returnUrl: input.completionUrl,
-          metadata: {
-            product: "avulso",
-            orderId: input.orderId,
-          },
-        }),
-      }
-    );
+
+    let response: HostedCheckoutResponse;
+    try {
+      response = await this.client.request<HostedCheckoutResponse>(
+        "/checkouts/create",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            items: [{ id: productId, quantity: 1 }],
+            methods: ["CARD"],
+            externalId: input.orderId,
+            completionUrl: input.completionUrl,
+            returnUrl: input.completionUrl,
+            metadata: {
+              product: "avulso",
+              orderId: input.orderId,
+            },
+          }),
+        }
+      );
+    } catch (error) {
+      logger.warn("Billing", "Checkout de cartão avulso falhou", {
+        providerProductId: productId,
+      });
+      throw error;
+    }
 
     return {
       kind: "hosted",
@@ -118,22 +131,31 @@ export class AbacatePayBillingProvider implements BillingProvider {
     input: CreateSubscriptionInput
   ): Promise<SubscriptionPaymentResult> {
     const productId = requiredProductId(this.config.proProductId, "Pro");
-    const response = await this.client.request<HostedCheckoutResponse>(
-      "/subscriptions/create",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          items: [{ id: productId, quantity: 1 }],
-          methods: ["CARD"],
-          externalId: input.orderId,
-          completionUrl: input.completionUrl,
-          metadata: {
-            product: "pro",
-            orderId: input.orderId,
-          },
-        }),
-      }
-    );
+
+    let response: HostedCheckoutResponse;
+    try {
+      response = await this.client.request<HostedCheckoutResponse>(
+        "/subscriptions/create",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            items: [{ id: productId, quantity: 1 }],
+            methods: ["CARD"],
+            externalId: input.orderId,
+            completionUrl: input.completionUrl,
+            metadata: {
+              product: "pro",
+              orderId: input.orderId,
+            },
+          }),
+        }
+      );
+    } catch (error) {
+      logger.warn("Billing", "Checkout de assinatura Pro falhou", {
+        providerProductId: productId,
+      });
+      throw error;
+    }
 
     return {
       kind: "hosted",
