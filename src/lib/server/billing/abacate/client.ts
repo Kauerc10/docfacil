@@ -39,6 +39,9 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 export function extractProviderErrorDetails(value: unknown): ProviderErrorDetails | null {
+  const directMessage = safeDiagnosticText(value, 240);
+  if (directMessage) return { message: directMessage };
+
   const record = asRecord(value);
   if (!record) return null;
 
