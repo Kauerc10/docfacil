@@ -24,7 +24,9 @@ export async function completeDemoCheckout(
     await emailInput.fill(options.email ?? "e2e.checkout@docfacil.test");
   }
 
-  const payCta = page.getByRole("button", { name: /pagar|assinar/i }).first();
+  const payCta = page
+    .getByRole("button", { name: /gerar pix|pagar|assinar/i })
+    .first();
   await expect(payCta).toBeVisible({ timeout: 10000 });
   await payCta.click();
 
