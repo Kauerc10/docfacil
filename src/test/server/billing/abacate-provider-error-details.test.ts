@@ -33,7 +33,19 @@ describe("AbacatePay provider error details", () => {
     });
   });
 
+  it("captures safe top-level string errors returned by the provider", () => {
+    expect(
+      extractProviderErrorDetails("Produto inválido ou não encontrado.")
+    ).toEqual({ message: "Produto inválido ou não encontrado." });
+  });
+
+  it("rejects sensitive top-level string errors", () => {
+    expect(
+      extractProviderErrorDetails("Authorization Bearer secret_should_never_log")
+    ).toBeNull();
+  });
+
   it("returns null when no safe diagnostic field exists", () => {
-    expect(extractProviderErrorDetails("raw secret trace")).toBeNull();
+    expect(extractProviderErrorDetails({ debug: "sql trace" })).toBeNull();
   });
 });
