@@ -93,11 +93,9 @@ describe("document access product contract", () => {
     expect(source).toContain("deleteAccountDraft(draft.id)");
   });
 
-  it("checkout autenticado nao repete consentimento e guest avulso continua pedindo aceite", async () => {
-    const source = await readSource("src/components/docfacil/views/checkout-view.tsx");
-    expect(source).toContain('const requiresCheckoutConsent = !user && plan === "avulso"');
-    expect(source).toContain("if (!requiresCheckoutConsent) {");
-    expect(source).toContain("void handleAcceptConsent();");
-    expect(source).toContain("setConsentOpen(true);");
+  it("checkout não abre um segundo aceite quando a própria tela já informa os termos", async () => {
+    const source = await readSource("src/components/docfacil/terms-consent-modal.tsx");
+    expect(source).toContain('flow === "checkout"');
+    expect(source).toContain("CheckoutConsentPassThrough");
   });
 });
