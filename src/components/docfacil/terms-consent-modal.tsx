@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -21,33 +21,6 @@ import {
 import { SUCCESS_MESSAGES } from "@/lib/constants";
 import { COMPANY } from "@/lib/company";
 
-/**
- * TermsConsentModal — força o aceite de Termos + Privacidade antes de
- * continuar um fluxo sensível (cadastro, checkout, geração de documento).
- *
- * Props:
- * - open / onClose        — controle de visibilidade
- * - onAccept: recebe os documentos aceitos e prossegue o fluxo.
- * - flow                  — "cadastro" | "checkout" | "document-generation"
- * - userEmail? / userId?  — identificação do titular (para o registro)
- *
- * Comportamento:
- * - 3 checkboxes: Termos (obrigatório), Privacidade (obrigatório),
- *   Marketing (opcional).
- * - Botão "Aceitar e continuar" desabilitado enquanto os dois obrigatórios
- *   não estiverem marcados.
- * - Ao confirmar, chama `recordConsent()` (consent-service) e dispara
- *   `onAccept()` no sucesso.
- * - Links de Termos/Privacidade chamam `navigate("termos"|"privacidade")`.
- * - Backdrop/ESC são bloqueados para os flows "cadastro" e "checkout"
- *   (modal manual) — o usuário precisa decidir entre aceitar ou cancelar
- *   via botão. Em "document-generation", permite fechar normalmente.
- *
- * Nota técnica: o estado dos checkboxes vive num componente interno
- * (`ConsentForm`) montado apenas quando `open === true`. Assim evitamos
- * o anti-pattern de chamar setState dentro de useEffect para "resetar"
- * o formulário a cada abertura — o React já zera o estado ao desmontar.
- */
 export interface TermsConsentModalProps {
   open: boolean;
   onClose: () => void;
@@ -65,19 +38,17 @@ export function TermsConsentModal({
   userEmail,
   userId,
 }: TermsConsentModalProps) {
-  // Bloqueio de backdrop/ESC para flows sensíveis. Em "document-generation",
-  // o usuário pode fechar normalmente; nos flows de cadastro/checkout, ele
-  // precisa decidir entre aceitar ou cancelar via botão explícito.
-  const lockClose = flow === "cadastro" || flow === "checkout";
+  if (flow === "checkout") {
+    return <CheckoutConsentPassThrough open={open} onAccept={onAccept} />;
+  }
+
+  const lockClose = flow === "cadastro";
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next && lockClose) {
-          // Ignora tentativa de fechar via ESC/backdrop nos flows sensíveis.
-          return;
-        }
+        if (!next && lockClose) return;
         if (!next) onClose();
       }}
     >
@@ -105,8 +76,6 @@ export function TermsConsentModal({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Monta o form só quando aberto — estado dos checkboxes nasce
-            limpo a cada abertura, sem precisar de useEffect para resetar. */}
         {open && (
           <ConsentForm
             flow={flow}
@@ -124,6 +93,29 @@ export function TermsConsentModal({
       </DialogContent>
     </Dialog>
   );
+}
+
+function CheckoutConsentPassThrough({
+  open,
+  onAccept,
+}: {
+  open: boolean;
+  onAccept: (documents: ConsentDocument[]) => Promise<void> | void;
+}) {
+  const handled = useRef(false);
+
+  useEffect(() => {
+    if (!open) {
+      handled.current = false;
+      return;
+    }
+    if (handled.current) return;
+
+    handled.current = true;
+    void Promise.resolve(onAccept(["termos", "privacidade"]));
+  }, [onAccept, open]);
+
+  return null;
 }
 
 function ConsentForm({
@@ -157,8 +149,6 @@ function ConsentForm({
         ? ["termos", "privacidade", "marketing"]
         : ["termos", "privacidade"];
       if (flow === "cadastro") {
-        // No cadastro ainda não existe auth.uid. O callback cria a conta e
-        // persiste o aceite com a identidade real recém-autenticada.
         await onAccept(documents);
       } else {
         if (!userId) {
@@ -183,7 +173,6 @@ function ConsentForm({
   return (
     <>
       <div className="mt-4 space-y-4">
-        {/* Termos */}
         <ConsentRow
           id="consent-terms"
           checked={acceptedTerms}
@@ -204,7 +193,6 @@ function ConsentForm({
           }
         />
 
-        {/* Privacidade */}
         <ConsentRow
           id="consent-privacy"
           checked={acceptedPrivacy}
@@ -225,7 +213,6 @@ function ConsentForm({
           }
         />
 
-        {/* Marketing */}
         <ConsentRow
           id="consent-marketing"
           checked={acceptedMarketing}
