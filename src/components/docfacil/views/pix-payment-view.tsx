@@ -27,13 +27,13 @@ import {
   buildPixCheckoutReturnUrl,
   parsePixPaymentSession,
   pixPaymentSessionStorageKey,
+  shouldPollPixPayment,
   type PixPaymentSession,
+  type PixPaymentState,
 } from "@/lib/services/pix-payment-session";
 
 const PAYMENT_POLL_INTERVAL_MS = 1500;
 const PAYMENT_POLL_MAX_ATTEMPTS = 120;
-
-type PaymentState = "loading" | "pending" | "paid" | "failed" | "expired" | "error";
 
 function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", {
@@ -71,7 +71,7 @@ export function PixPaymentView() {
 
   const [session, setSession] = useState<PixPaymentSession | null>(null);
   const [pix, setPix] = useState<CheckoutPixPayload | null>(null);
-  const [paymentState, setPaymentState] = useState<PaymentState>("loading");
+  const [paymentState, setPaymentState] = useState<PixPaymentState>("loading");
   const [lastStatus, setLastStatus] = useState<CheckoutStatusResult | null>(null);
 
   useEffect(() => {
@@ -79,11 +79,15 @@ export function PixPaymentView() {
     const stored = parsePixPaymentSession(
       window.sessionStorage.getItem(pixPaymentSessionStorageKey(orderId))
     );
-    if (stored?.orderId === orderId) {
+    if (stored?.orderId !== orderId) return;
+
+    const hydrateTimer = window.setTimeout(() => {
       setSession(stored);
       setPix(stored.pix);
       setPaymentState(Date.now() >= stored.pix.expiresAt ? "expired" : "pending");
-    }
+    }, 0);
+
+    return () => window.clearTimeout(hydrateTimer);
   }, [orderId]);
 
   const guestDraft = useMemo(
@@ -102,7 +106,7 @@ export function PixPaymentView() {
   );
 
   useEffect(() => {
-    if (!orderId || authLoading || paymentState === "expired") return;
+    if (!orderId || authLoading || !shouldPollPixPayment(paymentState)) return;
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -199,7 +203,13 @@ export function PixPaymentView() {
   }
 
   if (!orderId) {
-    return <PixStateCard title="Pagamento não encontrado" description="Volte ao checkout e gere um novo Pix." onBack={backToCheckout} />;
+    return (
+      <PixStateCard
+        title="Pagamento não encontrado"
+        description="Volte ao checkout e gere um novo Pix."
+        onBack={backToCheckout}
+      />
+    );
   }
 
   const qrSource = pix?.brCodeBase64 ? normalizeQrSource(pix.brCodeBase64) : null;
