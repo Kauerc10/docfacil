@@ -86,6 +86,18 @@ function providerFailure(): BackendError {
   );
 }
 
+function providerCapabilityFailure(details: ProviderErrorDetails | null): BackendError | null {
+  const message = details?.message?.toLowerCase();
+  if (message?.includes("card is not available for this store")) {
+    return new BackendError(
+      "BILLING_METHOD_UNAVAILABLE",
+      503,
+      "Pagamento com cartão ainda não está habilitado nesta loja. Use Pix por enquanto."
+    );
+  }
+  return null;
+}
+
 export class AbacatePayClient {
   private readonly timeoutMs: number;
 
@@ -151,13 +163,14 @@ export class AbacatePayClient {
       (body.success === true || typeof body.success === "object");
 
     if (!response.ok || !success) {
+      const providerError = extractProviderErrorDetails(body?.error);
       logger.warn("Billing", "AbacatePay respondeu com falha", {
         path,
         status: response.status,
         providerSuccess: body?.success ?? null,
-        providerError: extractProviderErrorDetails(body?.error),
+        providerError,
       });
-      throw providerFailure();
+      throw providerCapabilityFailure(providerError) ?? providerFailure();
     }
 
     return body.data;
