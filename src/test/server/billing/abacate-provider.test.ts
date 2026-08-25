@@ -155,4 +155,38 @@ describe("AbacatePayBillingProvider v2", () => {
       })
     ).rejects.toMatchObject({ code: "BILLING_NOT_CONFIGURED", status: 503 });
   });
+
+  it("fails closed before the gateway when a hosted product id is undefined-like", async () => {
+    const fetchMock = mock(async () => {
+      throw new Error("provider must not be called");
+    });
+    const client = new AbacatePayClient(
+      "dev_test_key",
+      fetchMock as unknown as typeof fetch
+    );
+    const provider = new AbacatePayBillingProvider(client, {
+      avulsoProductId: "undefined",
+      proProductId: "null",
+    });
+
+    await expect(
+      provider.createOneTimePayment({
+        orderId: "ord_invalid_product",
+        product: "avulso",
+        amountCents: 1990,
+        method: "card",
+        completionUrl: "https://docfacil.test/retorno",
+      })
+    ).rejects.toMatchObject({ code: "BILLING_NOT_CONFIGURED", status: 503 });
+
+    await expect(
+      provider.createSubscription({
+        orderId: "ord_invalid_pro",
+        amountCents: 3990,
+        completionUrl: "https://docfacil.test/retorno",
+      })
+    ).rejects.toMatchObject({ code: "BILLING_NOT_CONFIGURED", status: 503 });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
