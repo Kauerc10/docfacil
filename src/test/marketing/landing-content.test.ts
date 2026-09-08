@@ -8,7 +8,10 @@ const landingFile = readFileSync(
 );
 
 test("landing contém a proposta de valor e a headline comercial aprovadas", () => {
-  expect(landingFile).toContain("Crie contratos e declarações com orientação em cada etapa");
+  expect(landingFile).toContain("Documento difícil? Nunca mais.");
+  expect(landingFile).toContain(
+    "Responda perguntas simples e veja seu documento ganhar forma, com orientação do início ao fim."
+  );
   expect(landingFile).toContain("/documentos");
   expect(landingFile).toContain("#como-funciona");
 });

@@ -20,7 +20,7 @@ test.describe("Landing comercial e fluxo de descoberta pública", () => {
     // 1. Acessa a home
     await page.goto("/");
     await expect(
-      page.getByRole("heading", { name: "Crie contratos e declarações com orientação em cada etapa" })
+      page.getByRole("heading", { name: "Documento difícil? Nunca mais." })
     ).toBeVisible();
 
     // Confere se o hero e os CTAs estão visíveis

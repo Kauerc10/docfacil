@@ -66,11 +66,10 @@ export function LandingPage() {
               Documentos claros, do começo ao PDF
             </p>
             <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-950 sm:text-6xl">
-              Crie contratos e declarações com orientação em cada etapa
+              Documento difícil? Nunca mais.
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-              Escolha o documento, responda perguntas simples e confira tudo antes de gerar um PDF
-              profissional. Sem precisar decifrar juridiquês sozinho.
+              Responda perguntas simples e veja seu documento ganhar forma, com orientação do início ao fim.
             </p>
             <div className="mt-8 flex flex-col gap-3.5 sm:flex-row">
               <Link

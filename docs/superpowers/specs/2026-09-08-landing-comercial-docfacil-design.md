@@ -28,11 +28,9 @@ Pessoas físicas resolvendo situações cotidianas de moradia, declarações, co
 
 O DocFácil ajuda a transformar informações do cotidiano em documentos organizados por meio de modelos e preenchimento guiado.
 
-### Mensagem principal
+**Documento difícil? Nunca mais.**
 
-**Crie contratos e declarações com orientação em cada etapa.**
-
-Escolha um modelo, preencha suas informações e gere um PDF organizado para revisar, baixar e imprimir.
+Responda perguntas simples e veja seu documento ganhar forma, com orientação do início ao fim.
 
 ### Ações principais
 
