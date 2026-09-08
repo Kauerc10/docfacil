@@ -37,7 +37,7 @@ const faqs = [
   ],
   [
     "Meus dados ficam protegidos?",
-    "Sim. Cada conta tem acesso exclusivo aos seus próprios documentos salvos. Não compartilhamos suas informações com terceiros, conforme detalhado na nossa Política de Privacidade.",
+    "Seus documentos ficam vinculados à sua conta e protegidos pelas regras de acesso da plataforma. Veja na Política de Privacidade como seus dados são tratados.",
   ],
   [
     "O documento tem validade jurídica?",
