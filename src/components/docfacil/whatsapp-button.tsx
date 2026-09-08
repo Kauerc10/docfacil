@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { COMPANY } from "@/lib/company";
+import { COMPANY, COMPANY_DATA_IS_PLACEHOLDER } from "@/lib/company";
 
 /**
- * Floating WhatsApp button — "Sempre existe uma saída para o humano."
- * Appears after a small delay so it doesn't compete with the hero,
- * then stays pinned bottom-right on every screen.
+ * Botão flutuante do WhatsApp.
+ * Só é exibido se os dados da empresa (número real) tiverem sido confirmados,
+ * evitando divulgar canais inexistentes ou números fictícios.
  */
 export function WhatsAppButton() {
   const [shown, setShown] = useState(false);
@@ -15,6 +15,8 @@ export function WhatsAppButton() {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (COMPANY_DATA_IS_PLACEHOLDER) return;
+
     const t1 = setTimeout(() => setShown(true), 1400);
     const t2 = setTimeout(() => setHintOpen(true), 3200);
     const t3 = setTimeout(() => setHintOpen(false), 10000);
@@ -24,6 +26,10 @@ export function WhatsAppButton() {
       clearTimeout(t3);
     };
   }, []);
+
+  if (COMPANY_DATA_IS_PLACEHOLDER) {
+    return null;
+  }
 
   return (
     <div
@@ -52,7 +58,7 @@ export function WhatsAppButton() {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Falar com atendente no WhatsApp"
-        className="group relative grid place-items-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#25D366] text-white shadow-[0_10px_30px_-8px_rgba(37,211,102,0.6)] hover:scale-105 active:scale-95 transition-transform"
+        className="group relative grid place-items-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#25D366] text-white shadow-[0_10px_30px_-8px_rgba(37,211,102,0.6)] hover:scale-105 active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-400"
         onMouseEnter={() => {
           if (timer.current) clearTimeout(timer.current);
           setHintOpen(true);

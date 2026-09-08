@@ -125,6 +125,24 @@ export function NavProvider({ children }: { children: React.ReactNode }) {
   const navigate = useCallback((next: View, p: NavParams = {}) => {
     if (typeof window === "undefined") return;
 
+    if (next === "modelos") {
+      if (typeof window.location?.assign === "function") {
+        window.location.assign("/documentos");
+      } else if (window.location) {
+        window.location.href = "/documentos";
+      }
+      return;
+    }
+    if (next === "modelo-detalhe" && p.slug) {
+      const target = `/documentos/${p.slug}`;
+      if (typeof window.location?.assign === "function") {
+        window.location.assign(target);
+      } else if (window.location) {
+        window.location.href = target;
+      }
+      return;
+    }
+
     const search = new URLSearchParams();
     search.set("view", next);
     for (const [key, value] of Object.entries(p)) {

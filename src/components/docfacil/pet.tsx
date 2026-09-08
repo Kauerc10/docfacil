@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { cn } from "@/lib/utils";
@@ -15,38 +15,57 @@ gsap.registerPlugin(useGSAP);
  *   <div root>           ← APENAS posicionamento (w/h, relative)
  *     <svg círculo>      ← SMIL animation rotate 40s (independente)
  *     <svg corujinha>    ← GSAP mood animations (bounce/scale/tilt) — NÃO afeta o círculo
- *
- * Bug anterior: GSAP aplicava rotation/translate no root, fazendo o círculo
- * rodar junto com a corujinha. Agora o root é estático; só a corujinha se move.
  */
 type Mood = "idle" | "falando" | "feliz" | "atencao" | "pensando";
 
+function subscribeReducedMotion(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+  media.addEventListener("change", onStoreChange);
+  return () => media.removeEventListener("change", onStoreChange);
+}
+
+function getReducedMotionSnapshot() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function getReducedMotionServerSnapshot() {
+  return false;
+}
+
 export function Pet({ mood = "idle", size = 80, className }: { mood?: Mood; size?: number; className?: string; }) {
   const corujinha = useRef<SVGSVGElement>(null);
+  const reducedMotion = useSyncExternalStore(
+    subscribeReducedMotion,
+    getReducedMotionSnapshot,
+    getReducedMotionServerSnapshot
+  );
 
   useGSAP(() => {
     const el = corujinha.current;
-    if (!el) return;
+    if (!el || reducedMotion) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     gsap.killTweensOf(el);
-    // reset rápido antes de aplicar novo mood
     gsap.set(el, { y: 0, rotation: 0, scale: 1 });
     applyMood(el, mood);
-  }, { scope: corujinha, dependencies: [mood] });
+  }, { scope: corujinha, dependencies: [mood, reducedMotion] });
 
   return (
     <div className={cn("relative inline-block", className)} style={{ width: size, height: size }}>
       {mood === "pensando" && <ThinkingBubbles />}
       {mood === "falando" && <TalkingDots />}
-      {/* Círculo tracejado — SVG separado, roda via SMIL (40s) — não é afetado pelo GSAP da corujinha */}
+      {/* Círculo tracejado — SVG separado, roda via SMIL quando não estiver em reduced motion */}
       <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full" aria-hidden="true" style={{ pointerEvents: "none" }}>
         <circle cx="50" cy="50" r="46" fill="none" stroke="var(--blue-royal)" strokeWidth="1.5" strokeDasharray="3 4" opacity="0.4">
-          <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="40s" repeatCount="indefinite" />
+          {!reducedMotion && (
+            <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="40s" repeatCount="indefinite" />
+          )}
         </circle>
       </svg>
-      {/* Corujinha — SVG separado, GSAP aplica mood AQUI (não no root) — o círculo fica intacto */}
+      {/* Corujinha — SVG separado, GSAP aplica mood AQUI */}
       <svg ref={corujinha} viewBox="0 0 100 100" className="absolute inset-0 w-full h-full" aria-hidden="true" style={{ transformOrigin: "50% 70%" }}>
-        {/* Orelhas (tufts sutis e arredondados) */}
+        {/* Orelhas */}
         <path d="M 33 34 Q 30 25 35 24 Q 38 29 37 34 Z" fill="var(--blue-royal)" />
         <path d="M 67 34 Q 70 25 65 24 Q 62 29 63 34 Z" fill="var(--blue-royal)" />
         {/* Corpo */}
@@ -56,29 +75,45 @@ export function Pet({ mood = "idle", size = 80, className }: { mood?: Mood; size
         <circle cx="40" cy="42" r="8" fill="white" />
         <circle cx="60" cy="42" r="8" fill="white" />
         <circle cx="40" cy="42" r="4" fill="var(--ink)">
-          <animate attributeName="cx" values="40;42;38;40" dur="4s" repeatCount="indefinite" />
-          <animate attributeName="cy" values="42;40;44;42" dur="4s" repeatCount="indefinite" />
+          {!reducedMotion && (
+            <>
+              <animate attributeName="cx" values="40;42;38;40" dur="4s" repeatCount="indefinite" />
+              <animate attributeName="cy" values="42;40;44;42" dur="4s" repeatCount="indefinite" />
+            </>
+          )}
         </circle>
         <circle cx="60" cy="42" r="4" fill="var(--ink)">
-          <animate attributeName="cx" values="60;62;58;60" dur="4s" repeatCount="indefinite" />
-          <animate attributeName="cy" values="42;40;44;42" dur="4s" repeatCount="indefinite" />
+          {!reducedMotion && (
+            <>
+              <animate attributeName="cx" values="60;62;58;60" dur="4s" repeatCount="indefinite" />
+              <animate attributeName="cy" values="42;40;44;42" dur="4s" repeatCount="indefinite" />
+            </>
+          )}
         </circle>
-        {/* Brilho dos olhos — reflexo de luz natural (offset +1,-1 da pupila, mesmo timing 4s) */}
+        {/* Brilho dos olhos */}
         <circle cx="41" cy="41" r="1.5" fill="white">
-          <animate attributeName="cx" values="41;43;39;41" dur="4s" repeatCount="indefinite" />
-          <animate attributeName="cy" values="41;39;43;41" dur="4s" repeatCount="indefinite" />
+          {!reducedMotion && (
+            <>
+              <animate attributeName="cx" values="41;43;39;41" dur="4s" repeatCount="indefinite" />
+              <animate attributeName="cy" values="41;39;43;41" dur="4s" repeatCount="indefinite" />
+            </>
+          )}
         </circle>
         <circle cx="61" cy="41" r="1.5" fill="white">
-          <animate attributeName="cx" values="61;63;59;61" dur="4s" repeatCount="indefinite" />
-          <animate attributeName="cy" values="41;39;43;41" dur="4s" repeatCount="indefinite" />
+          {!reducedMotion && (
+            <>
+              <animate attributeName="cx" values="61;63;59;61" dur="4s" repeatCount="indefinite" />
+              <animate attributeName="cy" values="41;39;43;41" dur="4s" repeatCount="indefinite" />
+            </>
+          )}
         </circle>
-        {/* Pálpebras (pisca a cada 5s) */}
-        {mood !== "atencao" && (
+        {/* Pálpebras */}
+        {mood !== "atencao" && !reducedMotion && (
           <rect x="32" y="34" width="16" height="0" fill="var(--blue-royal)" rx="1">
             <animate attributeName="height" values="0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;10;0" dur="5s" repeatCount="indefinite" />
           </rect>
         )}
-        {mood !== "atencao" && (
+        {mood !== "atencao" && !reducedMotion && (
           <rect x="52" y="34" width="16" height="0" fill="var(--blue-royal)" rx="1">
             <animate attributeName="height" values="0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;10;0" dur="5s" repeatCount="indefinite" />
           </rect>
@@ -87,10 +122,12 @@ export function Pet({ mood = "idle", size = 80, className }: { mood?: Mood; size
         <path d="M 47 50 L 53 50 L 50 55 Z" fill="var(--selo-green)" />
         {mood === "falando" && (
           <path d="M 47.5 52 L 52.5 52 L 50 55 Z" fill="var(--ink)" opacity="0.3">
-            <animate attributeName="opacity" values="0.3;0.6;0.3;0.6;0.3" dur="0.4s" repeatCount="indefinite" />
+            {!reducedMotion && (
+              <animate attributeName="opacity" values="0.3;0.6;0.3;0.6;0.3" dur="0.4s" repeatCount="indefinite" />
+            )}
           </path>
         )}
-        {/* Sobrancelhas conforme mood */}
+        {/* Sobrancelhas */}
         {mood === "atencao" ? (
           <>
             <path d="M 34 34 L 46 36" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" />
@@ -102,12 +139,12 @@ export function Pet({ mood = "idle", size = 80, className }: { mood?: Mood; size
             <path d="M 55 34 Q 60 32 65 35" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" fill="none" />
           </>
         ) : null}
-        {/* Asas — batem quando feliz */}
+        {/* Asas */}
         <path d="M 28 52 Q 22 56 24 62 Q 27 60 30 58 Z" fill="var(--blue-royal)" opacity="0.85">
-          {mood === "feliz" && <animateTransform attributeName="transform" type="rotate" values="0 28 56; -20 28 56; 0 28 56" dur="0.3s" repeatCount="3" />}
+          {mood === "feliz" && !reducedMotion && <animateTransform attributeName="transform" type="rotate" values="0 28 56; -20 28 56; 0 28 56" dur="0.3s" repeatCount="3" />}
         </path>
         <path d="M 72 52 Q 78 56 76 62 Q 73 60 70 58 Z" fill="var(--blue-royal)" opacity="0.85">
-          {mood === "feliz" && <animateTransform attributeName="transform" type="rotate" values="0 72 56; 20 72 56; 0 72 56" dur="0.3s" repeatCount="3" />}
+          {mood === "feliz" && !reducedMotion && <animateTransform attributeName="transform" type="rotate" values="0 72 56; 20 72 56; 0 72 56" dur="0.3s" repeatCount="3" />}
         </path>
         {/* Selo no peito */}
         <circle cx="50" cy="64" r="4" fill="none" stroke="var(--selo-green)" strokeWidth="1" strokeDasharray="1 1" />
@@ -118,46 +155,6 @@ export function Pet({ mood = "idle", size = 80, className }: { mood?: Mood; size
       </svg>
     </div>
   );
-}
-
-/**
- * Aplica animações de mood na corujinha (SVG, NÃO no root div).
- * O círculo tracejado permanece intacto rodando via SMIL no seu próprio SVG.
- */
-function applyMood(el: SVGSVGElement, mood: Mood): void {
-  switch (mood) {
-    case "feliz":
-      gsap.timeline()
-        .to(el, { y: -14, scale: 1.06, duration: 0.28, ease: "back.out(1.7)" })
-        .to(el, { rotation: -5, duration: 0.12, ease: "power1.inOut" })
-        .to(el, { rotation: 5, duration: 0.12, ease: "power1.inOut" })
-        .to(el, { rotation: 0, duration: 0.12, ease: "power1.inOut" })
-        .to(el, { y: 0, scale: 1, duration: 0.35, ease: "bounce.out" })
-        .to(el, { y: -3, scale: 1.015, duration: 0.8, ease: "sine.inOut", yoyo: true, repeat: -1 });
-      break;
-    case "atencao":
-      gsap.timeline()
-        .to(el, { rotation: -2, duration: 0.08, ease: "power1.inOut" })
-        .to(el, { rotation: 2, duration: 0.08, ease: "power1.inOut" })
-        .to(el, { rotation: -1.5, duration: 0.08, ease: "power1.inOut" })
-        .to(el, { rotation: 1.5, duration: 0.08, ease: "power1.inOut" })
-        .to(el, { rotation: 0, duration: 0.15, ease: "power2.out" });
-      // bob suave contínuo (sem rotation contínua — era isso que fazia "girar")
-      gsap.to(el, { y: -2, duration: 1.4, ease: "sine.inOut", yoyo: true, repeat: -1 });
-      break;
-    case "falando":
-      // apenas oscilação vertical sutil + scale — sem rotation (não "gira")
-      gsap.to(el, { y: -2, duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: -1 });
-      gsap.to(el, { scale: 1.02, duration: 1.5, ease: "sine.inOut", yoyo: true, repeat: -1, transformOrigin: "50% 60%" });
-      break;
-    case "pensando":
-      gsap.to(el, { y: -3, duration: 2, ease: "sine.inOut", yoyo: true, repeat: -1 });
-      break;
-    case "idle":
-    default:
-      gsap.to(el, { scale: 1.03, duration: 1.8, ease: "sine.inOut", yoyo: true, repeat: -1, transformOrigin: "50% 60%" });
-      break;
-  }
 }
 
 function ThinkingBubbles() {
@@ -180,4 +177,38 @@ function TalkingDots() {
       <style>{`@keyframes petTyping { 0%,60%,100% { opacity:0.3; transform:translateY(0); } 30% { opacity:1; transform:translateY(-3px); } }`}</style>
     </div>
   );
+}
+
+function applyMood(el: SVGSVGElement, mood: Mood): void {
+  switch (mood) {
+    case "feliz":
+      gsap.timeline()
+        .to(el, { y: -14, scale: 1.06, duration: 0.28, ease: "back.out(1.7)" })
+        .to(el, { rotation: -5, duration: 0.12, ease: "power1.inOut" })
+        .to(el, { rotation: 5, duration: 0.12, ease: "power1.inOut" })
+        .to(el, { rotation: 0, duration: 0.12, ease: "power1.inOut" })
+        .to(el, { y: 0, scale: 1, duration: 0.35, ease: "bounce.out" })
+        .to(el, { y: -3, scale: 1.015, duration: 0.8, ease: "sine.inOut", yoyo: true, repeat: -1 });
+      break;
+    case "atencao":
+      gsap.timeline()
+        .to(el, { rotation: -2, duration: 0.08, ease: "power1.inOut" })
+        .to(el, { rotation: 2, duration: 0.08, ease: "power1.inOut" })
+        .to(el, { rotation: -1.5, duration: 0.08, ease: "power1.inOut" })
+        .to(el, { rotation: 1.5, duration: 0.08, ease: "power1.inOut" })
+        .to(el, { rotation: 0, duration: 0.15, ease: "power2.out" });
+      gsap.to(el, { y: -2, duration: 1.4, ease: "sine.inOut", yoyo: true, repeat: -1 });
+      break;
+    case "falando":
+      gsap.to(el, { y: -2, duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: -1 });
+      gsap.to(el, { scale: 1.02, duration: 1.5, ease: "sine.inOut", yoyo: true, repeat: -1, transformOrigin: "50% 60%" });
+      break;
+    case "pensando":
+      gsap.to(el, { y: -3, duration: 2, ease: "sine.inOut", yoyo: true, repeat: -1 });
+      break;
+    case "idle":
+    default:
+      gsap.to(el, { scale: 1.03, duration: 1.8, ease: "sine.inOut", yoyo: true, repeat: -1, transformOrigin: "50% 60%" });
+      break;
+  }
 }
