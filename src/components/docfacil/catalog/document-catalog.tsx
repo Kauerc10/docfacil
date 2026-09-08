@@ -6,6 +6,8 @@ import { Search, Clock, ArrowRight, X, Sparkles } from "lucide-react";
 import type { PublicModel } from "@/lib/catalog/search";
 import { searchPublicModels } from "@/lib/catalog/search";
 
+import { trackMarketingEvent } from "@/lib/services/marketing-events";
+
 type DocumentCatalogProps = {
   models: PublicModel[];
   initialQuery?: string;
@@ -52,7 +54,12 @@ export function DocumentCatalog({
           <input
             type="search"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              if (e.target.value.length > 2) {
+                trackMarketingEvent("catalog_search", {});
+              }
+            }}
             placeholder="Ex.: aluguel, procuração, residência ou compra e venda"
             className="h-14 w-full rounded-2xl border border-slate-300 bg-white pl-12 pr-10 text-base shadow-sm outline-none transition focus:border-blue-700 focus:ring-4 focus:ring-blue-100"
           />
@@ -71,7 +78,13 @@ export function DocumentCatalog({
         <button
           type="button"
           aria-pressed={freeOnly}
-          onClick={() => setFreeOnly((prev) => !prev)}
+          onClick={() => {
+            setFreeOnly((prev) => {
+              const next = !prev;
+              if (next) trackMarketingEvent("access_option_select", { option: "gratis" });
+              return next;
+            });
+          }}
           className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-2xl px-4 py-2.5 text-sm font-semibold transition sm:shrink-0 ${
             freeOnly
               ? "bg-emerald-800 text-white shadow-sm"
@@ -93,7 +106,10 @@ export function DocumentCatalog({
             key={item}
             type="button"
             aria-pressed={category === item}
-            onClick={() => setCategory(item)}
+            onClick={() => {
+              setCategory(item);
+              trackMarketingEvent("category_select", { category: item });
+            }}
             className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-blue-700 ${
               category === item
                 ? "bg-blue-900 text-white shadow-sm"
@@ -139,6 +155,7 @@ export function DocumentCatalog({
                 </p>
                 <Link
                   href={`/documentos/${m.slug}`}
+                  onClick={() => trackMarketingEvent("model_select", { slug: m.slug })}
                   className="mt-4 inline-flex min-h-11 w-full items-center justify-between rounded-xl bg-slate-100 px-4 font-semibold text-blue-950 transition hover:bg-blue-900 hover:text-white focus-visible:ring-2 focus-visible:ring-blue-700"
                 >
                   <span>Ver detalhes e requisitos</span>
