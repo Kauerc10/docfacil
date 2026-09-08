@@ -66,7 +66,8 @@ export function LandingPage() {
               Documentos claros, do começo ao PDF
             </p>
             <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-950 sm:text-6xl">
-              Documento difícil? Nunca mais.
+              Documento difícil?{" "}
+              <span className="text-[var(--blue-royal)]">Nunca mais.</span>
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
               Responda perguntas simples e veja seu documento ganhar forma, com orientação do início ao fim.

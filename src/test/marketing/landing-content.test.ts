@@ -8,7 +8,9 @@ const landingFile = readFileSync(
 );
 
 test("landing contém a proposta de valor e a headline comercial aprovadas", () => {
-  expect(landingFile).toContain("Documento difícil? Nunca mais.");
+  expect(landingFile).toContain("Documento difícil?");
+  expect(landingFile).toContain("Nunca mais.");
+  expect(landingFile).toContain("text-[var(--blue-royal)]");
   expect(landingFile).toContain(
     "Responda perguntas simples e veja seu documento ganhar forma, com orientação do início ao fim."
   );
