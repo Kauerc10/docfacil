@@ -87,7 +87,7 @@ export function Header() {
             go("home");
           }}
           className="flex items-center shrink-0 hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-royal)] rounded-lg"
-          aria-label="DocFacil — início"
+          aria-label="DocFácil — início"
         >
           <Logo variant="header" />
         </Link>

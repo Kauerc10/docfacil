@@ -21,9 +21,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: `${COMPANY.productName} — Documentos legais prontos como numa conversa`,
+  title: `${COMPANY.productName} — Contratos, declarações e documentos online`,
   description:
-    "Sem burocracia, sem juridiquês. Responda perguntas simples e veja seu documento ganhar forma. Modelos revisados com base em prática cartorial real.",
+    "Crie contratos, declarações e outros documentos com preenchimento guiado, perguntas simples e orientação em cada etapa até o PDF final.",
   applicationName: COMPANY.productName,
   keywords: [
     COMPANY.productName,
@@ -43,18 +43,18 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL(COMPANY.url),
   openGraph: {
-    title: `${COMPANY.productName} — Documentos legais prontos como numa conversa`,
+    title: `${COMPANY.productName} — Contratos, declarações e documentos online`,
     description:
-      "Sem burocracia, sem juridiquês. Responda perguntas simples e veja seu documento ganhar forma.",
+      "Crie contratos, declarações e outros documentos com preenchimento guiado, perguntas simples e orientação em cada etapa até o PDF final.",
     siteName: COMPANY.productName,
     type: "website",
     locale: "pt_BR",
   },
   twitter: {
     card: "summary_large_image",
-    title: `${COMPANY.productName} — Documentos legais prontos como numa conversa`,
+    title: `${COMPANY.productName} — Contratos, declarações e documentos online`,
     description:
-      "Sem burocracia, sem juridiquês. Responda perguntas simples e veja seu documento ganhar forma.",
+      "Crie contratos, declarações e outros documentos com preenchimento guiado, perguntas simples e orientação em cada etapa até o PDF final.",
   },
 };
 

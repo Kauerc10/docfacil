@@ -24,7 +24,7 @@ test.describe("Landing comercial e fluxo de descoberta pública", () => {
     ).toBeVisible();
 
     // Confere se o hero e os CTAs estão visíveis
-    const ctaCatalogo = page.getByRole("link", { name: "Encontrar meu documento" }).first();
+    const ctaCatalogo = page.getByRole("link", { name: "Encontrar o documento certo" }).first();
     await expect(ctaCatalogo).toBeVisible();
 
     // 2. Clica para navegar ao catálogo

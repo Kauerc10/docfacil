@@ -66,13 +66,12 @@ export function Footer() {
             href="/"
             onClick={() => navigate("home")}
             className="inline-block hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-lg"
-            aria-label="DocFacil — início"
+            aria-label="DocFácil — início"
           >
             <Logo variant="footer" />
           </Link>
           <p className="mt-4 text-white/60 text-sm max-w-sm leading-relaxed">
-            Documentos organizados e preparados com orientação em cada etapa.
-            Modelos para moradia, declarações, procurações e acordos do cotidiano.
+            Documentos claros, preenchimento guiado e orientação em cada etapa. Modelos para situações do dia a dia, do começo ao PDF.
           </p>
         </div>
 

@@ -21,27 +21,27 @@ const featured = PUBLIC_MODELS.filter((model) => model.popular).slice(0, 4);
 const faqs = [
   [
     "Preciso entender de Direito?",
-    "Não. As perguntas explicam o que informar em linguagem simples. Em casos complexos ou com conflito, procure orientação jurídica.",
+    "Não. As perguntas explicam o que informar em linguagem simples. Se o seu caso envolver litígio, partilha complexa ou exigência de escritura pública, recomendamos consultar um advogado ou cartório.",
   ],
   [
     "Preciso criar uma conta?",
-    "Você pode conhecer os modelos sem cadastro. Para salvar e gerar um documento, a conta é necessária.",
+    "Você pode explorar os modelos antes de se cadastrar. A conta só é necessária quando você quiser salvar seu rascunho ou gerar o PDF.",
   ],
   [
     "É gratuito?",
-    "Com uma conta, você pode gerar um documento gratuito por mês entre os modelos identificados como gratuitos. O PDF gratuito recebe marca d’água.",
+    "Com uma conta, você pode gerar gratuitamente um dos modelos participantes uma vez por mês. Nessa modalidade, o PDF inclui uma marca d’água.",
   ],
   [
     "Consigo fazer pelo celular?",
-    "Sim. O preenchimento foi pensado para funcionar em telas pequenas e você pode conferir a prévia antes de concluir.",
+    "Sim. Você pode responder às perguntas, acompanhar a prévia e gerar o documento direto pelo celular ou computador.",
   ],
   [
     "Meus dados ficam protegidos?",
-    "Usamos autenticação e controles de acesso para que cada pessoa consulte seus próprios documentos. Consulte a Política de Privacidade para conhecer o tratamento dos dados.",
+    "Sim. Cada conta tem acesso exclusivo aos seus próprios documentos salvos. Não compartilhamos suas informações com terceiros, conforme detalhado na nossa Política de Privacidade.",
   ],
   [
     "O documento tem validade jurídica?",
-    "A validade depende do conteúdo, da situação, das assinaturas e de eventuais formalidades legais. O DocFácil não promete validade automática e não substitui advogado ou cartório.",
+    "A validade e os efeitos de um documento dependem do tipo de documento, das informações preenchidas, das assinaturas exigidas e da situação em que será utilizado. O DocFácil ajuda na elaboração do documento, mas não substitui análise jurídica quando o caso exigir.",
   ],
 ];
 
@@ -63,21 +63,21 @@ export function LandingPage() {
           <div>
             <p className="inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200/60 px-4 py-1.5 text-xs sm:text-sm font-bold text-emerald-800 shadow-xs">
               <ShieldCheck className="size-4 text-emerald-700" />
-              Documentos claros, do começo ao PDF
+              Sem juridiquês. Com orientação em cada etapa.
             </p>
             <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-950 sm:text-6xl">
               Documento difícil?{" "}
               <span className="text-[var(--blue-royal)]">Nunca mais.</span>
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-              Responda perguntas simples e veja seu documento ganhar forma, com orientação do início ao fim.
+              Responda perguntas simples e veja seu documento ganhar forma, com orientação em cada etapa até o PDF final.
             </p>
             <div className="mt-8 flex flex-col gap-3.5 sm:flex-row">
               <Link
                 href="/documentos"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-900 px-7 font-bold text-white shadow-md shadow-blue-950/15 transition-all hover:bg-blue-950 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-700 active:scale-[0.99]"
               >
-                <span>Encontrar meu documento</span>
+                <span>Encontrar o documento certo</span>
                 <ArrowRight className="size-5" />
               </Link>
               <a
@@ -109,33 +109,32 @@ export function LandingPage() {
             O nome jurídico pode esperar
           </h2>
           <p className="mt-3 max-w-2xl text-base text-slate-600">
-            Você não precisa saber de cabeça o nome técnico da peça jurídica. Escolha o objetivo e
-            encontre o modelo certo:
+            Você não precisa saber o nome técnico do documento. Conte o que quer resolver e encontre o modelo certo para a sua situação.
           </p>
 
           <div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 title: "Alugar um imóvel",
-                body: "Contratos para moradia ou negócio com garantia e vistoria",
+                body: "Contratos para moradia ou negócio, com opções de garantia e vistoria.",
                 icon: Home,
                 badgeBg: "bg-emerald-50 text-emerald-800 border-emerald-100",
               },
               {
                 title: "Declarar uma informação",
-                body: "Residência, renda, dependência e outros fatos do cotidiano",
+                body: "Modelos para declarar residência, renda, dependência e outras situações do dia a dia.",
                 icon: FileText,
                 badgeBg: "bg-blue-50 text-blue-900 border-blue-100",
               },
               {
                 title: "Autorizar alguém",
-                body: "Procurações com poderes específicos para representação",
+                body: "Documentos para autorizar outra pessoa a agir em seu nome.",
                 icon: UserCheck,
                 badgeBg: "bg-amber-50 text-amber-900 border-amber-200/80",
               },
               {
                 title: "Formalizar um acordo",
-                body: "Compra e venda, empréstimo de bens, serviços e parceria",
+                body: "Documentos para compra e venda, empréstimos, serviços e outros acordos.",
                 icon: Handshake,
                 badgeBg: "bg-indigo-50 text-indigo-900 border-indigo-100",
               },
@@ -155,7 +154,7 @@ export function LandingPage() {
                   <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
                 </div>
                 <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-bold text-blue-900 group-hover:text-blue-950">
-                  Ver opções{" "}
+                  Ver modelos{" "}
                   <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
                 </span>
               </Link>
@@ -188,17 +187,17 @@ export function LandingPage() {
                 {
                   n: "1",
                   t: "Escolha com segurança",
-                  b: "Veja quando usar cada modelo e quais informações serão necessárias antes de iniciar.",
+                  b: "Entenda para que serve cada modelo e o que você vai precisar antes de começar.",
                 },
                 {
                   n: "2",
                   t: "Preencha com orientação",
-                  b: "Responda uma etapa por vez com dicas da corujinha em linguagem acessível e exemplos práticos.",
+                  b: "Responda uma etapa por vez, com dicas da corujinha, explicações claras e exemplos práticos.",
                 },
                 {
                   n: "3",
                   t: "Confira e gere",
-                  b: "Revise a prévia atualizada em tempo real e receba o documento formatado em PDF para imprimir ou assinar.",
+                  b: "Acompanhe a prévia, revise as informações e gere o documento formatado em PDF para imprimir ou assinar.",
                 },
               ].map(({ n, t, b }) => (
                 <li
@@ -271,29 +270,29 @@ export function LandingPage() {
               Feito para dar clareza
             </p>
             <h2 className="mt-2 text-3xl font-extrabold text-slate-950 sm:text-4xl">
-              Ajuda prática sem promessas mágicas
+              Você sempre sabe o próximo passo
             </h2>
             <div className="mt-8 grid gap-5">
               {[
                 [
                   MessageCircleQuestion,
                   "Perguntas que fazem sentido",
-                  "Cada etapa explica o dado necessário e mostra exemplos claros.",
+                  "Cada etapa explica o que precisamos saber e mostra exemplos claros.",
                 ],
                 [
                   FileCheck2,
                   "Prévia antes do final",
-                  "Confira o conteúdo do documento atualizado antes de concluir.",
+                  "Veja o documento ganhar forma e confira o conteúdo antes de concluir.",
                 ],
                 [
                   Smartphone,
                   "Do celular ao PDF",
-                  "Faça o processo inteiro em uma interface responsiva pensada para o polegar.",
+                  "Preencha, revise e gere seu documento pelo celular ou computador.",
                 ],
                 [
                   ShieldCheck,
                   "Seus documentos na sua conta",
-                  "Autenticação e regras de acesso protegem a sua biblioteca pessoal.",
+                  "Seus documentos ficam organizados na sua conta, com acesso protegido.",
                 ],
               ].map(([Icon, title, body]) => {
                 const I = Icon as typeof ShieldCheck;
@@ -320,7 +319,7 @@ export function LandingPage() {
                 <Sparkles className="size-6" />
               </span>
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-800">
-                Acesso Inicial
+                Comece grátis
               </span>
             </div>
 
@@ -328,14 +327,13 @@ export function LandingPage() {
               Uma opção gratuita para começar
             </h2>
             <p className="mt-4 text-base leading-relaxed text-slate-700">
-              Com uma conta, você pode gerar uma vez por mês um dos modelos marcados como gratuitos.
-              O PDF dessa modalidade inclui marca d’água.
+              Crie sua conta e gere gratuitamente um dos modelos participantes uma vez por mês. Nessa modalidade, o PDF inclui uma marca d’água.
             </p>
             <ul className="mt-6 space-y-3">
               {[
-                "Catálogo aberto para consulta e simulação",
-                "Conta necessária para salvar e gerar",
-                "Condições e marca d’água informadas antes de concluir",
+                "Explore os modelos antes de criar sua conta",
+                "Crie uma conta apenas quando quiser salvar ou gerar",
+                "Veja todas as condições antes de concluir",
               ].map((x) => (
                 <li key={x} className="flex gap-2.5 items-center text-sm font-medium text-slate-800">
                   <CheckCircle2 className="size-5 shrink-0 text-emerald-700" />
@@ -397,16 +395,16 @@ export function LandingPage() {
           </div>
 
           <h2 className="mt-2 text-3xl font-extrabold text-slate-950 sm:text-4xl">
-            Seu documento pode começar com uma pergunta simples
+            Pronto para tirar esse documento do papel?
           </h2>
           <p className="mx-auto mt-4 max-w-xl leading-relaxed text-slate-600 text-base sm:text-lg">
-            Conte o que você precisa resolver e encontre o modelo certo para preencher no seu ritmo.
+            Encontre o modelo certo, responda no seu ritmo e deixe o DocFácil guiar o resto.
           </p>
           <Link
             href="/documentos"
             className="mt-8 inline-flex min-h-12 items-center gap-2 rounded-xl bg-blue-900 px-7 font-bold text-white shadow-md shadow-blue-950/15 transition-all hover:bg-blue-950 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-700 active:scale-[0.99]"
           >
-            <span>Escolher um documento</span>
+            <span>Encontrar meu documento</span>
             <ArrowRight className="size-5" />
           </Link>
         </div>

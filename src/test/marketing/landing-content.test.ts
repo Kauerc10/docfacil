@@ -12,8 +12,12 @@ test("landing contém a proposta de valor e a headline comercial aprovadas", () 
   expect(landingFile).toContain("Nunca mais.");
   expect(landingFile).toContain("text-[var(--blue-royal)]");
   expect(landingFile).toContain(
-    "Responda perguntas simples e veja seu documento ganhar forma, com orientação do início ao fim."
+    "Responda perguntas simples e veja seu documento ganhar forma, com orientação em cada etapa até o PDF final."
   );
+  expect(landingFile).toContain("O nome jurídico pode esperar");
+  expect(landingFile).toContain("Você responde. O documento ganha forma.");
+  expect(landingFile).toContain("Você sempre sabe o próximo passo");
+  expect(landingFile).toContain("Pronto para tirar esse documento do papel?");
   expect(landingFile).toContain("/documentos");
   expect(landingFile).toContain("#como-funciona");
 });

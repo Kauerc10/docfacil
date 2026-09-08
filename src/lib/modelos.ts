@@ -301,7 +301,7 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
   {
     slug: "contrato-locacao",
     nome: "Contrato de Locação Residencial",
-    desc: "Contrato residencial completo, estruturado pela Lei do Inquilinato.",
+    desc: "Modelo de contrato para locação residencial elaborado com base na Lei do Inquilinato.",
     quandoUsar:
       "Use quando você vai alugar um imóvel para moradia e precisa formalizar prazo, aluguel, encargos, garantia e regras de uso entre locador e locatário.",
     categoria: "Locação",
@@ -717,7 +717,7 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
   {
     slug: "declaracao-residencia",
     nome: "Autodeclaração de Residência",
-    desc: "Declaração da própria residência sob penas da lei (art. 299 CP).",
+    desc: "Modelo para declarar formalmente o próprio endereço de residência.",
     quandoUsar:
       "Use quando VOCÊ MESMO precisa declarar onde mora, para bancos, escolas, órgãos públicos, processos seletivos, etc. Esta é uma autodeclaração firmada sob as penas da lei.",
     categoria: "Pessoal",
@@ -834,7 +834,7 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
   {
     slug: "contrato-compra-venda-imovel",
     nome: "Compra e Venda de Imóvel",
-    desc: "Contrato completo de compra e venda de imóvel urbano.",
+    desc: "Modelo para formalizar a compra e venda de imóvel urbano entre as partes.",
     quandoUsar:
       "Use quando você vai comprar ou vender um imóvel (casa, apartamento, terreno) e precisa de um contrato formal de compra e venda com todas as cláusulas legais.",
     categoria: "Comercial",
@@ -988,7 +988,7 @@ const MODELS_INPUT: Omit<Modelo, "campos">[] = [
   {
     slug: "comodato",
     nome: "Contrato de Comodato",
-    desc: "Empréstimo gratuito de bens entre conhecidos.",
+    desc: "Modelo para formalizar o empréstimo gratuito de um bem.",
     quandoUsar:
       "Use quando você vai emprestar um bem (veículo, equipamento, imóvel) gratuitamente para alguém e quer formalizar o empréstimo.",
     categoria: "Comercial",
