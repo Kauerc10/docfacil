@@ -3,12 +3,7 @@
 import { NavProvider, useNav } from "@/components/docfacil/nav-context";
 import { AuthProvider } from "@/lib/auth-context";
 import { Header } from "@/components/docfacil/header";
-import { Hero } from "@/components/docfacil/hero";
-import { Catalog } from "@/components/docfacil/catalog";
-import { HowItWorks } from "@/components/docfacil/how-it-works";
-import { AIBanner } from "@/components/docfacil/ai-banner";
-import { SocialProof } from "@/components/docfacil/social-proof";
-import { SuccessShowcase } from "@/components/docfacil/success-showcase";
+import { LandingPage } from "@/components/docfacil/landing/landing-page";
 import { Footer } from "@/components/docfacil/footer";
 import { WhatsAppButton } from "@/components/docfacil/whatsapp-button";
 import { GsapSafety } from "@/components/docfacil/gsap-safety";
@@ -34,12 +29,7 @@ import { useAnalyticsInit } from "@/hooks/use-analytics-init";
 function HomeView() {
   return (
     <>
-      <Hero />
-      <Catalog />
-      <HowItWorks />
-      <AIBanner />
-      <SocialProof />
-      <SuccessShowcase />
+      <LandingPage />
     </>
   );
 }
