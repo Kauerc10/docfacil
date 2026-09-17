@@ -30,6 +30,11 @@ import {
   InMemoryUsersRepository,
   InMemoryGenerationCommitRepository,
 } from "./in-memory-repositories";
+import {
+  getDocumentStore,
+  setDocumentStoreForTesting,
+  adaptRepositoriesToStore,
+} from "./document-store";
 
 export class FirestoreDocumentsRepository implements IDocumentsRepository {
   private readonly db: Firestore;
@@ -685,6 +690,26 @@ export function getRepositories(): BackendRepositories {
     return repositoriesSingleton;
   }
 
+  const store = getDocumentStore() as any;
+  if (
+    store.documents &&
+    store.access &&
+    store.orders &&
+    store.generationRequests &&
+    store.users &&
+    store.generationCommit
+  ) {
+    repositoriesSingleton = {
+      documents: store.documents,
+      access: store.access,
+      orders: store.orders,
+      generationRequests: store.generationRequests,
+      users: store.users,
+      generationCommit: store.generationCommit,
+    };
+    return repositoriesSingleton;
+  }
+
   const env = getServerEnv();
   assertProductionServerConfig(env);
 
@@ -729,11 +754,17 @@ export function getRepositories(): BackendRepositories {
 
 export function setTestRepositories(repos: BackendRepositories | null): void {
   repositoriesSingleton = repos;
+  if (repos) {
+    setDocumentStoreForTesting(adaptRepositoriesToStore(repos));
+  } else {
+    setDocumentStoreForTesting(null);
+  }
 }
 
 export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | null): void {
   if (!repos) {
     repositoriesSingleton = null;
+    setDocumentStoreForTesting(null);
     return;
   }
   const current = getRepositories();
@@ -764,4 +795,5 @@ export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | 
     users,
     generationCommit,
   };
+  setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
 }
