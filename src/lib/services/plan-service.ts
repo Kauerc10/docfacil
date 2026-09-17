@@ -1,14 +1,11 @@
 /**
  * Plan Service — verificação de plano (paywall) do DocFacil.
  *
- * Fonte única de verdade para quem pode fazer o quê. Usado por:
- *  - sucesso-view.tsx (download pós-criação)
- *  - documento-detalhe-view.tsx / use-documento-actions.ts (download e edição)
- *  - dashboard-view.tsx (download)
- *  - criar-view.tsx (limite mensal do plano grátis)
+ * Fachada do client delegando para a política unificada de entitlement
+ * (@/lib/billing/entitlement-policy).
  *
  * Modelo de negócio:
- *  - **Grátis**: até FREE_PLAN_MONTHLY_LIMIT documentos/mês, PDF com marca d'água.
+ *  - **Grátis**: até FREE_PLAN_MONTHLY_LIMIT documentos/mês (em modelos selecionados), PDF com marca d'água.
  *  - **Avulso**: 1 documento específico sem marca d'água (vinculado ao pagamento).
  *  - **Pro**: documentos ilimitados, sem marca d'água, edição e re-download liberados.
  *
@@ -16,84 +13,99 @@
  * A validação server-side definitiva acontece nas API routes / regras do Firestore.
  * Nunca confie apenas no client para proteger recursos pagos.
  */
-import type { AppUser } from "@/lib/types";
-import type { Documento } from "@/lib/types";
-import { FREE_PLAN_MONTHLY_LIMIT, isPaidPlan, type Plan } from "@/lib/pricing";
+import type { AppUser, Documento } from "@/lib/types";
+import { type Plan } from "@/lib/pricing";
+import {
+  isPro as policyIsPro,
+  isAvulso as policyIsAvulso,
+  hasPaidPlan as policyHasPaidPlan,
+  getPlan as policyGetPlan,
+  countBillingMonthDocuments,
+  canCreateDocument as policyCanCreateDocument,
+  remainingDocumentsThisMonth as policyRemainingDocumentsThisMonth,
+  resolveDocumentWatermark,
+  canDownloadClean as policyCanDownloadClean,
+  canEditDocument as policyCanEditDocument,
+  downloadBlockReason as policyDownloadBlockReason,
+  type DocumentLikeForWatermark,
+} from "@/lib/billing/entitlement-policy";
+
+export type { DocumentLikeForWatermark };
 
 /** Tipo mínimo que aceita tanto AppUser quanto PerfilUsuario. */
-type UserLike = Pick<AppUser, "plano"> | null | undefined;
+export type UserLike = Pick<AppUser, "plano"> | null | undefined;
 
 /** Retorna verdadeiro se o usuário tem plano Pro ativo. */
 export function isPro(user: UserLike): boolean {
-  return user?.plano === "pro";
+  return policyIsPro(user);
 }
 
 /** Retorna verdadeiro se o usuário tem plano Avulso ativo. */
 export function isAvulso(user: UserLike): boolean {
-  return user?.plano === "avulso";
+  return policyIsAvulso(user);
 }
 
 /** Retorna verdadeiro se o usuário tem qualquer plano pago (avulso ou pro). */
 export function hasPaidPlan(user: UserLike): boolean {
-  return isPaidPlan(user?.plano);
+  return policyHasPaidPlan(user);
 }
 
 /** Retorna o plano normalizado (default "gratis" se indefinido). */
 export function getPlan(user: UserLike): Plan {
-  return (user?.plano as Plan) ?? "gratis";
+  return policyGetPlan(user);
 }
 
 /**
- * Conta quantos documentos o usuário criou no mês atual.
- * Usado para enforce do limite do plano grátis.
+ * Conta quantos documentos o usuário criou no mês civil vigente em São Paulo.
+ * Usado para enforce do limite do plano grátis alinhado com o servidor.
  */
-export function countDocumentsThisMonth(docs: Documento[]): number {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  return docs.filter((d) => d.criadoEm >= startOfMonth).length;
+export function countDocumentsThisMonth(
+  docs: Array<{ criadoEm?: number; createdAt?: number }>
+): number {
+  return countBillingMonthDocuments(docs);
 }
 
 /**
  * Verdadeiro se o usuário ainda pode criar documentos neste mês.
- * Pro = ilimitado. Grátis = respeita FREE_PLAN_MONTHLY_LIMIT. Avulso = 1 (já pago).
+ * Pro = ilimitado. Grátis = respeita FREE_MONTHLY_LIMIT e modelo elegível.
  */
-export function canCreateDocument(user: UserLike, monthDocCount: number): boolean {
-  if (isPro(user)) return true;
-  if (isAvulso(user)) return true; // avulso libera 1 documento (o pago)
-  // Grátis: limite mensal
-  return monthDocCount < FREE_PLAN_MONTHLY_LIMIT;
+export function canCreateDocument(
+  user: UserLike,
+  monthDocCount: number,
+  modelSlug?: string
+): boolean {
+  return policyCanCreateDocument(user, monthDocCount, modelSlug);
 }
 
 /** Quantos documentos restam no mês para o usuário (null = ilimitado). */
-export function remainingDocumentsThisMonth(user: UserLike, monthDocCount: number): number | null {
-  if (isPro(user)) return null;
-  if (isAvulso(user)) return Math.max(0, 1 - monthDocCount);
-  return Math.max(0, FREE_PLAN_MONTHLY_LIMIT - monthDocCount);
+export function remainingDocumentsThisMonth(
+  user: UserLike,
+  monthDocCount: number
+): number | null {
+  return policyRemainingDocumentsThisMonth(user, monthDocCount);
 }
 
 /**
  * Decide se o PDF deve levar marca d'água.
- * Grátis = SIM. Avulso/Pro = NÃO.
+ * Prioriza os atributos persistidos no próprio documento (entitlement/watermarked),
+ * mantendo compatibilidade caso o documento seja omitido.
  */
-export function shouldWatermark(user: UserLike): boolean {
-  return !hasPaidPlan(user);
+export function shouldWatermark(
+  user: UserLike,
+  doc?: Documento | DocumentLikeForWatermark | null
+): boolean {
+  return resolveDocumentWatermark(doc, user);
 }
 
 /**
  * Verdadeiro se o usuário pode baixar o PDF deste documento SEM marca d'água.
- *
- * Regras:
- *  - Pro: sempre sim (sem marca d'água).
- *  - Avulso: sim APENAS para o documento pago (matching por documentId via payment).
- *    Como não há vinculação payment→document implementada ainda, Avulso libera
- *    o último documento criado. TODO: vincular orderId ao documentId no checkout.
- *  - Grátis: nunca (sempre com marca d'água).
- *  - Deslogado: nunca (PaymentBarrier cuida do gating de UI).
+ * Respeita documentos avulsos pagos e contas Pro.
  */
-export function canDownloadClean(user: UserLike, _doc: Documento): boolean {
-  if (isPro(user)) return true;
-  if (isAvulso(user)) return true; // vê TODO acima
-  return false;
+export function canDownloadClean(
+  user: UserLike,
+  doc?: Documento | DocumentLikeForWatermark | null
+): boolean {
+  return policyCanDownloadClean(user, doc);
 }
 
 /**
@@ -101,12 +113,10 @@ export function canDownloadClean(user: UserLike, _doc: Documento): boolean {
  * Marketing: "Editar e rebaixar quando quiser" é feature Pro.
  */
 export function canEditDocument(user: UserLike): boolean {
-  return isPro(user);
+  return policyCanEditDocument(user);
 }
 
 /** Mensagem humana explicando o bloqueio de download limpo, se aplicável. */
 export function downloadBlockReason(user: UserLike): string | null {
-  if (canDownloadClean(user, null as unknown as Documento)) return null;
-  if (!user) return null; // deslogado — PaymentBarrier cuida
-  return "Seu plano gratuito inclui marca d'água. Faça upgrade para baixar sem marca.";
+  return policyDownloadBlockReason(user);
 }

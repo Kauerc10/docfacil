@@ -62,7 +62,7 @@ export function useDocumentoActions(
       if (doc.id.startsWith("demo-")) {
         if (!modelo) throw new Error("Modelo não encontrado.");
         await gerarEBaixarPDF(modelo, doc.respostas, doc.modeloSlug, {
-          watermark: shouldWatermark(user),
+          watermark: shouldWatermark(user, doc),
         });
       } else {
         const { downloadUrl } = await getDocumentDownloadUrl(doc.id);

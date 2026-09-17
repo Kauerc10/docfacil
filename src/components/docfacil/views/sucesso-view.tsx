@@ -215,7 +215,10 @@ export function SucessoView() {
         window.location.href = downloadUrl;
       } else {
         await gerarEBaixarPDF(modelo, respostas, modelo.slug, {
-          watermark: shouldWatermark(user),
+          watermark:
+            typeof documentWatermarked === "boolean"
+              ? documentWatermarked
+              : shouldWatermark(user),
         });
       }
       toast.success(SUCCESS_MESSAGES.PDF_GENERATED, {
