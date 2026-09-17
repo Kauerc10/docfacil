@@ -14,6 +14,8 @@ import { createBuyerFingerprint } from "../billing/order-identity";
 import { generatePdfServer } from "../../pdf/server/generator";
 import type { BackendRepositories } from "../firestore/repositories";
 import { getRepositories } from "../firestore/repositories";
+import type { DocumentStore } from "../firestore/document-store";
+import { getDocumentStore, adaptRepositoriesToStore } from "../firestore/document-store";
 import type { ArtifactStorage } from "../r2/storage";
 import { getArtifactStorage } from "../r2/storage";
 import { logger } from "../../logger";
@@ -21,6 +23,7 @@ import { FREE_MONTHLY_LIMIT } from "../../document-access-policy";
 import { resolveDocumentWatermark } from "./preview-render-policy";
 
 export interface GenerateDocumentDependencies {
+  store?: DocumentStore;
   repositories?: Partial<BackendRepositories>;
   storage?: ArtifactStorage;
 }
@@ -121,35 +124,34 @@ export async function generateDocumentArtifact(
     deps,
   } = input;
 
-  const defaultRepos = getRepositories();
-  const docs = deps?.repositories?.documents || defaultRepos.documents;
-  const access = deps?.repositories?.access || defaultRepos.access;
-  const orders = deps?.repositories?.orders || defaultRepos.orders;
-  const generationRequests =
-    deps?.repositories?.generationRequests || defaultRepos.generationRequests;
-  const users = deps?.repositories?.users || defaultRepos.users;
+  const store: DocumentStore =
+    deps?.store ||
+    (deps?.repositories
+      ? adaptRepositoriesToStore(deps.repositories)
+      : getDocumentStore());
 
-  let generationCommit =
-    deps?.repositories?.generationCommit || defaultRepos.generationCommit;
-  if (!deps?.repositories?.generationCommit && deps?.repositories) {
-    const { InMemoryGenerationCommitRepository } = await import(
-      "../firestore/in-memory-repositories"
-    );
-    generationCommit = new InMemoryGenerationCommitRepository(
-      docs as any,
-      access as any,
-      orders as any,
-      generationRequests as any
-    );
-  }
-
-  const repos: BackendRepositories = {
-    documents: docs,
-    access,
-    orders,
-    generationRequests,
-    users,
-    generationCommit,
+  const repos = {
+    documents: {
+      getDocument: (id: string) => store.getDocument(id),
+      createDocument: (data: any) => store.createDocument(data),
+      listUserDocuments: (userId: string) => store.listUserDocuments(userId),
+      reserveNextVersion: (id: string, reqId: string) => store.reserveNextVersion(id, reqId),
+      setArtifactState: (id: string, state: any, err?: any) => store.setArtifactState(id, state, err),
+    },
+    generationRequests: {
+      getOrCreateRequest: (id: string, initData: any) => store.getOrCreateGenerationRequest(id, initData),
+      markFailed: (id: string, errCode: string) => store.markGenerationFailed(id, errCode),
+    },
+    users: {
+      getUserProfile: (userId: string) => store.getUserProfile(userId),
+    },
+    orders: {
+      reservePaidOrder: (params: any) => store.reservePaidOrder(params),
+      releaseReservedOrder: (params: any) => store.releaseReservedOrder(params),
+    },
+    generationCommit: {
+      commitGeneratedArtifact: (commitInput: any) => store.commitGeneratedArtifact(commitInput),
+    },
   };
   const storage = deps?.storage || getArtifactStorage();
 
