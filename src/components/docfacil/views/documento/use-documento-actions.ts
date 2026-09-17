@@ -12,7 +12,7 @@ import {
   revokeDocumentShare,
   saveClientDraft,
 } from "@/lib/documents/client";
-import { gerarEBaixarPDF } from "@/lib/pdf/generator";
+import { gerarEBaixarPDF } from "@/lib/pdf";
 import { useNav } from "@/components/docfacil/nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { shouldWatermark } from "@/lib/services/plan-service";

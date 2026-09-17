@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { MODELOS } from "@/lib/modelos";
-import { generatePdfServer } from "@/lib/pdf/server/generator";
+import { generatePdfServer } from "@/lib/pdf/server";
 import { reconstructAndValidateResponses } from "@/lib/server/domain/documents";
 import { resolveDocumentWatermark } from "@/lib/server/domain/preview-render-policy";
 import { BackendError } from "@/lib/server/errors";

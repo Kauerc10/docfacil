@@ -29,7 +29,7 @@ import {
   type AccountDraftData,
 } from "@/lib/documents/client";
 import { getModel } from "@/lib/services/models-service";
-import { gerarEBaixarPDF } from "@/lib/pdf/generator";
+import { gerarEBaixarPDF } from "@/lib/pdf";
 import { shouldWatermark } from "@/lib/services/plan-service";
 import { MODELOS } from "@/lib/modelos";
 import type { Documento } from "@/lib/types";

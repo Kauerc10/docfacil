@@ -28,7 +28,7 @@ import {
 import { shouldPreserveFinalizationRequestId } from "@/lib/documents/idempotency";
 import { shouldStartPaidOrderFinalization } from "@/lib/documents/paid-order-finalization";
 import { buildGuestFinalizationAnswers } from "@/lib/documents/guest-draft";
-import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf/generator";
+import { gerarEBaixarPDF, preloadPdfmake } from "@/lib/pdf";
 import { logger } from "@/lib/logger";
 import { shouldWatermark } from "@/lib/services/plan-service";
 import { SUCCESS_MESSAGES, ERROR_MESSAGES } from "@/lib/constants";

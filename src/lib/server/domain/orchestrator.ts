@@ -11,7 +11,7 @@ import { BackendError } from "../errors";
 import { MODELOS } from "../../modelos";
 import { resolveEntitlement } from "../billing/entitlement";
 import { createBuyerFingerprint } from "../billing/order-identity";
-import { generatePdfServer } from "../../pdf/server/generator";
+import { generatePdfServer } from "@/lib/pdf/server";
 import type { BackendRepositories } from "../firestore/repositories";
 import { getRepositories } from "../firestore/repositories";
 import type { DocumentStore } from "../firestore/document-store";
