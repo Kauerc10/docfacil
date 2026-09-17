@@ -7,22 +7,17 @@ import { useAuth } from "@/lib/auth-context";
 import { getModel } from "@/lib/services/models-service";
 import { duplicateDocument } from "@/lib/services/documents-service";
 import {
-  finalizeDocument,
-  createDocumentVersion,
-  saveGuestDraft,
-  loadGuestDraft,
-  clearGuestDraft,
-  saveAccountDraft,
+  loadSessionDraft,
+  saveClientDraft,
+  finalizeClientDraft,
+  compileDraftAnswers,
+} from "@/lib/documents/client-document";
+import {
   getAccountDraft,
-  deleteAccountDraft,
-  getOrCreateFinalizationRequestId,
-  clearFinalizationRequestId,
+  createDocumentVersion,
 } from "@/lib/documents/client";
 import { normalizarEstado } from "@/lib/normalizers";
-import {
-  hasInvalidMoradoresAutorizados,
-} from "@/lib/document-engine";
-import { buildFinalizationAnswers } from "@/lib/documents/finalization-answers";
+import { hasInvalidMoradoresAutorizados } from "@/lib/document-engine";
 import { logger } from "@/lib/logger";
 import { UX_CONFIG } from "@/lib/constants";
 import { campoEstaVisivel, type Modelo, type EtapaModelo } from "@/lib/types";
@@ -112,12 +107,12 @@ export function CriarView() {
         return;
       }
 
-      const localDraft = loadGuestDraft(slug);
-      if (localDraft) {
-        setAnswers(localDraft.answers || {});
-        setClausulasSelecionadas(localDraft.clausulasSelecionadas || []);
-        setExtrasPorClausula(localDraft.extrasPorClausula || {});
-        setStepIndex(Math.max(0, localDraft.stepIndex || 0));
+      const sessionDraft = await loadSessionDraft({ slug });
+      if (sessionDraft) {
+        setAnswers(sessionDraft.respostas || {});
+        setClausulasSelecionadas(sessionDraft.clausulasSelecionadas || []);
+        setExtrasPorClausula(sessionDraft.extrasPorClausula || {});
+        setStepIndex(sessionDraft.stepIndex || 0);
       }
     } catch (e) {
       logger.error("CriarView", "falha ao carregar modelo ou estado editável", e, {
@@ -249,43 +244,24 @@ export function CriarView() {
   const persistCurrentDraft = async (): Promise<string | undefined> => {
     if (!modelo || !slug) return undefined;
 
-    if (user) {
-      const saved = await saveAccountDraft({
-        draftId: activeDraftId,
+    const saved = await saveClientDraft(
+      {
+        id: activeDraftId,
         modeloSlug: slug,
         sourceDocumentId: activeDocumentId,
         respostas: answers,
         stepIndex,
         clausulasSelecionadas,
         extrasPorClausula,
-      });
+      },
+      user
+    );
+
+    if (user && saved.id) {
       setActiveDraftId(saved.id);
       return saved.id;
     }
-
-    const requestId = getOrCreateFinalizationRequestId(modelo.slug);
-    saveGuestDraft(slug, {
-      requestId,
-      modeloSlug: slug,
-      answers,
-      stepIndex,
-      clausulasSelecionadas,
-      extrasPorClausula,
-    });
     return undefined;
-  };
-
-  const removeCurrentAccountDraft = async () => {
-    if (!activeDraftId) return;
-    try {
-      await deleteAccountDraft(activeDraftId);
-      setActiveDraftId(undefined);
-    } catch (error) {
-      logger.warn("CriarView", "documento gerado, mas rascunho não foi removido", {
-        draftId: activeDraftId,
-        error,
-      });
-    }
   };
 
   const salvarDocumento = async (respostasFinais: Record<string, string>) => {
@@ -296,30 +272,39 @@ export function CriarView() {
 
     try {
       if (user) {
-        const requestId = getOrCreateFinalizationRequestId(modelo.slug);
-
         if (activeDocumentId) {
-          const result = await createDocumentVersion(activeDocumentId, {
-            requestId,
-            respostas: respostasFinais,
-            clausulasSelecionadas,
+          const result = await finalizeClientDraft({
+            draft: {
+              id: activeDraftId,
+              modeloSlug: modelo.slug,
+              sourceDocumentId: activeDocumentId,
+              respostas: respostasFinais,
+              stepIndex,
+              clausulasSelecionadas,
+              extrasPorClausula,
+            },
+            versionCreator: (docId, p) => createDocumentVersion(activeDocumentId, p),
+            user,
           });
-          clearFinalizationRequestId(modelo.slug);
-          await removeCurrentAccountDraft();
-          clearGuestDraft(slug);
+          setActiveDraftId(undefined);
           navigate("sucesso", { slug, id: result.document.id });
           return;
         }
 
-        const result = await finalizeDocument({
-          requestId,
-          modeloSlug: modelo.slug,
-          respostas: respostasFinais,
-          clausulasSelecionadas,
+        const result = await finalizeClientDraft({
+          draft: {
+            id: activeDraftId,
+            modeloSlug: modelo.slug,
+            sourceDocumentId: activeDocumentId,
+            respostas: respostasFinais,
+            stepIndex,
+            clausulasSelecionadas,
+            extrasPorClausula,
+          },
+          user,
         });
-        clearFinalizationRequestId(modelo.slug);
-        await removeCurrentAccountDraft();
-        clearGuestDraft(slug);
+
+        setActiveDraftId(undefined);
         navigate("sucesso", { slug, id: result.document.id });
       } else {
         await persistCurrentDraft();
@@ -392,7 +377,11 @@ export function CriarView() {
       }
 
       setPetMood("feliz");
-      const respostasFinais = buildFinalizationAnswers(answers, extrasPorClausula);
+      const respostasFinais = compileDraftAnswers({
+        respostas: answers,
+        clausulasSelecionadas,
+        extrasPorClausula,
+      });
       void salvarDocumento(respostasFinais);
       return;
     }

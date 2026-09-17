@@ -10,8 +10,7 @@ import {
   getDocumentDownloadUrl,
   shareDocument,
   revokeDocumentShare,
-  saveGuestDraft,
-  getOrCreateFinalizationRequestId,
+  saveClientDraft,
 } from "@/lib/documents/client";
 import { gerarEBaixarPDF } from "@/lib/pdf/generator";
 import { useNav } from "@/components/docfacil/nav-context";
@@ -124,15 +123,16 @@ export function useDocumentoActions(
     try {
       const draft = await duplicateDocument(doc.id);
       if (draft) {
-        const requestId = getOrCreateFinalizationRequestId(draft.modeloSlug);
-        saveGuestDraft(draft.modeloSlug, {
-          requestId,
-          modeloSlug: draft.modeloSlug,
-          answers: draft.respostas,
-          stepIndex: 0,
-          clausulasSelecionadas: draft.clausulasSelecionadas || [],
-          extrasPorClausula: draft.extrasPorClausula || {},
-        });
+        await saveClientDraft(
+          {
+            modeloSlug: draft.modeloSlug,
+            respostas: draft.respostas,
+            stepIndex: 0,
+            clausulasSelecionadas: draft.clausulasSelecionadas || [],
+            extrasPorClausula: draft.extrasPorClausula || {},
+          },
+          user
+        );
         toast.success("Documento duplicado!", {
           description: "Respostas carregadas no formulário para você revisar e gerar.",
         });

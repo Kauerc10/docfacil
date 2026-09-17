@@ -128,6 +128,9 @@ export function getDocumentStore(): DocumentStore {
 
 export function setDocumentStoreForTesting(store: DocumentStore | null): void {
   storeSingleton = store;
+  if (!store && typeof (globalThis as any).__resetRepositoriesSingleton === "function") {
+    (globalThis as any).__resetRepositoriesSingleton();
+  }
 }
 
 export function adaptRepositoriesToStore(repos: any): DocumentStore {

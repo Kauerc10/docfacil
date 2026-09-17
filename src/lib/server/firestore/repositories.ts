@@ -685,6 +685,10 @@ export interface BackendRepositories {
 
 let repositoriesSingleton: BackendRepositories | null = null;
 
+(globalThis as any).__resetRepositoriesSingleton = () => {
+  repositoriesSingleton = null;
+};
+
 export function getRepositories(): BackendRepositories {
   if (repositoriesSingleton) {
     return repositoriesSingleton;
@@ -738,6 +742,7 @@ export function getRepositories(): BackendRepositories {
       users,
       generationCommit,
     };
+    setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
   } else {
     repositoriesSingleton = {
       documents: new FirestoreDocumentsRepository(),
@@ -747,6 +752,7 @@ export function getRepositories(): BackendRepositories {
       users: new FirestoreUsersRepository(),
       generationCommit: new FirestoreGenerationCommitRepository(),
     };
+    setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
   }
 
   return repositoriesSingleton;
