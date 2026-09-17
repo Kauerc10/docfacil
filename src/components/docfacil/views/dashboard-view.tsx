@@ -176,7 +176,7 @@ function DashboardContent() {
         const model = await getModel(doc.modeloSlug);
         if (!model) throw new Error("Modelo não encontrado.");
         await gerarEBaixarPDF(model, doc.respostas, doc.modeloSlug, {
-          watermark: shouldWatermark(user),
+          watermark: shouldWatermark(user, doc),
         });
       } else {
         const { downloadUrl } = await getDocumentDownloadUrl(doc.id);

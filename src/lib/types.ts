@@ -165,6 +165,14 @@ export interface Documento {
   userId: string;
   criadoEm: number;
   atualizadoEm: number;
+  /** Indica se o PDF deste documento possui marca d'água */
+  watermarked?: boolean;
+  /** Metadados de entitlement registrados no momento da emissão */
+  entitlement?: {
+    type?: "free" | "single_purchase" | "pro" | string;
+    orderId?: string;
+    watermarked?: boolean;
+  };
 }
 
 /** Perfil do usuário no Firestore */

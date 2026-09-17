@@ -2,7 +2,7 @@ import "server-only";
 import type { Principal } from "../security";
 import type { OrderRecord, DocumentEntitlement } from "../domain/documents";
 import { BackendError } from "../errors";
-import { FREE_MONTHLY_LIMIT, isMonthlyFreeModel } from "@/lib/document-access-policy";
+import { evaluateCreationEntitlement } from "@/lib/billing/entitlement-policy";
 
 export type AccountPlan = "gratis" | "pro";
 export type PurchaseProduct = "avulso" | "pro";
@@ -48,33 +48,40 @@ export function resolveEntitlement(params: ResolveEntitlementParams): Entitlemen
     };
   }
 
-  if (principal.type === "guest") {
-    throw new BackendError(
-      "PAYMENT_REQUIRED",
-      402,
-      "Entre ou crie uma conta para usar a geração grátis, ou adquira este documento avulso."
-    );
+  const decision = evaluateCreationEntitlement({
+    isUserLoggedIn: principal.type === "user",
+    userPlan: userProfile?.plano,
+    modelSlug: modeloSlug,
+    monthDocCount: currentMonthlyCount,
+  });
+
+  if (!decision.allowed) {
+    if (decision.reason === "login_or_payment_required") {
+      throw new BackendError(
+        "PAYMENT_REQUIRED",
+        402,
+        "Entre ou crie uma conta para usar a geração grátis, ou adquira este documento avulso."
+      );
+    }
+    if (decision.reason === "model_not_eligible") {
+      throw new BackendError(
+        "FREE_MODEL_NOT_ELIGIBLE",
+        402,
+        "Este modelo não faz parte da seleção gratuita deste mês."
+      );
+    }
+    if (decision.reason === "free_limit_reached") {
+      throw new BackendError(
+        "FREE_LIMIT_REACHED",
+        402,
+        "Você já usou sua geração gratuita deste mês."
+      );
+    }
+    throw new BackendError("PAYMENT_REQUIRED", 402, "Geração não permitida.");
   }
 
-  if (userProfile?.plano === "pro") {
-    return { entitlement: "pro", watermarked: false };
-  }
-
-  if (!isMonthlyFreeModel(modeloSlug)) {
-    throw new BackendError(
-      "FREE_MODEL_NOT_ELIGIBLE",
-      402,
-      "Este modelo não faz parte da seleção gratuita deste mês."
-    );
-  }
-
-  if (currentMonthlyCount >= FREE_MONTHLY_LIMIT) {
-    throw new BackendError(
-      "FREE_LIMIT_REACHED",
-      402,
-      "Você já usou sua geração gratuita deste mês."
-    );
-  }
-
-  return { entitlement: "free", watermarked: true };
+  return {
+    entitlement: decision.entitlement!,
+    watermarked: decision.watermarked!,
+  };
 }
