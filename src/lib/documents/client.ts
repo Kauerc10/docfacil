@@ -6,6 +6,18 @@ import {
   shouldPreserveFinalizationRequestId,
 } from "./idempotency";
 export { getOrCreateFinalizationRequestId, clearFinalizationRequestId };
+export {
+  compileDraftAnswers,
+  loadSessionDraft,
+  saveClientDraft,
+  deleteClientDraft,
+  finalizeClientDraft,
+  type ClientDraft,
+  type CompileAnswersInput,
+  type LoadSessionDraftParams,
+  type FinalizeClientDraftParams,
+  type FinalizeClientDraftResult,
+} from "./client-document";
 
 export interface GuestDraftData {
   requestId: string;

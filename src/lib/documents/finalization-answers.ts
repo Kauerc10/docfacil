@@ -1,3 +1,5 @@
+import { compileDraftAnswers } from "./client-document";
+
 /**
  * Keeps answers in their form shape until the server validates and composes
  * them. Some fields (such as authorized residents) are structured JSON at
@@ -7,11 +9,8 @@ export function buildFinalizationAnswers(
   answers: Record<string, string>,
   extrasPorClausula: Record<string, Record<string, string>>
 ): Record<string, string> {
-  const finalAnswers = { ...answers };
-
-  for (const extraMap of Object.values(extrasPorClausula)) {
-    Object.assign(finalAnswers, extraMap);
-  }
-
-  return finalAnswers;
+  return compileDraftAnswers({
+    respostas: answers,
+    extrasPorClausula,
+  });
 }

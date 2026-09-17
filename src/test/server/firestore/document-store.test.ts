@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "bun:test";
+import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import {
   DocumentStore,
   getDocumentStore,
@@ -13,6 +13,10 @@ describe("DocumentStore Seam", () => {
   beforeEach(() => {
     store = new InMemoryDocumentStore();
     setDocumentStoreForTesting(store);
+  });
+
+  afterEach(() => {
+    setDocumentStoreForTesting(null);
   });
 
   it("provides singleton access and testing override", () => {
