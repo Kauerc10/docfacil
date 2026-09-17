@@ -102,4 +102,23 @@ describe("preferências de cookies", () => {
     );
     expect(getCookiePreferences()).toBeNull();
   });
+
+  it("permite importar diretamente do módulo desacoplado cookie-preferences", async () => {
+    const directModule = await import("@/lib/services/cookie-preferences");
+    expect(directModule.COOKIE_PREFS_KEY).toBe(COOKIE_PREFS_KEY);
+    expect(typeof directModule.getCookiePreferences).toBe("function");
+    expect(typeof directModule.saveCookiePreferences).toBe("function");
+
+    directModule.saveCookiePreferences({
+      essential: true,
+      analytics: true,
+      marketing: false,
+    });
+
+    const prefs = directModule.getCookiePreferences();
+    expect(prefs).not.toBeNull();
+    expect(prefs?.analytics).toBe(true);
+    expect(prefs?.marketing).toBe(false);
+  });
 });
+

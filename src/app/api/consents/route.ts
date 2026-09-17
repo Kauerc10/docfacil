@@ -1,7 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAppCheck, resolvePrincipal } from "@/lib/server/security";
+import { requireAppCheck, resolvePrincipal, requireUser } from "@/lib/server/security";
 import { getAdminFirestore } from "@/lib/server/firebase-admin";
 import { BackendError } from "@/lib/server/errors";
 import {
@@ -130,3 +130,31 @@ export async function POST(req: Request) {
     return BackendError.fromUnknown(error).toResponse();
   }
 }
+
+export async function GET(req: Request) {
+  try {
+    await requireAppCheck(req);
+    const principal = await resolvePrincipal(req);
+    const user = requireUser(principal);
+
+    const snapshot = await getAdminFirestore()
+      .collection("consents")
+      .where("userId", "==", user.userId)
+      .orderBy("acceptedAt", "desc")
+      .limit(50)
+      .get();
+
+    const consents = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    return NextResponse.json(
+      { consents },
+      { status: 200, headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (error: unknown) {
+    return BackendError.fromUnknown(error).toResponse();
+  }
+}
+

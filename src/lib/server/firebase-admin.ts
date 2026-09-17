@@ -64,6 +64,10 @@ export function getAdminFirestore(): Firestore {
   return adminFirestore;
 }
 
+export function setAdminFirestoreForTesting(mock: Firestore | null): void {
+  adminFirestore = mock;
+}
+
 export function getAdminAppCheck(): AppCheck {
   if (testAppCheck) return testAppCheck;
   return getAppCheck(getFirebaseAdminApp());
