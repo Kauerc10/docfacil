@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-19T12:30:00Z",
+  "title": "Design System: DocFácil",
+  "extensions": {
+    "colorMeta": {
+      "paper": { "role": "neutral", "displayName": "Paper Pergaminho", "canonical": "#faf7f2", "tonalRamp": ["#ffffff", "#fdfbf7", "#faf7f2", "#f1ece3", "#e6dccb"] },
+      "surface": { "role": "neutral", "displayName": "Surface Folha Limpa", "canonical": "#ffffff", "tonalRamp": ["#ffffff", "#faf7f2", "#f1ece3"] },
+      "ink": { "role": "neutral", "displayName": "Ink Tinta Escrita", "canonical": "#0e2340", "tonalRamp": ["#364f70", "#213959", "#14315c", "#0e2340", "#061324"] },
+      "navy": { "role": "primary", "displayName": "Navy Tinta Notarial", "canonical": "#14315c", "tonalRamp": ["#426294", "#284a7d", "#14315c", "#0e2340", "#081b33"] },
+      "blue-royal": { "role": "primary", "displayName": "Blue Royal Ação", "canonical": "#2554c7", "tonalRamp": ["#729bf2", "#4779e6", "#2554c7", "#1e44a8", "#14317d"] },
+      "blue-soft": { "role": "neutral", "displayName": "Blue Soft Brisa", "canonical": "#e7eefc", "tonalRamp": ["#f5f8fe", "#e7eefc", "#cad9f7"] },
+      "selo-green": { "role": "secondary", "displayName": "Selo Green Validação", "canonical": "#3e8e6e", "tonalRamp": ["#7ec4a8", "#57ab88", "#3e8e6e", "#2c6b52", "#1d4737"] },
+      "green-tint": { "role": "secondary", "displayName": "Green Tint Suave", "canonical": "#e7f3ec", "tonalRamp": ["#f5faf7", "#e7f3ec", "#cee5d8"] },
+      "coral": { "role": "tertiary", "displayName": "Coral Conclusão", "canonical": "#ff6a4d", "tonalRamp": ["#ff9e8a", "#ff7e63", "#ff6a4d", "#e85a3f", "#bf3d24"] },
+      "border": { "role": "neutral", "displayName": "Border Papel Envelhecido", "canonical": "#e6dccb", "tonalRamp": ["#f4eee2", "#e6dccb", "#d1c4ae"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display Hero", "purpose": "Headline principal da landing page e títulos heróicos de alto impacto." },
+      "headline": { "displayName": "Headline H2", "purpose": "Títulos de seção que guiam a narrativa do produto." },
+      "title": { "displayName": "Title H3", "purpose": "Títulos de cards de modelos, categorias e etapas." },
+      "body": { "displayName": "Body Text", "purpose": "Parágrafos de orientação, perguntas do catálogo e respostas do FAQ." },
+      "label": { "displayName": "Label & Badges", "purpose": "Tags de categoria, status de rascunho seguro e microcopy." }
+    },
+    "shadows": [
+      { "name": "card-rest", "value": "0 1px 3px rgba(14, 35, 64, 0.06), 0 4px 12px -2px rgba(14, 35, 64, 0.08)", "purpose": "Sombra de repouso para cards em fundo marfim." },
+      { "name": "card-hover", "value": "0 12px 28px -10px rgba(14, 35, 64, 0.18)", "purpose": "Elevação tátil responsiva ao passar o cursor." },
+      { "name": "hero-scene", "value": "0 20px 40px -15px rgba(20, 49, 92, 0.15)", "purpose": "Profundidade concentrada na cena interativa do Hero." }
+    ],
+    "motion": [
+      { "name": "ease-physical", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Easing suave simulando física de papel apoiando na mesa." },
+      { "name": "duration-fast", "value": "200ms", "purpose": "Micro-interações de botões e links." },
+      { "name": "duration-smooth", "value": "350ms", "purpose": "Transições de elevação de cards e expansão de menus." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Botão principal de avanço e navegação comercial.",
+      "html": "<button class=\"ds-btn-primary\"><span>Encontrar o documento certo</span> &rarr;</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #2554c7; color: #ffffff; padding: 12px 28px; min-height: 48px; border-radius: 12px; font-weight: 700; font-size: 1rem; border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(37, 84, 199, 0.25); transition: background-color 0.2s, transform 0.2s; } .ds-btn-primary:hover { background: #1e44a8; transform: translateY(-1px); }"
+    },
+    {
+      "name": "Outline Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Botão secundário de apoio para 'Ver como funciona'.",
+      "html": "<button class=\"ds-btn-secondary\">Ver como funciona</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; background: #ffffff; color: #0e2340; border: 1px solid #e6dccb; padding: 12px 24px; min-height: 48px; border-radius: 12px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; } .ds-btn-secondary:hover { background: #faf7f2; border-color: #2554c7; }"
+    },
+    {
+      "name": "Document Card with Dog-ear",
+      "kind": "card",
+      "refersTo": "card-document",
+      "description": "Card de modelo documental com dobra de canto superior direito.",
+      "html": "<article class=\"ds-doc-card\"><h3>Contrato de Locação</h3><p>Preenchimento guiado para imóveis residenciais.</p></article>",
+      "css": ".ds-doc-card { position: relative; background: #ffffff; border: 1px solid #e6dccb; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(14, 35, 64, 0.06); transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s; } .ds-doc-card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px -10px rgba(14, 35, 64, 0.18); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "O Cartório Acolhedor (The Warm Registry)",
+    "overview": "O DocFácil une a solidez e a autoridade notarial à leveza e calor de um serviço digital contemporâneo. A interface se materializa como uma bancada de documentos bem organizada: fundo marfim, tinta azul marinho profunda e acentos nobres em azul royal e verde selo.",
+    "keyCharacteristics": [
+      "Papel e Tinta: Fundo marfim/creme e folhas A4 com sobreposição em profundidade.",
+      "Selo Notarial Proprietário: Elementos tracejados de autenticação e garantia de qualidade.",
+      "Hierarquia Singular: Azul royal para orientação diária e coral estrito para conclusão."
+    ],
+    "rules": [
+      { "name": "The Never-Pure-Black Rule", "body": "Proibido usar preto puro ou cinza neutro sem subtom azul marinho.", "section": "colors" },
+      { "name": "The Coral Rarity Rule", "body": "A cor coral é reservada estritamente para a ação de conclusão/pagamento.", "section": "colors" },
+      { "name": "The Physical Paper Rule", "body": "Profundidade é transmitida por sobreposição física de folhas com rotação sutil.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do manter sempre o fundo da página como papel marfim (#faf7f2).",
+      "Do colorizar sombras com a tinta navy (rgba(14, 35, 64, ...)).",
+      "Do garantir área mínima de toque de 44px em todo elemento interativo."
+    ],
+    "donts": [
+      "Don't usar cinzas descoloridos ou preto puro (#000000).",
+      "Don't aplicar sombras difusas genéricas no estilo SaaS clichê.",
+      "Don't permitir que ilustrações ou mascotes causem overflow horizontal no mobile."
+    ]
+  }
+}

@@ -48,7 +48,7 @@ export function HeroScene() {
               <div className="h-2 w-28 rounded bg-blue-400" />
               <div className="h-1.5 w-36 rounded bg-slate-300" />
             </div>
-            <div className="flex items-center gap-1 text-[0.65rem] font-bold uppercase tracking-wider text-emerald-700">
+            <div className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-emerald-700">
               <ShieldCheck className="size-3.5" />
               DocFácil
             </div>
@@ -90,7 +90,7 @@ export function HeroScene() {
               <Sparkles className="size-3.5 text-amber-800" />
               Dica da Corujinha
             </p>
-            <p className="mt-1 text-xs sm:text-[0.825rem] leading-relaxed text-slate-700">
+            <p className="mt-1 text-xs sm:text-sm leading-relaxed text-slate-700">
               Informe o nome como consta no documento de identidade. As cláusulas legais são
               formatadas automaticamente.
             </p>

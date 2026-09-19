@@ -332,9 +332,9 @@ export function LandingPage() {
             </div>
           </div>
 
-          <aside className="relative rounded-3xl border border-emerald-200 bg-emerald-50/70 p-7 sm:p-9 shadow-sm pb-16 sm:pb-9 pr-7 sm:pr-14">
+          <aside className="group relative rounded-3xl border border-emerald-200 bg-emerald-50/70 p-7 sm:p-9 shadow-sm pb-16 sm:pb-9 pr-7 sm:pr-14 transition-all duration-300 hover:border-emerald-300 hover:shadow-md">
             <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-xl bg-emerald-100 text-emerald-900">
+              <span className="grid size-10 place-items-center rounded-xl bg-emerald-100 text-emerald-900 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-105">
                 <Sparkles className="size-6" />
               </span>
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-800">
@@ -369,7 +369,7 @@ export function LandingPage() {
 
             {/* Mascote Corujinha oficial com documento aprovado */}
             <div
-              className="pointer-events-none absolute -bottom-5 -right-3 sm:-bottom-7 sm:-right-6 lg:-bottom-8 lg:-right-8 z-10 w-28 sm:w-36 lg:w-44 select-none"
+              className="pointer-events-none absolute -bottom-5 -right-3 sm:-bottom-7 sm:-right-6 lg:-bottom-8 lg:-right-8 z-10 w-28 sm:w-36 lg:w-44 select-none transition-transform duration-500 ease-out group-hover:-translate-y-2 group-hover:rotate-1"
               aria-hidden="true"
             >
               <Image
@@ -416,8 +416,8 @@ export function LandingPage() {
             </div>
 
             {/* Card lateral "Ainda com dúvidas?" com a Corujinha pensativa */}
-            <div className="rounded-3xl border border-amber-200/90 bg-amber-50/70 p-6 sm:p-8 text-center flex flex-col items-center justify-center shadow-xs lg:sticky lg:top-28">
-              <div className="w-24 sm:w-28 h-auto mx-auto mb-3 select-none">
+            <div className="group rounded-3xl border border-amber-200/90 bg-amber-50/70 p-6 sm:p-8 text-center flex flex-col items-center justify-center shadow-xs lg:sticky lg:top-28 transition-all duration-300 hover:border-amber-300 hover:shadow-md">
+              <div className="w-24 sm:w-28 h-auto mx-auto mb-3 select-none transition-transform duration-500 ease-out group-hover:scale-105 group-hover:-rotate-3">
                 <Image
                   src="/mascotes/coruja-faq-duvida.webp"
                   alt="Corujinha tirando dúvidas"
@@ -437,7 +437,7 @@ export function LandingPage() {
                 className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-sm font-bold text-slate-800 shadow-xs transition hover:bg-slate-50 hover:text-blue-900 focus-visible:ring-2 focus-visible:ring-blue-700"
               >
                 <span>Acessar Central de Ajuda</span>
-                <ArrowRight className="size-4" />
+                <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
           </div>
@@ -446,11 +446,11 @@ export function LandingPage() {
 
       {/* CTA Final — Faixa comemorativa horizontal com a Mascote Oficial */}
       <section className="px-4 py-16 sm:px-6 lg:py-24">
-        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-3xl border border-blue-100 bg-[#EDF4FD] p-6 sm:p-8 lg:p-10 shadow-xs">
+        <div className="group relative mx-auto max-w-7xl overflow-hidden rounded-3xl border border-blue-100 bg-[#EDF4FD] p-6 sm:p-8 lg:p-10 shadow-xs transition-all duration-300 hover:border-blue-200 hover:shadow-md">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
             {/* Bloco da Mascote comemorando + Copy principal */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start lg:items-center gap-5 sm:gap-6 text-center sm:text-left">
-              <div className="relative shrink-0 w-24 sm:w-28 lg:w-32 select-none -mt-2 sm:-my-3">
+              <div className="relative shrink-0 w-24 sm:w-28 lg:w-32 select-none -mt-2 sm:-my-3 transition-transform duration-500 ease-out group-hover:scale-110 group-hover:rotate-2">
                 <Image
                   src="/mascotes/coruja-cta-comemorando.webp"
                   alt="Mascote Corujinha comemorando com confetes"
