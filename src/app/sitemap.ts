@@ -58,7 +58,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     // Views SPA via query string (crawlable, mas sem SSR próprio).
     {
-      url: `${base}/?view=modelos`,
+      url: `${base}/documentos`,
       lastModified: now,
       changeFrequency: "weekly",
       priority: 0.8,
@@ -68,7 +68,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // Rotas dinâmicas: uma entrada por modelo do catálogo (deep link).
   // Conteúdo distinto por slug, relevante para buscas por tipo de documento.
   const modelRoutes: MetadataRoute.Sitemap = MODELOS.map((modelo) => ({
-    url: `${base}/?view=modelo-detalhe&slug=${modelo.slug}`,
+    url: `${base}/documentos/${modelo.slug}`,
     lastModified: now,
     changeFrequency: "monthly" as const,
     priority: 0.7,

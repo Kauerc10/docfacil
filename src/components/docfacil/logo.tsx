@@ -27,7 +27,7 @@ export function Logo({ variant = "header", className }: LogoProps) {
     return (
       <Image
         src="/logo-docfacil.png"
-        alt="DocFacil"
+        alt="DocFácil"
         width={32}
         height={32}
         priority
