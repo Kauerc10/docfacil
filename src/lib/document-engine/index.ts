@@ -43,6 +43,12 @@ export type {
 } from "./types";
 
 export {
+  compileDocument,
+  type CompileDocumentParams,
+  type CompiledDocument,
+} from "./compiler";
+
+export {
   fillTemplate,
   fillTemplateOrNull,
   buildClausulaMap,

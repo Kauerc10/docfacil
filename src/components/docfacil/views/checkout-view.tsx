@@ -29,12 +29,10 @@ import {
   saveGuestDraft,
   getAccountDraft,
   deleteAccountDraft,
-  finalizeDocument,
   createDocumentVersion,
-  getOrCreateFinalizationRequestId,
   clearFinalizationRequestId,
 } from "@/lib/documents/client";
-import { buildAccountDraftFinalizationAnswers } from "@/lib/documents/account-draft";
+import { finalizeClientDraft } from "@/lib/documents/client-document";
 
 export function CheckoutView() {
   const { params, navigate } = useNav();
@@ -108,28 +106,40 @@ export function CheckoutView() {
           throw new Error("O rascunho associado ao checkout não foi encontrado.");
         }
 
-        clearFinalizationRequestId(draft.modeloSlug);
-        const requestId = getOrCreateFinalizationRequestId(draft.modeloSlug);
-        const respostas = buildAccountDraftFinalizationAnswers(draft);
+        const isNovaVersao = Boolean(draft.sourceDocumentId);
         const finalized = draft.sourceDocumentId
-          ? await createDocumentVersion(draft.sourceDocumentId, {
-              requestId,
-              respostas,
-              clausulasSelecionadas: draft.clausulasSelecionadas,
+          ? await finalizeClientDraft({
+              draft: {
+                id: draft.id,
+                modeloSlug: draft.modeloSlug,
+                sourceDocumentId: draft.sourceDocumentId,
+                respostas: draft.respostas,
+                stepIndex: draft.stepIndex,
+                clausulasSelecionadas: draft.clausulasSelecionadas,
+                extrasPorClausula: draft.extrasPorClausula,
+              },
               orderId: result.orderId,
+              versionCreator: (id, p) => createDocumentVersion(draft.sourceDocumentId!, { ...p, orderId: result.orderId }),
+              user,
             })
-          : await finalizeDocument({
-              requestId,
-              modeloSlug: draft.modeloSlug,
-              respostas,
-              clausulasSelecionadas: draft.clausulasSelecionadas,
+          : await finalizeClientDraft({
+              draft: {
+                id: draft.id,
+                modeloSlug: draft.modeloSlug,
+                sourceDocumentId: draft.sourceDocumentId,
+                respostas: draft.respostas,
+                stepIndex: draft.stepIndex,
+                clausulasSelecionadas: draft.clausulasSelecionadas,
+                extrasPorClausula: draft.extrasPorClausula,
+              },
               orderId: result.orderId,
+              user,
             });
 
         await deleteAccountDraft(draft.id);
-        clearFinalizationRequestId(draft.modeloSlug);
+
         toast.success(
-          draft.sourceDocumentId
+          isNovaVersao
             ? "Pagamento demo aprovado e nova versão liberada."
             : "Pagamento demo aprovado e documento liberado."
         );

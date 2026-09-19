@@ -2,16 +2,27 @@
  * Consent service — registra a concordância do usuário com Termos e
  * Privacidade. Em Firebase real a evidência é criada pelo backend; o client
  * envia somente a decisão do usuário e, no checkout guest, o e-mail informado.
+ *
+ * Consolidação no ConsentManager:
+ * - Seam exclusiva via API routes (/api/consents POST e GET).
+ * - Zero acoplamento ou importação do SDK client do Firestore.
+ * - Preferências de cookies isoladas no submódulo cookie-preferences.ts.
  */
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import { apiFetch } from "@/lib/auth/api-fetch";
-import { db, IS_FIREBASE_CONFIGURED } from "../firebase";
+import { IS_FIREBASE_CONFIGURED } from "../firebase";
 import { STORAGE_KEYS } from "../constants";
 import {
   COOKIES_VERSION,
   PRIVACY_VERSION,
   TERMS_VERSION,
 } from "../legal/versions";
+
+export {
+  COOKIE_PREFS_KEY,
+  type CookiePreferences,
+  getCookiePreferences,
+  saveCookiePreferences,
+} from "./cookie-preferences";
 
 export { COOKIES_VERSION, PRIVACY_VERSION, TERMS_VERSION };
 
@@ -39,19 +50,35 @@ export interface ConsentRecord {
   marketingOptIn?: boolean;
 }
 
+let inMemoryDemoConsents: ConsentRecord[] = [];
+
 function loadDemoConsents(): ConsentRecord[] {
-  if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.DEMO_CONSENTS);
-    return raw ? (JSON.parse(raw) as ConsentRecord[]) : [];
+    if (typeof window !== "undefined" && window.localStorage) {
+      const raw = window.localStorage.getItem(STORAGE_KEYS.DEMO_CONSENTS);
+      return raw ? (JSON.parse(raw) as ConsentRecord[]) : [];
+    }
+    if (typeof localStorage !== "undefined") {
+      const raw = localStorage.getItem(STORAGE_KEYS.DEMO_CONSENTS);
+      return raw ? (JSON.parse(raw) as ConsentRecord[]) : [];
+    }
   } catch {
-    return [];
+    // fallback
   }
+  return inMemoryDemoConsents;
 }
 
 function saveDemoConsents(list: ConsentRecord[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.DEMO_CONSENTS, JSON.stringify(list));
+  inMemoryDemoConsents = list;
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem(STORAGE_KEYS.DEMO_CONSENTS, JSON.stringify(list));
+    } else if (typeof localStorage !== "undefined") {
+      localStorage.setItem(STORAGE_KEYS.DEMO_CONSENTS, JSON.stringify(list));
+    }
+  } catch {
+    // fallback
+  }
 }
 
 function getUserAgent(): string {
@@ -112,7 +139,7 @@ export async function recordConsent(params: {
   /** @deprecated Compatibilidade temporária. A versão real é definida pelo servidor. */
   termsVersion?: string;
 }): Promise<ConsentRecord> {
-  if (!IS_FIREBASE_CONFIGURED || !db) {
+  if (!IS_FIREBASE_CONFIGURED) {
     const record = await createDemoConsentRecord(params);
     const list = loadDemoConsents();
     const saved = { ...record, id: `demo-${Date.now()}` };
@@ -143,64 +170,34 @@ export async function recordConsent(params: {
   return payload.consent;
 }
 
-export async function listConsents(userId: string): Promise<ConsentRecord[]> {
-  if (!IS_FIREBASE_CONFIGURED || !db) {
+export async function listConsents(userId?: string): Promise<ConsentRecord[]> {
+  if (!IS_FIREBASE_CONFIGURED) {
     return loadDemoConsents()
-      .filter((c) => c.userId === userId)
+      .filter((c) => !userId || c.userId === userId)
       .sort((a, b) => b.acceptedAt - a.acceptedAt);
   }
 
-  const q = query(
-    collection(db, "consents"),
-    where("userId", "==", userId),
-    orderBy("acceptedAt", "desc"),
-    limit(50)
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as Omit<ConsentRecord, "id">),
-  }));
-}
+  const response = await apiFetch("/api/consents", {
+    method: "GET",
+  });
 
-export const COOKIE_PREFS_KEY = STORAGE_KEYS.COOKIE_PREFS;
-
-export interface CookiePreferences {
-  version?: string;
-  essential: true;
-  analytics: boolean;
-  marketing: boolean;
-  acceptedAt?: number;
-  rejectedAt?: number;
-}
-
-function isCookiePreferences(value: unknown): value is CookiePreferences {
-  if (!value || typeof value !== "object") return false;
-  const prefs = value as Partial<CookiePreferences>;
-  return (
-    prefs.version === COOKIES_VERSION &&
-    prefs.essential === true &&
-    typeof prefs.analytics === "boolean" &&
-    typeof prefs.marketing === "boolean"
-  );
-}
-
-export function getCookiePreferences(): CookiePreferences | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(COOKIE_PREFS_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    return isCookiePreferences(parsed) ? parsed : null;
-  } catch {
-    return null;
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(
+      payload.error?.message || "Não foi possível carregar os registros de consentimento."
+    );
   }
+
+  const payload = (await response.json()) as { consents: ConsentRecord[] };
+  const list = payload.consents || [];
+  return userId ? list.filter((c) => c.userId === userId) : list;
 }
 
-export function saveCookiePreferences(prefs: CookiePreferences): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(
-    COOKIE_PREFS_KEY,
-    JSON.stringify({ ...prefs, version: COOKIES_VERSION })
-  );
-}
+export const listUserConsents = listConsents;
+
+export const ConsentManager = {
+  record: recordConsent,
+  list: listConsents,
+  listUserConsents,
+};
+

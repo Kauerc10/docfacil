@@ -29,7 +29,7 @@ import {
   type AccountDraftData,
 } from "@/lib/documents/client";
 import { getModel } from "@/lib/services/models-service";
-import { gerarEBaixarPDF } from "@/lib/pdf/generator";
+import { gerarEBaixarPDF } from "@/lib/pdf";
 import { shouldWatermark } from "@/lib/services/plan-service";
 import { MODELOS } from "@/lib/modelos";
 import type { Documento } from "@/lib/types";
@@ -176,7 +176,7 @@ function DashboardContent() {
         const model = await getModel(doc.modeloSlug);
         if (!model) throw new Error("Modelo não encontrado.");
         await gerarEBaixarPDF(model, doc.respostas, doc.modeloSlug, {
-          watermark: shouldWatermark(user),
+          watermark: shouldWatermark(user, doc),
         });
       } else {
         const { downloadUrl } = await getDocumentDownloadUrl(doc.id);

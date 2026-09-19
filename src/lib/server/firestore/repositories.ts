@@ -30,6 +30,11 @@ import {
   InMemoryUsersRepository,
   InMemoryGenerationCommitRepository,
 } from "./in-memory-repositories";
+import {
+  getDocumentStore,
+  setDocumentStoreForTesting,
+  adaptRepositoriesToStore,
+} from "./document-store";
 
 export class FirestoreDocumentsRepository implements IDocumentsRepository {
   private readonly db: Firestore;
@@ -680,8 +685,32 @@ export interface BackendRepositories {
 
 let repositoriesSingleton: BackendRepositories | null = null;
 
+(globalThis as any).__resetRepositoriesSingleton = () => {
+  repositoriesSingleton = null;
+};
+
 export function getRepositories(): BackendRepositories {
   if (repositoriesSingleton) {
+    return repositoriesSingleton;
+  }
+
+  const store = getDocumentStore() as any;
+  if (
+    store.documents &&
+    store.access &&
+    store.orders &&
+    store.generationRequests &&
+    store.users &&
+    store.generationCommit
+  ) {
+    repositoriesSingleton = {
+      documents: store.documents,
+      access: store.access,
+      orders: store.orders,
+      generationRequests: store.generationRequests,
+      users: store.users,
+      generationCommit: store.generationCommit,
+    };
     return repositoriesSingleton;
   }
 
@@ -713,6 +742,7 @@ export function getRepositories(): BackendRepositories {
       users,
       generationCommit,
     };
+    setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
   } else {
     repositoriesSingleton = {
       documents: new FirestoreDocumentsRepository(),
@@ -722,6 +752,7 @@ export function getRepositories(): BackendRepositories {
       users: new FirestoreUsersRepository(),
       generationCommit: new FirestoreGenerationCommitRepository(),
     };
+    setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
   }
 
   return repositoriesSingleton;
@@ -729,11 +760,17 @@ export function getRepositories(): BackendRepositories {
 
 export function setTestRepositories(repos: BackendRepositories | null): void {
   repositoriesSingleton = repos;
+  if (repos) {
+    setDocumentStoreForTesting(adaptRepositoriesToStore(repos));
+  } else {
+    setDocumentStoreForTesting(null);
+  }
 }
 
 export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | null): void {
   if (!repos) {
     repositoriesSingleton = null;
+    setDocumentStoreForTesting(null);
     return;
   }
   const current = getRepositories();
@@ -764,4 +801,5 @@ export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | 
     users,
     generationCommit,
   };
+  setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
 }

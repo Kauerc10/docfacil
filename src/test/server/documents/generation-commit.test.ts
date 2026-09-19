@@ -1,36 +1,14 @@
 import { describe, expect, it, beforeEach } from "bun:test";
 import { generateDocumentArtifact } from "@/lib/server/domain/orchestrator";
-import {
-  InMemoryDocumentsRepository,
-  InMemoryOrdersRepository,
-  InMemoryAccessRepository,
-  InMemoryGenerationRequestsRepository,
-  InMemoryUsersRepository,
-  InMemoryGenerationCommitRepository,
-} from "@/lib/server/firestore/in-memory-repositories";
+import { InMemoryDocumentStore } from "@/lib/server/firestore/in-memory-document-store";
 import { InMemoryArtifactStorage } from "@/lib/server/r2/storage";
 
 describe("Atomic Generation Commit & Rollback", () => {
-  let docsRepo: InMemoryDocumentsRepository;
-  let ordersRepo: InMemoryOrdersRepository;
-  let accessRepo: InMemoryAccessRepository;
-  let genRequestsRepo: InMemoryGenerationRequestsRepository;
-  let usersRepo: InMemoryUsersRepository;
-  let commitRepo: InMemoryGenerationCommitRepository;
+  let store: InMemoryDocumentStore;
   let storage: InMemoryArtifactStorage;
 
   beforeEach(() => {
-    docsRepo = new InMemoryDocumentsRepository();
-    ordersRepo = new InMemoryOrdersRepository();
-    accessRepo = new InMemoryAccessRepository();
-    genRequestsRepo = new InMemoryGenerationRequestsRepository();
-    usersRepo = new InMemoryUsersRepository();
-    commitRepo = new InMemoryGenerationCommitRepository(
-      docsRepo,
-      accessRepo,
-      ordersRepo,
-      genRequestsRepo
-    );
+    store = new InMemoryDocumentStore();
     storage = new InMemoryArtifactStorage();
   });
 
@@ -51,7 +29,7 @@ describe("Atomic Generation Commit & Rollback", () => {
   };
 
   it("compensates R2, releases order and leaves no partial Firestore state when commit fails", async () => {
-    commitRepo.failNextCommit(new Error("transaction aborted by Firestore"));
+    store.failNextCommit(new Error("transaction aborted by Firestore"));
 
     let deleteArtifactCalledWithKey: string | null = null;
     const originalDeleteArtifact = storage.deleteArtifact.bind(storage);
@@ -60,7 +38,7 @@ describe("Atomic Generation Commit & Rollback", () => {
       return originalDeleteArtifact(key);
     };
 
-    const order = await ordersRepo.createOrder({
+    const order = await store.createOrder({
       provider: "demo",
       product: "avulso",
       amountCents: 990,
@@ -82,14 +60,7 @@ describe("Atomic Generation Commit & Rollback", () => {
         guestContact: { email: "maria@example.com" },
         orderId: order.id,
         deps: {
-          repositories: {
-            documents: docsRepo,
-            orders: ordersRepo,
-            access: accessRepo,
-            generationRequests: genRequestsRepo,
-            users: usersRepo,
-            generationCommit: commitRepo,
-          },
+          store,
           storage,
         },
       });
@@ -100,13 +71,13 @@ describe("Atomic Generation Commit & Rollback", () => {
     expect(thrownError).toBeDefined();
     expect(deleteArtifactCalledWithKey).toBeDefined();
 
-    const updatedOrder = await ordersRepo.getOrder(order.id!);
+    const updatedOrder = await store.getOrder(order.id!);
     expect(updatedOrder?.status).toBe("paid");
 
-    const genReq = await genRequestsRepo.getRequest(requestId);
+    const genReq = await store.getGenerationRequest(requestId);
     expect(genReq?.status).toBe("failed");
 
-    expect(accessRepo.size()).toBe(0);
+    expect(store.access.size()).toBe(0);
   });
 
   it("never deletes R2 artifact after Firestore commit succeeds", async () => {
@@ -115,7 +86,7 @@ describe("Atomic Generation Commit & Rollback", () => {
       deleteArtifactCalled = true;
     };
 
-    const order = await ordersRepo.createOrder({
+    const order = await store.createOrder({
       provider: "demo",
       product: "avulso",
       amountCents: 990,
@@ -135,14 +106,7 @@ describe("Atomic Generation Commit & Rollback", () => {
       guestContact: { email: "maria@example.com" },
       orderId: order.id,
       deps: {
-        repositories: {
-          documents: docsRepo,
-          orders: ordersRepo,
-          access: accessRepo,
-          generationRequests: genRequestsRepo,
-          users: usersRepo,
-          generationCommit: commitRepo,
-        },
+        store,
         storage,
       },
     });
@@ -150,12 +114,12 @@ describe("Atomic Generation Commit & Rollback", () => {
     expect(result.artifactState).toBe("ready");
     expect(deleteArtifactCalled).toBe(false);
 
-    const updatedOrder = await ordersRepo.getOrder(order.id!);
+    const updatedOrder = await store.getOrder(order.id!);
     expect(updatedOrder?.status).toBe("consumed");
 
-    const genReq = await genRequestsRepo.getRequest(requestId);
+    const genReq = await store.getGenerationRequest(requestId);
     expect(genReq?.status).toBe("completed");
 
-    expect(accessRepo.size()).toBe(1);
+    expect(store.access.size()).toBe(1);
   });
 });

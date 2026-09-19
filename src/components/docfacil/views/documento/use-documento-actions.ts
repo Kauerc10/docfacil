@@ -10,10 +10,9 @@ import {
   getDocumentDownloadUrl,
   shareDocument,
   revokeDocumentShare,
-  saveGuestDraft,
-  getOrCreateFinalizationRequestId,
+  saveClientDraft,
 } from "@/lib/documents/client";
-import { gerarEBaixarPDF } from "@/lib/pdf/generator";
+import { gerarEBaixarPDF } from "@/lib/pdf";
 import { useNav } from "@/components/docfacil/nav-context";
 import { useAuth } from "@/lib/auth-context";
 import { shouldWatermark } from "@/lib/services/plan-service";
@@ -63,7 +62,7 @@ export function useDocumentoActions(
       if (doc.id.startsWith("demo-")) {
         if (!modelo) throw new Error("Modelo não encontrado.");
         await gerarEBaixarPDF(modelo, doc.respostas, doc.modeloSlug, {
-          watermark: shouldWatermark(user),
+          watermark: shouldWatermark(user, doc),
         });
       } else {
         const { downloadUrl } = await getDocumentDownloadUrl(doc.id);
@@ -124,15 +123,16 @@ export function useDocumentoActions(
     try {
       const draft = await duplicateDocument(doc.id);
       if (draft) {
-        const requestId = getOrCreateFinalizationRequestId(draft.modeloSlug);
-        saveGuestDraft(draft.modeloSlug, {
-          requestId,
-          modeloSlug: draft.modeloSlug,
-          answers: draft.respostas,
-          stepIndex: 0,
-          clausulasSelecionadas: draft.clausulasSelecionadas || [],
-          extrasPorClausula: draft.extrasPorClausula || {},
-        });
+        await saveClientDraft(
+          {
+            modeloSlug: draft.modeloSlug,
+            respostas: draft.respostas,
+            stepIndex: 0,
+            clausulasSelecionadas: draft.clausulasSelecionadas || [],
+            extrasPorClausula: draft.extrasPorClausula || {},
+          },
+          user
+        );
         toast.success("Documento duplicado!", {
           description: "Respostas carregadas no formulário para você revisar e gerar.",
         });
