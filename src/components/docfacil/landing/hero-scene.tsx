@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { FileText, Check, ShieldCheck, Sparkles } from "lucide-react";
 import { Pet } from "@/components/docfacil/pet";
 
@@ -129,6 +130,24 @@ export function HeroScene() {
             Pronto para revisar
           </span>
         </div>
+      </div>
+
+      {/* Mascote Corujinha oficial recepcionando na Hero */}
+      <div
+        className="pointer-events-none absolute -bottom-5 -right-2 sm:-bottom-7 sm:-right-6 lg:-bottom-9 lg:-right-8 z-20 w-28 sm:w-36 lg:w-44 select-none transition-transform duration-500 ease-out"
+        style={{
+          transform: isHovered ? "translateY(-6px) rotate(1.5deg)" : undefined,
+        }}
+        aria-hidden="true"
+      >
+        <Image
+          src="/mascotes/coruja-hero-acenando.webp"
+          alt="Mascote Corujinha DocFácil acenando"
+          width={280}
+          height={280}
+          priority
+          className="h-auto w-full drop-shadow-xl"
+        />
       </div>
     </div>
   );

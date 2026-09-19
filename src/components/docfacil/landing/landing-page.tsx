@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   CheckCircle2,
@@ -90,6 +91,24 @@ export function LandingPage() {
             <p className="mt-4 text-xs sm:text-sm text-slate-500">
               Conheça todos os modelos antes de criar sua conta.
             </p>
+
+            {/* Badges de credibilidade / confiança (conforme mockup) */}
+            <div className="mt-7 flex flex-wrap items-center gap-y-2.5 gap-x-4 sm:gap-x-6 text-xs sm:text-sm font-semibold text-slate-600">
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="size-4 text-emerald-600" />
+                Rápido e seguro
+              </span>
+              <span className="text-slate-300 hidden sm:inline" aria-hidden="true">•</span>
+              <span className="inline-flex items-center gap-1.5">
+                <FileCheck2 className="size-4 text-blue-600" />
+                Modelos revisados
+              </span>
+              <span className="text-slate-300 hidden sm:inline" aria-hidden="true">•</span>
+              <span className="inline-flex items-center gap-1.5">
+                <FileText className="size-4 text-indigo-600" />
+                PDF pronto para usar
+              </span>
+            </div>
           </div>
 
           {/* Cena interativa do produto com a Corujinha oficial e papéis sobrepostos */}
@@ -263,7 +282,7 @@ export function LandingPage() {
       </section>
 
       {/* Benefícios e Acesso Gratuito */}
-      <section className="px-4 py-16 sm:px-6 lg:py-24">
+      <section className="relative px-4 py-16 sm:px-6 lg:py-24 overflow-hidden lg:overflow-visible">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-2 lg:items-center">
           <div>
             <p className="text-sm font-bold uppercase tracking-widest text-emerald-700">
@@ -313,7 +332,7 @@ export function LandingPage() {
             </div>
           </div>
 
-          <aside className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-7 sm:p-9 shadow-sm">
+          <aside className="relative rounded-3xl border border-emerald-200 bg-emerald-50/70 p-7 sm:p-9 shadow-sm pb-16 sm:pb-9 pr-7 sm:pr-14">
             <div className="flex items-center gap-3">
               <span className="grid size-10 place-items-center rounded-xl bg-emerald-100 text-emerald-900">
                 <Sparkles className="size-6" />
@@ -347,66 +366,123 @@ export function LandingPage() {
             >
               Ver modelos disponíveis
             </Link>
+
+            {/* Mascote Corujinha oficial com documento aprovado */}
+            <div
+              className="pointer-events-none absolute -bottom-5 -right-3 sm:-bottom-7 sm:-right-6 lg:-bottom-8 lg:-right-8 z-10 w-28 sm:w-36 lg:w-44 select-none"
+              aria-hidden="true"
+            >
+              <Image
+                src="/mascotes/coruja-comece-gratis-check.webp"
+                alt="Mascote Corujinha com documento verificado"
+                width={260}
+                height={260}
+                className="h-auto w-full drop-shadow-xl"
+              />
+            </div>
           </aside>
         </div>
       </section>
 
-      {/* Dúvidas frequentes */}
+      {/* Dúvidas frequentes — Layout em 2 colunas com Card de Ajuda e Mascote */}
       <section className="border-y border-slate-200 bg-white px-4 py-16 sm:px-6 lg:py-24">
-        <div className="mx-auto max-w-4xl">
-          <p className="text-sm font-bold uppercase tracking-widest text-emerald-700">
-            Dúvidas frequentes
-          </p>
-          <h2 className="mt-2 text-3xl font-extrabold text-slate-950 sm:text-4xl">
-            Antes de começar, vale saber
-          </h2>
-          <div className="mt-8 divide-y divide-slate-200">
-            {faqs.map(([q, a]) => (
-              <details key={q} className="group py-5">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 font-bold text-slate-950 transition hover:text-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 rounded-lg py-1">
-                  <span className="text-base sm:text-lg">{q}</span>
-                  <span
-                    className="text-2xl text-blue-900 transition-transform group-open:rotate-45 select-none"
-                    aria-hidden="true"
-                  >
-                    +
-                  </span>
-                </summary>
-                <p className="max-w-3xl pb-2 pr-8 leading-relaxed text-slate-600 text-sm sm:text-base">
-                  {a}
-                </p>
-              </details>
-            ))}
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-12 lg:grid-cols-[1fr_340px] xl:grid-cols-[1fr_380px] lg:items-start">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-widest text-emerald-700">
+                Dúvidas frequentes
+              </p>
+              <h2 className="mt-2 text-3xl font-extrabold text-slate-950 sm:text-4xl">
+                Antes de começar, vale saber
+              </h2>
+              <div className="mt-8 divide-y divide-slate-200">
+                {faqs.map(([q, a]) => (
+                  <details key={q} className="group py-5">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 font-bold text-slate-950 transition hover:text-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 rounded-lg py-1">
+                      <span className="text-base sm:text-lg">{q}</span>
+                      <span
+                        className="text-2xl text-blue-900 transition-transform group-open:rotate-45 select-none"
+                        aria-hidden="true"
+                      >
+                        +
+                      </span>
+                    </summary>
+                    <p className="max-w-3xl pb-2 pr-8 leading-relaxed text-slate-600 text-sm sm:text-base">
+                      {a}
+                    </p>
+                  </details>
+                ))}
+              </div>
+            </div>
+
+            {/* Card lateral "Ainda com dúvidas?" com a Corujinha pensativa */}
+            <div className="rounded-3xl border border-amber-200/90 bg-amber-50/70 p-6 sm:p-8 text-center flex flex-col items-center justify-center shadow-xs lg:sticky lg:top-28">
+              <div className="w-24 sm:w-28 h-auto mx-auto mb-3 select-none">
+                <Image
+                  src="/mascotes/coruja-faq-duvida.webp"
+                  alt="Corujinha tirando dúvidas"
+                  width={180}
+                  height={180}
+                  className="h-auto w-full drop-shadow-md"
+                />
+              </div>
+              <h3 className="text-xl font-extrabold text-slate-950">
+                Ainda com dúvidas?
+              </h3>
+              <p className="mt-2 text-sm text-slate-600 leading-relaxed max-w-xs">
+                Nossa equipe está pronta para ajudar.
+              </p>
+              <Link
+                href="/ajuda"
+                className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-sm font-bold text-slate-800 shadow-xs transition hover:bg-slate-50 hover:text-blue-900 focus-visible:ring-2 focus-visible:ring-blue-700"
+              >
+                <span>Acessar Central de Ajuda</span>
+                <ArrowRight className="size-4" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Final — Com a Mascote Oficial em destaque */}
-      <section className="px-4 py-16 text-center sm:px-6 lg:py-24">
-        <div className="relative mx-auto max-w-3xl rounded-3xl border border-amber-200/80 bg-amber-50/80 p-8 sm:p-12 shadow-sm">
-          {/* Mascote Corujinha oficial em destaque */}
-          <div className="mx-auto flex justify-center mb-4">
-            <Pet
-              mood="feliz"
-              size={90}
-              lookAtCursor={true}
-              showDashedCircle={true}
-            />
-          </div>
+      {/* CTA Final — Faixa comemorativa horizontal com a Mascote Oficial */}
+      <section className="px-4 py-16 sm:px-6 lg:py-24">
+        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-3xl border border-blue-100 bg-[#EDF4FD] p-6 sm:p-8 lg:p-10 shadow-xs">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            {/* Bloco da Mascote comemorando + Copy principal */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start lg:items-center gap-5 sm:gap-6 text-center sm:text-left">
+              <div className="relative shrink-0 w-24 sm:w-28 lg:w-32 select-none -mt-2 sm:-my-3">
+                <Image
+                  src="/mascotes/coruja-cta-comemorando.webp"
+                  alt="Mascote Corujinha comemorando com confetes"
+                  width={220}
+                  height={220}
+                  className="h-auto w-full drop-shadow-lg"
+                />
+              </div>
+              <div>
+                <h2 className="text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl lg:text-4xl">
+                  Pronto para tirar esse documento do papel?
+                </h2>
+                <p className="mt-2 max-w-2xl leading-relaxed text-slate-600 text-sm sm:text-base">
+                  Encontre o modelo certo, responda no seu ritmo e deixe o DocFácil guiar o resto.
+                </p>
+              </div>
+            </div>
 
-          <h2 className="mt-2 text-3xl font-extrabold text-slate-950 sm:text-4xl">
-            Pronto para tirar esse documento do papel?
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl leading-relaxed text-slate-600 text-base sm:text-lg">
-            Encontre o modelo certo, responda no seu ritmo e deixe o DocFácil guiar o resto.
-          </p>
-          <Link
-            href="/documentos"
-            className="mt-8 inline-flex min-h-12 items-center gap-2 rounded-xl bg-blue-900 px-7 font-bold text-white shadow-md shadow-blue-950/15 transition-all hover:bg-blue-950 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-700 active:scale-[0.99]"
-          >
-            <span>Encontrar meu documento</span>
-            <ArrowRight className="size-5" />
-          </Link>
+            {/* Bloco de Conversão CTA + Microcopy */}
+            <div className="flex flex-col items-center lg:items-end shrink-0 gap-2 w-full sm:w-auto">
+              <Link
+                href="/documentos"
+                className="inline-flex min-h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-blue-900 px-7 font-bold text-white shadow-md shadow-blue-950/15 transition-all hover:bg-blue-950 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-700 active:scale-[0.99]"
+              >
+                <span>Encontrar meu documento</span>
+                <ArrowRight className="size-5" />
+              </Link>
+              <p className="text-xs text-slate-500 font-medium text-center lg:text-right">
+                É rápido, seguro e gratuito para começar.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
     </>
