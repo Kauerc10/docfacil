@@ -6,7 +6,6 @@ import { BackendError } from '@/lib/server/errors';
 import { requireAppCheck, resolvePrincipal, requireUser } from '@/lib/server/security';
 import { getBillingProvider } from '@/lib/server/billing/provider';
 import { getRepositories } from '@/lib/server/firestore/repositories';
-import { setServerUserPendingOrder } from '@/lib/server/billing/account-plan';
 import { getServerEnv } from '@/lib/server/env';
 
 export const runtime = "nodejs";
@@ -181,23 +180,84 @@ export async function POST(req: Request) {
 
     if (product === 'pro') {
       const user = requireUser(principal);
-      const result = await provider.createSubscription({
-        orderId: order.id,
-        product: 'pro',
-        amountCents,
-        payer: {
-          email: user.email || 'cliente@docfacil.com.br',
-          userId: user.userId,
-        },
-        completionUrl,
-      });
+
+      const reservation = await repos.users.reservePendingProSubscription(
+        user.userId,
+        order.id
+      );
+
+      if (reservation.status === 'active_pro') {
+        await repos.orders.updateOrder(order.id, { status: 'cancelled' });
+        throw new BackendError(
+          'CONFLICT',
+          409,
+          'Você já possui uma assinatura do Plano Pro ativa.'
+        );
+      }
+
+      if (reservation.status === 'existing_pending') {
+        await repos.orders.updateOrder(order.id, { status: 'cancelled' });
+
+        let existingOrder = await repos.orders.getOrder(reservation.orderId);
+        if (!existingOrder?.checkoutUrl) {
+          for (let i = 0; i < 6; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            existingOrder = await repos.orders.getOrder(reservation.orderId);
+            if (existingOrder?.checkoutUrl) {
+              break;
+            }
+          }
+        }
+
+        if (
+          existingOrder &&
+          existingOrder.status === 'pending' &&
+          existingOrder.checkoutUrl
+        ) {
+          const env = getServerEnv();
+          const isDev = env.NODE_ENV !== 'production' || env.VERCEL_ENV === 'preview';
+          return NextResponse.json(
+            {
+              kind: 'redirect',
+              orderId: existingOrder.id,
+              product: 'pro',
+              amountCents: existingOrder.amountCents,
+              checkoutUrl: existingOrder.checkoutUrl,
+              devMode: isDev,
+            },
+            { status: 200, headers: { 'Cache-Control': 'no-store' } }
+          );
+        }
+
+        throw new BackendError(
+          'CONFLICT',
+          409,
+          'Uma solicitação de assinatura já está em andamento. Aguarde alguns instantes.'
+        );
+      }
+
+      let result;
+      try {
+        result = await provider.createSubscription({
+          orderId: order.id,
+          product: 'pro',
+          amountCents,
+          payer: {
+            email: user.email || 'cliente@docfacil.com.br',
+            userId: user.userId,
+          },
+          completionUrl,
+        });
+      } catch (err) {
+        await repos.users.releasePendingProSubscription(user.userId, order.id);
+        await repos.orders.updateOrder(order.id, { status: 'failed' });
+        throw err;
+      }
 
       await repos.orders.updateOrder(order.id, {
         checkoutUrl: result.checkoutUrl,
         externalPaymentId: result.providerCheckoutId,
       });
-
-      await setServerUserPendingOrder(user.userId, order.id);
 
       return NextResponse.json(
         {

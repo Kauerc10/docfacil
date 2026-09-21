@@ -147,7 +147,15 @@ export async function handleMercadoPagoWebhook(
           });
 
           if (order.product === 'pro' && order.buyer.type === 'user') {
-            await setServerUserPlan(order.buyer.userId, 'gratis', null, null);
+            const currentProfile = await repos.users.getUserProfile(order.buyer.userId);
+            const isCurrentSubscription =
+              (currentProfile?.subscriptionId && currentProfile.subscriptionId === preapproval.id) ||
+              (currentProfile?.subscriptionOrderId && currentProfile.subscriptionOrderId === orderId) ||
+              (!currentProfile?.subscriptionId && !currentProfile?.subscriptionOrderId);
+
+            if (isCurrentSubscription) {
+              await setServerUserPlan(order.buyer.userId, 'gratis', null, null);
+            }
           }
         }
       }

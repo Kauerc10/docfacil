@@ -427,5 +427,62 @@ describe("POST /api/webhooks/mercadopago", () => {
     const userProfile = await usersRepo.getUserProfile(userId);
     expect(userProfile?.plano).toBe("pro");
   });
+
+  it("ignora cancelamento de assinatura antiga que já foi substituída por uma nova assinatura Pro ativa", async () => {
+    const userId = "usr_superseded_sub";
+    const orderOld = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "user@docfacil.com.br" },
+      status: "paid",
+      createdAt: Date.now() - 10000000,
+    });
+
+    const orderNew = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "user@docfacil.com.br" },
+      status: "paid",
+      createdAt: Date.now() - 1000000,
+    });
+
+    usersRepo.setUserProfile(userId, {
+      plano: "pro",
+      email: "user@docfacil.com.br",
+      subscriptionId: "preapp_new",
+      subscriptionOrderId: orderNew.id,
+    });
+
+    mockMpClient = createTestMpClient({
+      getPreapproval: async (id) => ({
+        id: "preapp_old",
+        status: "cancelled",
+        external_reference: orderOld.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("preapp_old", {
+      action: "updated",
+      data: { id: "preapp_old" },
+      type: "subscription_preapproval",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+
+    const updatedOldOrder = await ordersRepo.getOrder(orderOld.id!);
+    expect(updatedOldOrder?.status).toBe("cancelled");
+
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.plano).toBe("pro");
+    expect(userProfile?.subscriptionId).toBe("preapp_new");
+    expect(userProfile?.subscriptionOrderId).toBe(orderNew.id);
+  });
 });
 

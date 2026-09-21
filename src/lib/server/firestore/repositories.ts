@@ -13,6 +13,7 @@ import type {
   IGenerationRequestsRepository,
   IUsersRepository,
   UserProfileRecord,
+  ReservePendingProSubscriptionResult,
   IGenerationCommitRepository,
   CommitGeneratedArtifactInput,
 } from "./interfaces";
@@ -602,6 +603,71 @@ export class FirestoreUsersRepository implements IUsersRepository {
     if (!snap.exists) return null;
     return snap.data() as UserProfileRecord;
   }
+
+  public async reservePendingProSubscription(
+    userId: string,
+    orderId: string
+  ): Promise<ReservePendingProSubscriptionResult> {
+    const userRef = this.db.collection("users").doc(userId);
+
+    return await this.db.runTransaction(async (tx) => {
+      const userSnap = await tx.get(userRef);
+      const user = userSnap.exists ? (userSnap.data() as UserProfileRecord) : null;
+
+      if (user?.plano === "pro") {
+        return { status: "active_pro" };
+      }
+
+      if (user?.pendingProOrderId) {
+        const orderSnap = await tx.get(
+          this.db.collection("orders").doc(user.pendingProOrderId)
+        );
+        if (orderSnap.exists) {
+          const order = orderSnap.data() as OrderRecord;
+          if (order.status === "pending") {
+            return {
+              status: "existing_pending",
+              orderId: user.pendingProOrderId,
+            };
+          }
+        }
+      }
+
+      tx.set(
+        userRef,
+        {
+          pendingProOrderId: orderId,
+          atualizadoEm: Date.now(),
+        },
+        { merge: true }
+      );
+
+      return { status: "acquired" };
+    });
+  }
+
+  public async releasePendingProSubscription(
+    userId: string,
+    orderId: string
+  ): Promise<void> {
+    const userRef = this.db.collection("users").doc(userId);
+    await this.db.runTransaction(async (tx) => {
+      const userSnap = await tx.get(userRef);
+      if (userSnap.exists) {
+        const user = userSnap.data() as UserProfileRecord;
+        if (user.pendingProOrderId === orderId) {
+          tx.set(
+            userRef,
+            {
+              pendingProOrderId: null,
+              atualizadoEm: Date.now(),
+            },
+            { merge: true }
+          );
+        }
+      }
+    });
+  }
 }
 
 export class FirestoreGenerationCommitRepository implements IGenerationCommitRepository {
@@ -795,6 +861,10 @@ export function getRepositories(): BackendRepositories {
       generationRequests
     );
 
+    if (users instanceof InMemoryUsersRepository && orders instanceof InMemoryOrdersRepository) {
+      users.setOrdersRepository(orders);
+    }
+
     repositoriesSingleton = {
       documents: docs,
       access,
@@ -824,6 +894,9 @@ export function getRepositories(): BackendRepositories {
 export function setTestRepositories(repos: BackendRepositories | null): void {
   repositoriesSingleton = repos;
   if (repos) {
+    if (repos.users instanceof InMemoryUsersRepository && repos.orders instanceof InMemoryOrdersRepository) {
+      repos.users.setOrdersRepository(repos.orders);
+    }
     setDocumentStoreForTesting(adaptRepositoriesToStore(repos));
   } else {
     setDocumentStoreForTesting(null);
@@ -842,6 +915,9 @@ export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | 
   const orders = repos.orders || current.orders;
   const generationRequests = repos.generationRequests || current.generationRequests;
   const users = repos.users || current.users;
+  if (users instanceof InMemoryUsersRepository && orders instanceof InMemoryOrdersRepository) {
+    users.setOrdersRepository(orders);
+  }
   const generationCommit =
     repos.generationCommit ||
     (documents instanceof InMemoryDocumentsRepository &&

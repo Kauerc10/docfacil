@@ -243,4 +243,75 @@ describe("POST /api/checkout/create", () => {
     expect(data.checkoutUrl).toBe("https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=existing_pref");
     expect(subscriptionCreated).toBe(false);
   });
+
+  it("protege atomicamente contra chamadas concorrentes ao assinar Pro, criando apenas uma assinatura externa e retornando o mesmo checkout", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+    });
+
+    let calls = 0;
+    mockProvider.createSubscription = async (input) => {
+      calls++;
+      // Simula latência de rede na criação externa
+      await new Promise((r) => setTimeout(r, 100));
+      return {
+        kind: "hosted",
+        providerCheckoutId: `mp_sub_${input.orderId}`,
+        providerStatus: "pending",
+        checkoutUrl: `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=mp_sub_${input.orderId}`,
+        devMode: true,
+      };
+    };
+
+    const [res1, res2] = await Promise.all([
+      POST(makeRequest({ product: "pro" }, "Bearer valid_user_token")),
+      POST(makeRequest({ product: "pro" }, "Bearer valid_user_token")),
+    ]);
+
+    expect(calls).toBe(1);
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+
+    const data1 = await res1.json();
+    const data2 = await res2.json();
+
+    expect(data1.orderId).toBe(data2.orderId);
+    expect(data1.checkoutUrl).toBe(data2.checkoutUrl);
+  });
+
+  it("libera a reserva pendente se a chamada para criar assinatura no provedor falhar", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+    });
+
+    mockProvider.createSubscription = async () => {
+      throw new Error("Mercado Pago API indisponível");
+    };
+
+    const res1 = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+    expect(res1.status).toBe(500);
+
+    const profileAfterFail = await usersRepo.getUserProfile("usr_123");
+    expect(profileAfterFail?.pendingProOrderId).toBeFalsy();
+
+    // Uma nova tentativa agora tem sucesso
+    mockProvider.createSubscription = async (input) => ({
+      kind: "hosted",
+      providerCheckoutId: `mp_sub_retry_${input.orderId}`,
+      providerStatus: "pending",
+      checkoutUrl: `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=mp_sub_retry`,
+      devMode: true,
+    });
+
+    const res2 = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+    expect(res2.status).toBe(200);
+    const data2 = await res2.json();
+    expect(data2.checkoutUrl).toBe("https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=mp_sub_retry");
+  });
 });

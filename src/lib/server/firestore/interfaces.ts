@@ -104,10 +104,23 @@ export interface UserProfileRecord {
   pendingProOrderId?: string | null;
 }
 
+export type ReservePendingProSubscriptionResult =
+  | { status: "active_pro" }
+  | { status: "existing_pending"; orderId: string }
+  | { status: "acquired" };
+
 export interface IUsersRepository {
   getUserProfile(
     userId: string
   ): Promise<UserProfileRecord | null>;
+  reservePendingProSubscription(
+    userId: string,
+    orderId: string
+  ): Promise<ReservePendingProSubscriptionResult>;
+  releasePendingProSubscription(
+    userId: string,
+    orderId: string
+  ): Promise<void>;
 }
 
 export interface CommitGeneratedArtifactInput {

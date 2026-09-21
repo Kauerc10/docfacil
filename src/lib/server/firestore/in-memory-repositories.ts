@@ -8,6 +8,7 @@ import type {
   IGenerationRequestsRepository,
   IUsersRepository,
   UserProfileRecord,
+  ReservePendingProSubscriptionResult,
   IGenerationCommitRepository,
   CommitGeneratedArtifactInput,
 } from "./interfaces";
@@ -36,7 +37,7 @@ declare global {
     accessLinks: Map<string, AccessLinkRecord>;
     orders: Map<string, OrderRecord>;
     generationRequests: Map<string, GenerationRequestRecord>;
-    users: Map<string, { plano?: string; email?: string; nome?: string }>;
+    users: Map<string, UserProfileRecord>;
     webhookEvents: Map<string, { status: "processing" | "completed"; claimedAt: number; completedAt?: number }>;
   } | undefined;
 }
@@ -551,9 +552,14 @@ export class InMemoryGenerationRequestsRepository
 
 export class InMemoryUsersRepository implements IUsersRepository {
   private readonly _users: Map<string, UserProfileRecord> | null;
+  private ordersRepo?: IOrdersRepository;
 
   constructor(isolated = true) {
     this._users = isolated ? new Map() : null;
+  }
+
+  public setOrdersRepository(ordersRepo: IOrdersRepository): void {
+    this.ordersRepo = ordersRepo;
   }
 
   private get users() { return this._users ?? getStore().users; }
@@ -577,6 +583,48 @@ export class InMemoryUsersRepository implements IUsersRepository {
   ): Promise<UserProfileRecord | null> {
     const u = this.users.get(userId);
     return u ? JSON.parse(JSON.stringify(u)) : null;
+  }
+
+  public async reservePendingProSubscription(
+    userId: string,
+    orderId: string
+  ): Promise<ReservePendingProSubscriptionResult> {
+    const user = this.users.get(userId);
+    if (user?.plano === "pro") {
+      return { status: "active_pro" };
+    }
+
+    if (user?.pendingProOrderId) {
+      const order = this.ordersRepo
+        ? await this.ordersRepo.getOrder(user.pendingProOrderId)
+        : (getStore().orders.get(user.pendingProOrderId) ?? null);
+      if (order && order.status === "pending") {
+        return {
+          status: "existing_pending",
+          orderId: user.pendingProOrderId,
+        };
+      }
+    }
+
+    const current = user ?? {};
+    this.users.set(userId, {
+      ...current,
+      pendingProOrderId: orderId,
+    });
+    return { status: "acquired" };
+  }
+
+  public async releasePendingProSubscription(
+    userId: string,
+    orderId: string
+  ): Promise<void> {
+    const user = this.users.get(userId);
+    if (user && user.pendingProOrderId === orderId) {
+      this.users.set(userId, {
+        ...user,
+        pendingProOrderId: null,
+      });
+    }
   }
 }
 

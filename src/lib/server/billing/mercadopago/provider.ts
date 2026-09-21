@@ -138,7 +138,7 @@ export class MercadoPagoBillingProvider implements BillingProvider {
       payer_email: input.payer.email,
       back_url: input.completionUrl,
       external_reference: input.orderId,
-    });
+    }, input.orderId);
 
     const checkoutUrl =
       (isDev && preapproval.sandbox_init_point
