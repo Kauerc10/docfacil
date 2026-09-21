@@ -484,5 +484,104 @@ describe("POST /api/webhooks/mercadopago", () => {
     expect(userProfile?.subscriptionId).toBe("preapp_new");
     expect(userProfile?.subscriptionOrderId).toBe(orderNew.id);
   });
+
+  it("não sobrescreve plano ou ponteiros de assinatura ativa B quando uma assinatura mais antiga A é retomada como authorized", async () => {
+    const userId = "usr_multiple_subs";
+    const orderOld = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "user@docfacil.com.br" },
+      status: "cancelled",
+      createdAt: Date.now() - 10000000,
+    });
+
+    const orderNew = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "user@docfacil.com.br" },
+      status: "paid",
+      createdAt: Date.now() - 1000000,
+    });
+
+    // Usuário já está ativo na assinatura nova B
+    usersRepo.setUserProfile(userId, {
+      plano: "pro",
+      email: "user@docfacil.com.br",
+      subscriptionId: "preapp_B",
+      subscriptionOrderId: orderNew.id,
+    });
+
+    // Webhook de retomada da assinatura antiga A
+    mockMpClient = createTestMpClient({
+      getPreapproval: async (id) => ({
+        id: "preapp_A",
+        status: "authorized",
+        external_reference: orderOld.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("preapp_A", {
+      action: "updated",
+      data: { id: "preapp_A" },
+      type: "subscription_preapproval",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+
+    // O pedido antigo pode ir para paid no histórico
+    const updatedOldOrder = await ordersRepo.getOrder(orderOld.id!);
+    expect(updatedOldOrder?.status).toBe("paid");
+
+    // Mas os ponteiros do usuário PERMANECEM apontando para a assinatura B ativa!
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.plano).toBe("pro");
+    expect(userProfile?.subscriptionId).toBe("preapp_B");
+    expect(userProfile?.subscriptionOrderId).toBe(orderNew.id);
+  });
+
+  it("marca pedido como failed quando recebe evento payment com status rejected", async () => {
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "avulso",
+      amountCents: 1990,
+      buyer: { type: "guest", email: "card_fail@exemplo.com" },
+      status: "pending",
+      createdAt: Date.now(),
+    });
+
+    mockMpClient = createTestMpClient({
+      getPayment: async (id) => ({
+        id: Number(id) || 99999,
+        status: "rejected",
+        status_detail: "cc_rejected_bad_filled_security_code",
+        external_reference: order.id,
+        payment_method_id: "master",
+        transaction_amount: 19.9,
+      }),
+    });
+
+    const req = makeWebhookRequest("pay_rejected_1", {
+      action: "payment.updated",
+      data: { id: "pay_rejected_1" },
+      type: "payment",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+
+    const updatedOrder = await ordersRepo.getOrder(order.id!);
+    expect(updatedOrder?.status).toBe("failed");
+  });
 });
 

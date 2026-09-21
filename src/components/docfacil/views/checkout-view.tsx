@@ -203,9 +203,22 @@ export function CheckoutView() {
   );
 
   const returnOrderId = params.billingReturn === "1" ? params.orderId : undefined;
+  const isFailedReturn =
+    params.billingStatus === "failed" ||
+    params.collection_status === "rejected" ||
+    params.collection_status === "cancelled" ||
+    params.status === "failure";
 
   useEffect(() => {
     if (!returnOrderId || loading) return;
+
+    if (isFailedReturn) {
+      setVerifyingPayment(false);
+      toast.error("O pagamento não foi aprovado ou foi cancelado no Mercado Pago.", {
+        description: "Você pode tentar novamente com outro cartão ou via Pix.",
+      });
+      return;
+    }
 
     let cancelled = false;
     setVerifyingPayment(true);
@@ -245,6 +258,14 @@ export function CheckoutView() {
           if (status.status === "paid" || status.status === "consumed") {
             setVerifyingPayment(false);
             await continueAfterPaidOrder(status);
+            return;
+          }
+
+          if (status.status === "failed") {
+            setVerifyingPayment(false);
+            toast.error("O pagamento não foi aprovado ou foi cancelado no Mercado Pago.", {
+              description: "Você pode tentar novamente com outro cartão ou via Pix.",
+            });
             return;
           }
 

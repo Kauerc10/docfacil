@@ -46,7 +46,11 @@ export class MercadoPagoBillingProvider implements BillingProvider {
         back_urls: {
           success: input.completionUrl,
           pending: input.completionUrl,
-          failure: input.completionUrl,
+          failure: (() => {
+            const failUrl = new URL(input.completionUrl);
+            failUrl.searchParams.set('billingStatus', 'failed');
+            return failUrl.toString();
+          })(),
         },
         auto_return: 'approved',
         notification_url: notificationUrl,

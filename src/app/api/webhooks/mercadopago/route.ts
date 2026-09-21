@@ -85,23 +85,33 @@ export async function handleMercadoPagoWebhook(
       const client = deps.client || new MercadoPagoClient();
       const payment = await client.getPayment(event.id);
 
-      if (payment.status === 'approved' && payment.external_reference) {
+      if (payment.external_reference) {
         const orderId = payment.external_reference;
         const order = await repos.orders.getOrder(orderId);
 
         if (order) {
-          if (order.status === 'pending') {
-            await repos.orders.markOrderPaid(orderId);
-            await repos.orders.updateOrder(orderId, {
-              externalPaymentId: String(payment.id),
-              paidAt: payment.date_approved
-                ? Date.parse(payment.date_approved)
-                : Date.now(),
-            });
+          if (payment.status === 'approved') {
+            if (order.status === 'pending') {
+              await repos.orders.markOrderPaid(orderId);
+              await repos.orders.updateOrder(orderId, {
+                externalPaymentId: String(payment.id),
+                paidAt: payment.date_approved
+                  ? Date.parse(payment.date_approved)
+                  : Date.now(),
+              });
 
-            if (order.product === 'pro' && order.buyer.type === 'user') {
-              await setServerUserPlan(order.buyer.userId, 'pro');
+              if (order.product === 'pro' && order.buyer.type === 'user') {
+                await setServerUserPlan(order.buyer.userId, 'pro');
+              }
             }
+          } else if (
+            (payment.status === 'rejected' || payment.status === 'cancelled') &&
+            order.status === 'pending'
+          ) {
+            await repos.orders.updateOrder(orderId, {
+              status: 'failed',
+              externalPaymentId: String(payment.id),
+            });
           }
         }
       }
@@ -126,12 +136,20 @@ export async function handleMercadoPagoWebhook(
           }
 
           if (order.product === 'pro' && order.buyer.type === 'user') {
-            await setServerUserPlan(
-              order.buyer.userId,
-              'pro',
-              preapproval.id,
-              orderId
-            );
+            const currentProfile = await repos.users.getUserProfile(order.buyer.userId);
+            const hasDifferentActiveSubscription =
+              currentProfile?.plano === 'pro' &&
+              Boolean(currentProfile.subscriptionId) &&
+              currentProfile.subscriptionId !== preapproval.id;
+
+            if (!hasDifferentActiveSubscription) {
+              await setServerUserPlan(
+                order.buyer.userId,
+                'pro',
+                preapproval.id,
+                orderId
+              );
+            }
           }
         }
       } else if (

@@ -625,10 +625,13 @@ export class FirestoreUsersRepository implements IUsersRepository {
         if (orderSnap.exists) {
           const order = orderSnap.data() as OrderRecord;
           if (order.status === "pending") {
-            return {
-              status: "existing_pending",
-              orderId: user.pendingProOrderId,
-            };
+            const isStale = !order.checkoutUrl && (Date.now() - (order.createdAt || 0) > 30_000);
+            if (!isStale) {
+              return {
+                status: "existing_pending",
+                orderId: user.pendingProOrderId,
+              };
+            }
           }
         }
       }

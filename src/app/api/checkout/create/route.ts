@@ -229,10 +229,16 @@ export async function POST(req: Request) {
           );
         }
 
+        // If the existing order failed to persist a checkoutUrl, recover by releasing the reservation
+        await repos.users.releasePendingProSubscription(user.userId, reservation.orderId).catch(() => undefined);
+        if (existingOrder && existingOrder.status === 'pending') {
+          await repos.orders.updateOrder(reservation.orderId, { status: 'failed' }).catch(() => undefined);
+        }
+
         throw new BackendError(
-          'CONFLICT',
-          409,
-          'Uma solicitação de assinatura já está em andamento. Aguarde alguns instantes.'
+          'INTERNAL_ERROR',
+          500,
+          'A tentativa anterior de gerar o checkout não foi persistida. A trava foi liberada, por favor tente novamente.'
         );
       }
 
@@ -248,16 +254,16 @@ export async function POST(req: Request) {
           },
           completionUrl,
         });
+
+        await repos.orders.updateOrder(order.id, {
+          checkoutUrl: result.checkoutUrl,
+          externalPaymentId: result.providerCheckoutId,
+        });
       } catch (err) {
-        await repos.users.releasePendingProSubscription(user.userId, order.id);
-        await repos.orders.updateOrder(order.id, { status: 'failed' });
+        await repos.users.releasePendingProSubscription(user.userId, order.id).catch(() => undefined);
+        await repos.orders.updateOrder(order.id, { status: 'failed' }).catch(() => undefined);
         throw err;
       }
-
-      await repos.orders.updateOrder(order.id, {
-        checkoutUrl: result.checkoutUrl,
-        externalPaymentId: result.providerCheckoutId,
-      });
 
       return NextResponse.json(
         {
