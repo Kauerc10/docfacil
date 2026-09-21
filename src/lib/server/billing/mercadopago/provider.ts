@@ -27,6 +27,45 @@ export class MercadoPagoBillingProvider implements BillingProvider {
     const amountInReais = Number((input.amountCents / 100).toFixed(2));
     const notificationUrl = `${env.NEXT_PUBLIC_APP_URL}/api/webhooks/mercadopago`;
 
+    if (input.method === 'credit_card') {
+      const preference = await this.client.createPreference({
+        items: [
+          {
+            id: 'documento-avulso',
+            title: 'DocFácil - Documento Avulso',
+            quantity: 1,
+            unit_price: amountInReais,
+            currency_id: 'BRL',
+          },
+        ],
+        payer: {
+          email: input.payer.email,
+          name: input.payer.name,
+        },
+        external_reference: input.orderId,
+        back_urls: {
+          success: input.completionUrl,
+          pending: input.completionUrl,
+          failure: input.completionUrl,
+        },
+        auto_return: 'approved',
+        notification_url: notificationUrl,
+      });
+
+      const checkoutUrl =
+        isDev && preference.sandbox_init_point
+          ? preference.sandbox_init_point
+          : preference.init_point;
+
+      return {
+        kind: 'hosted',
+        providerCheckoutId: preference.id,
+        providerStatus: 'pending',
+        checkoutUrl,
+        devMode: isDev,
+      };
+    }
+
     const nameParts = (input.payer.name || 'Cliente DocFácil').trim().split(' ');
     const firstName = nameParts[0] || 'Cliente';
     const lastName = nameParts.slice(1).join(' ') || 'DocFácil';
@@ -87,41 +126,29 @@ export class MercadoPagoBillingProvider implements BillingProvider {
     const env = getServerEnv();
     const isDev = env.NODE_ENV !== 'production' || env.VERCEL_ENV === 'preview';
     const amountInReais = Number((input.amountCents / 100).toFixed(2));
-    const notificationUrl = `${env.NEXT_PUBLIC_APP_URL}/api/webhooks/mercadopago`;
 
-    const preference = await this.client.createPreference({
-      items: [
-        {
-          id: 'plano-pro-mensal',
-          title: 'DocFácil - Plano Pro Mensal',
-          quantity: 1,
-          unit_price: amountInReais,
-          currency_id: 'BRL',
-        },
-      ],
-      payer: {
-        email: input.payer.email,
-        name: input.payer.name,
+    const preapproval = await this.client.createPreapproval({
+      reason: 'DocFácil - Assinatura Plano Pro',
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: 'months',
+        transaction_amount: amountInReais,
+        currency_id: 'BRL',
       },
+      payer_email: input.payer.email,
+      back_url: input.completionUrl,
       external_reference: input.orderId,
-      back_urls: {
-        success: input.completionUrl,
-        pending: input.completionUrl,
-        failure: `${env.NEXT_PUBLIC_APP_URL}/planos`,
-      },
-      auto_return: 'approved',
-      notification_url: notificationUrl,
     });
 
     const checkoutUrl =
-      isDev && preference.sandbox_init_point
-        ? preference.sandbox_init_point
-        : preference.init_point;
+      (isDev && preapproval.sandbox_init_point
+        ? preapproval.sandbox_init_point
+        : preapproval.init_point) || '';
 
     return {
       kind: 'hosted',
-      providerCheckoutId: preference.id,
-      providerStatus: 'pending',
+      providerCheckoutId: preapproval.id,
+      providerStatus: preapproval.status,
       checkoutUrl,
       devMode: isDev,
     };

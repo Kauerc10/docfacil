@@ -204,7 +204,8 @@ export function CheckoutView() {
       let successUrl: string | undefined;
       if (typeof window !== "undefined") {
         const success = new URL(window.location.origin);
-        success.searchParams.set("view", "sucesso");
+        success.searchParams.set("view", "checkout");
+        if (plan) success.searchParams.set("plan", plan);
         if (slug) success.searchParams.set("slug", slug);
         if (draftId) success.searchParams.set("draftId", draftId);
         successUrl = success.toString();

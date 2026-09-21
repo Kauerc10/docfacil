@@ -36,7 +36,8 @@ const createCheckoutSchema = z.object({
 function buildCompletionUrl(
   requestUrl: string,
   successUrl: string | undefined,
-  orderId: string
+  orderId: string,
+  product?: string
 ): string {
   const origin = new URL(requestUrl).origin;
   const target = successUrl
@@ -49,6 +50,15 @@ function buildCompletionUrl(
       400,
       'A URL de retorno do checkout é inválida.'
     );
+  }
+
+  const currentView = target.searchParams.get('view');
+  if (!currentView || currentView === 'sucesso') {
+    target.searchParams.set('view', 'checkout');
+  }
+
+  if (product) {
+    target.searchParams.set('plan', product);
   }
 
   target.searchParams.set('billingReturn', '1');
@@ -129,7 +139,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const completionUrl = buildCompletionUrl(req.url, successUrl, order.id);
+    const completionUrl = buildCompletionUrl(req.url, successUrl, order.id, product);
     const provider = getBillingProvider();
 
     if (product === 'pro') {

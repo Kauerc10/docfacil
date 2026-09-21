@@ -74,6 +74,17 @@ describe("POST /api/webhooks/mercadopago", () => {
     expect(res.status).toBe(401);
   });
 
+  function createTestMpClient(overrides: Partial<IMercadoPagoClient> = {}): IMercadoPagoClient {
+    return {
+      createPayment: async () => ({} as any),
+      createPreference: async () => ({} as any),
+      createPreapproval: async () => ({} as any),
+      getPayment: async () => ({} as any),
+      getPreapproval: async () => ({} as any),
+      ...overrides,
+    };
+  }
+
   it("processa pagamento avulso aprovado e marca o pedido como pago", async () => {
     const order = await ordersRepo.createOrder({
       provider: "mercadopago",
@@ -84,16 +95,14 @@ describe("POST /api/webhooks/mercadopago", () => {
       createdAt: Date.now(),
     });
 
-    mockMpClient = {
-      createPayment: async () => ({} as any),
-      createPreference: async () => ({} as any),
+    mockMpClient = createTestMpClient({
       getPayment: async (id) => ({
         id: Number(id),
         status: "approved",
         date_approved: new Date().toISOString(),
         external_reference: order.id,
       }),
-    };
+    });
 
     const req = makeWebhookRequest("998877", {
       action: "payment.updated",
@@ -125,9 +134,7 @@ describe("POST /api/webhooks/mercadopago", () => {
     });
 
     let fetchCount = 0;
-    mockMpClient = {
-      createPayment: async () => ({} as any),
-      createPreference: async () => ({} as any),
+    mockMpClient = createTestMpClient({
       getPayment: async (id) => {
         fetchCount++;
         return {
@@ -136,7 +143,7 @@ describe("POST /api/webhooks/mercadopago", () => {
           external_reference: order.id,
         };
       },
-    };
+    });
 
     const body = {
       action: "payment.updated",
@@ -179,15 +186,13 @@ describe("POST /api/webhooks/mercadopago", () => {
       createdAt: Date.now(),
     });
 
-    mockMpClient = {
-      createPayment: async () => ({} as any),
-      createPreference: async () => ({} as any),
+    mockMpClient = createTestMpClient({
       getPayment: async (id) => ({
         id: Number(id),
         status: "approved",
         external_reference: order.id,
       }),
-    };
+    });
 
     const req = makeWebhookRequest("776655", {
       action: "payment.created",
@@ -203,6 +208,99 @@ describe("POST /api/webhooks/mercadopago", () => {
     expect(res.status).toBe(200);
     const updatedOrder = await ordersRepo.getOrder(order.id!);
     expect(updatedOrder?.status).toBe("paid");
+
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.plano).toBe("pro");
+  });
+
+  it("permite reprocessar payment.updated após payment.created pendente para o mesmo data.id", async () => {
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "avulso",
+      amountCents: 1990,
+      buyer: { type: "guest", email: "cliente@exemplo.com" },
+      status: "pending",
+      createdAt: Date.now(),
+    });
+
+    let paymentStatus: "pending" | "approved" = "pending";
+    mockMpClient = createTestMpClient({
+      getPayment: async (id) => ({
+        id: Number(id),
+        status: paymentStatus,
+        external_reference: order.id,
+      }),
+    });
+
+    // 1. Primeiro evento: payment.created (Pix gerado, pendente)
+    const req1 = makeWebhookRequest(
+      "998877",
+      { action: "payment.created", data: { id: "998877" }, type: "payment" },
+      { requestId: "delivery_1" }
+    );
+    const res1 = await handleMercadoPagoWebhook(req1, {
+      secret,
+      client: mockMpClient,
+    });
+    expect(res1.status).toBe(200);
+    const orderAfterCreated = await ordersRepo.getOrder(order.id!);
+    expect(orderAfterCreated?.status).toBe("pending");
+
+    // 2. Cliente paga o Pix -> Mercado Pago envia payment.updated com o MESMO data.id ("998877")
+    paymentStatus = "approved";
+    const req2 = makeWebhookRequest(
+      "998877",
+      { action: "payment.updated", data: { id: "998877" }, type: "payment" },
+      { requestId: "delivery_2" }
+    );
+    const res2 = await handleMercadoPagoWebhook(req2, {
+      secret,
+      client: mockMpClient,
+    });
+    expect(res2.status).toBe(200);
+    const orderAfterUpdated = await ordersRepo.getOrder(order.id!);
+    expect(orderAfterUpdated?.status).toBe("paid");
+  });
+
+  it("processa evento subscription_preapproval autorizado e atualiza o plano do usuário para pro", async () => {
+    const userId = "usr_subscriber_999";
+    usersRepo.setUserProfile(userId, {
+      plano: "gratis",
+      email: "subscriber@docfacil.com.br",
+    });
+
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "subscriber@docfacil.com.br" },
+      status: "pending",
+      createdAt: Date.now(),
+    });
+
+    mockMpClient = createTestMpClient({
+      getPreapproval: async (id) => ({
+        id,
+        status: "authorized",
+        external_reference: order.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("preapp_sub_555", {
+      action: "updated",
+      data: { id: "preapp_sub_555" },
+      type: "subscription_preapproval",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+    const updatedOrder = await ordersRepo.getOrder(order.id!);
+    expect(updatedOrder?.status).toBe("paid");
+    expect(updatedOrder?.externalPaymentId).toBe("preapp_sub_555");
 
     const userProfile = await usersRepo.getUserProfile(userId);
     expect(userProfile?.plano).toBe("pro");

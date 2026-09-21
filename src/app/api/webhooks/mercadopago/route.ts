@@ -65,15 +65,20 @@ export async function handleMercadoPagoWebhook(
       );
     }
 
-    // Webhook event idempotency
-    const claimed = await repos.webhookEvents.claim(event.id, now);
+    // Webhook delivery idempotency
+    const requestId = req.headers.get('x-request-id')?.trim();
+    const eventDedupeKey = requestId
+      ? `req:${requestId}`
+      : `${event.type}:${event.id}:${event.action || 'status'}`;
+
+    const claimed = await repos.webhookEvents.claim(eventDedupeKey, now);
     if (!claimed) {
       return NextResponse.json(
         { ok: true, duplicate: true },
         { status: 200, headers: { 'Cache-Control': 'no-store' } }
       );
     }
-    claimedEventId = event.id;
+    claimedEventId = eventDedupeKey;
 
     // Process event
     if (event.type === 'payment') {
@@ -85,22 +90,49 @@ export async function handleMercadoPagoWebhook(
         const order = await repos.orders.getOrder(orderId);
 
         if (order) {
-          await repos.orders.markOrderPaid(orderId);
-          await repos.orders.updateOrder(orderId, {
-            externalPaymentId: String(payment.id),
-            paidAt: payment.date_approved
-              ? Date.parse(payment.date_approved)
-              : Date.now(),
-          });
+          if (order.status !== 'paid') {
+            await repos.orders.markOrderPaid(orderId);
+            await repos.orders.updateOrder(orderId, {
+              externalPaymentId: String(payment.id),
+              paidAt: payment.date_approved
+                ? Date.parse(payment.date_approved)
+                : Date.now(),
+            });
 
-          if (order.product === 'pro' && order.buyer.type === 'user') {
-            await setServerUserPlan(order.buyer.userId, 'pro');
+            if (order.product === 'pro' && order.buyer.type === 'user') {
+              await setServerUserPlan(order.buyer.userId, 'pro');
+            }
+          }
+        }
+      }
+    } else if (
+      event.type === 'subscription_preapproval' ||
+      event.type === 'preapproval'
+    ) {
+      const client = deps.client || new MercadoPagoClient();
+      const preapproval = await client.getPreapproval(event.id);
+
+      if (preapproval.status === 'authorized' && preapproval.external_reference) {
+        const orderId = preapproval.external_reference;
+        const order = await repos.orders.getOrder(orderId);
+
+        if (order) {
+          if (order.status !== 'paid') {
+            await repos.orders.markOrderPaid(orderId);
+            await repos.orders.updateOrder(orderId, {
+              externalPaymentId: preapproval.id,
+              paidAt: Date.now(),
+            });
+
+            if (order.product === 'pro' && order.buyer.type === 'user') {
+              await setServerUserPlan(order.buyer.userId, 'pro');
+            }
           }
         }
       }
     }
 
-    await repos.webhookEvents.complete(event.id, now);
+    await repos.webhookEvents.complete(eventDedupeKey, now);
     claimedEventId = null;
 
     return NextResponse.json(

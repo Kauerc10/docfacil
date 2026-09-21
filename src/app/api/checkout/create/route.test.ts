@@ -1,8 +1,9 @@
-import { describe, expect, it, beforeEach } from "bun:test";
+import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { POST } from "./route";
 import { setRepositoriesForTesting } from "@/lib/server/firestore/repositories";
 import { InMemoryOrdersRepository, InMemoryUsersRepository } from "@/lib/server/firestore/in-memory-repositories";
 import { setBillingProviderForTesting, type BillingProvider } from "@/lib/server/billing/provider";
+import { setAdminAuthForTesting } from "@/lib/server/firebase-admin";
 
 describe("POST /api/checkout/create", () => {
   let ordersRepo: InMemoryOrdersRepository;
@@ -14,6 +15,18 @@ describe("POST /api/checkout/create", () => {
       orders: ordersRepo,
       users: new InMemoryUsersRepository(true),
     });
+
+    setAdminAuthForTesting({
+      verifyIdToken: async (token: string) => {
+        if (token === "valid_user_token") {
+          return {
+            uid: "usr_123",
+            email: "usuario@exemplo.com",
+          } as any;
+        }
+        throw new Error("Invalid token");
+      },
+    } as any);
 
     mockProvider = {
       createOneTimePayment: async (input) => ({
@@ -34,6 +47,10 @@ describe("POST /api/checkout/create", () => {
       }),
     };
     setBillingProviderForTesting(mockProvider);
+  });
+
+  afterEach(() => {
+    setAdminAuthForTesting(null);
   });
 
   function makeRequest(body: any, authHeader?: string): Request {
@@ -101,5 +118,72 @@ describe("POST /api/checkout/create", () => {
     expect(savedOrder?.status).toBe("pending");
     expect(savedOrder?.amountCents).toBe(1990);
     expect(savedOrder?.brCode).toBe(data.pix.brCode);
+  });
+
+  it("cria pedido avulso com cartão de crédito retornando redirect e checkoutUrl", async () => {
+    let capturedMethod: string | undefined;
+    mockProvider.createOneTimePayment = async (input) => {
+      capturedMethod = input.method;
+      return {
+        kind: "hosted",
+        providerCheckoutId: "pref_card_123",
+        providerStatus: "pending",
+        checkoutUrl: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_card_123",
+        devMode: true,
+      };
+    };
+
+    const res = await POST(
+      makeRequest({
+        product: "avulso",
+        method: "credit_card",
+        guestContact: {
+          email: "cartao@exemplo.com",
+          phone: "11999998888",
+        },
+      })
+    );
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.kind).toBe("redirect");
+    expect(data.checkoutUrl).toContain("pref_card_123");
+    expect(capturedMethod).toBe("credit_card");
+
+    const savedOrder = await ordersRepo.getOrder(data.orderId);
+    expect(savedOrder?.checkoutUrl).toContain("pref_card_123");
+  });
+
+  it("força view=checkout na completionUrl mesmo quando caller envia view=sucesso", async () => {
+    let capturedCompletionUrl: string | undefined;
+    mockProvider.createSubscription = async (input) => {
+      capturedCompletionUrl = input.completionUrl;
+      return {
+        kind: "hosted",
+        providerCheckoutId: "pref_pro_123",
+        providerStatus: "pending",
+        checkoutUrl: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_pro_123",
+        devMode: true,
+      };
+    };
+
+    const res = await POST(
+      makeRequest(
+        {
+          product: "pro",
+          successUrl: "https://docfacil.com.br/?view=sucesso&slug=locacao-residencial",
+        },
+        "Bearer valid_user_token"
+      )
+    );
+
+    expect(res.status).toBe(200);
+    expect(capturedCompletionUrl).toBeDefined();
+    const parsed = new URL(capturedCompletionUrl!);
+    expect(parsed.searchParams.get("view")).toBe("checkout");
+    expect(parsed.searchParams.get("plan")).toBe("pro");
+    expect(parsed.searchParams.get("billingReturn")).toBe("1");
+    expect(parsed.searchParams.get("slug")).toBe("locacao-residencial");
+    expect(parsed.searchParams.get("orderId")).toBeDefined();
   });
 });
