@@ -7,9 +7,9 @@ describe("Pricing and Canonical Plans", () => {
     expect(PLAN_PRICES.avulso).toBe(19.9);
   });
 
-  it("pro costs exactly 3990 cents (R$ 39,90)", () => {
-    expect(planPriceToCents("pro")).toBe(3990);
-    expect(PLAN_PRICES.pro).toBe(39.9);
+  it("pro costs exactly 3490 cents (R$ 34,90)", () => {
+    expect(planPriceToCents("pro")).toBe(3490);
+    expect(PLAN_PRICES.pro).toBe(34.9);
   });
 
   it("gratis costs 0 cents", () => {

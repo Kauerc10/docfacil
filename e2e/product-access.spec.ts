@@ -30,7 +30,7 @@ test.describe("Document access product UX", () => {
     await expect(page.getByText("1 geração grátis por mês")).toBeVisible();
     await expect(page.getByText("Conta DocFácil necessária")).toBeVisible();
     await expect(page.getByText("R$ 19,90")).toBeVisible();
-    await expect(page.getByText("R$ 39,90")).toBeVisible();
+    await expect(page.getByText("R$ 34,90")).toBeVisible();
     await expect(page.getByText(/modelos disponíveis gratuitamente podem mudar/i)).toBeVisible();
   });
 

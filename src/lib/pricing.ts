@@ -22,7 +22,7 @@ export type PaidPlan = Exclude<Plan, "gratis">;
 export const PLAN_PRICES = {
   gratis: 0,
   avulso: 19.9,
-  pro: 39.9,
+  pro: 34.9,
 } as const;
 
 /**
@@ -50,7 +50,7 @@ export const PLAN_FULL_LABELS: Record<Plan, string> = {
 export const PLAN_BILLING_DESC: Record<Plan, string> = {
   gratis: "Gratuito",
   avulso: "R$ 19,90 / documento avulso",
-  pro: "R$ 39,90/mês",
+  pro: "R$ 34,90/mês",
 };
 
 /**

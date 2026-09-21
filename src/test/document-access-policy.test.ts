@@ -27,6 +27,6 @@ describe("document access policy", () => {
 
   it("usa os novos precos comerciais em uma unica fonte", () => {
     expect(PLAN_PRICES.avulso).toBe(19.9);
-    expect(PLAN_PRICES.pro).toBe(39.9);
+    expect(PLAN_PRICES.pro).toBe(34.9);
   });
 });

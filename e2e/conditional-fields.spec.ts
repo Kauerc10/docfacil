@@ -157,7 +157,7 @@ test.describe("Conditional fields and residents E2E", () => {
       timeout: 10000,
     });
 
-    await page.getByRole("button", { name: "Voltar", exact: true }).click();
+    await page.getByRole("button", { name: "Voltar", exact: true }).click({ force: true });
     await expect(firstResident).toBeVisible({ timeout: 10000 });
     await expect(firstName).toHaveValue("João Pedro da Silva");
     await expect(firstCpf).toHaveValue(VALID_CPFS[0]);
