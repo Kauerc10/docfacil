@@ -583,5 +583,84 @@ describe("POST /api/webhooks/mercadopago", () => {
     const updatedOrder = await ordersRepo.getOrder(order.id!);
     expect(updatedOrder?.status).toBe("failed");
   });
+
+  it("permite que uma tentativa aprovada posterior recupere um pedido com status failed para paid sem reabrir pedidos consumidos", async () => {
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "avulso",
+      amountCents: 1990,
+      buyer: { type: "guest", email: "card_retry@exemplo.com" },
+      status: "failed", // Primeira tentativa falhou
+      createdAt: Date.now() - 60000,
+    });
+
+    mockMpClient = createTestMpClient({
+      getPayment: async (id) => ({
+        id: Number(id) || 123456,
+        status: "approved",
+        external_reference: order.id,
+        payment_method_id: "visa",
+        transaction_amount: 19.9,
+      }),
+    });
+
+    const req = makeWebhookRequest("pay_approved_after_fail", {
+      action: "payment.created",
+      data: { id: "pay_approved_after_fail" },
+      type: "payment",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+
+    const updatedOrder = await ordersRepo.getOrder(order.id!);
+    expect(updatedOrder?.status).toBe("paid");
+  });
+
+  it("garante que a concessão do plano Pro seja reexecutada na redelivery mesmo quando o pedido já foi gravado como paid", async () => {
+    const userId = "usr_pro_redelivery";
+    usersRepo.setUserProfile(userId, {
+      plano: "gratis", // Simulando que a primeira execução falhou antes de atualizar o plano
+      email: "pro_retry@docfacil.com.br",
+    });
+
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "pro_retry@docfacil.com.br" },
+      status: "paid", // Pedido já estava gravado como pago
+      createdAt: Date.now() - 30000,
+    });
+
+    mockMpClient = createTestMpClient({
+      getPayment: async (id) => ({
+        id: Number(id) || 789012,
+        status: "approved",
+        external_reference: order.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("pay_pro_redelivery_1", {
+      action: "payment.updated",
+      data: { id: "pay_pro_redelivery_1" },
+      type: "payment",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+
+    // O plano do usuário deve ser atualizado para Pro mesmo o pedido já estando pago
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.plano).toBe("pro");
+  });
 });
 

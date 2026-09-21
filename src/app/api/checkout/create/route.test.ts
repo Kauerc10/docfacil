@@ -348,4 +348,38 @@ describe("POST /api/checkout/create", () => {
     const data2 = await res2.json();
     expect(data2.checkoutUrl).toContain("mercadopago");
   });
+
+  it("mantém a reserva viva quando outra requisição concorrente aguarda chamada em andamento ao provedor (< 60s), retornando 409 sem invalidar a primeira", async () => {
+    const liveOrder = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId: "usr_123" },
+      status: "pending",
+      // Sem checkoutUrl ainda, pois a primeira requisição está chamando o gateway
+      createdAt: Date.now() - 2000,
+    });
+
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+      pendingProOrderId: liveOrder.id,
+    });
+
+    const res = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+
+    // Retorna 409 sem cancelar a requisição original
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/já está em andamento/);
+
+    // O pedido original PERMANECE pendente e a reserva no perfil NÃO foi apagada
+    const orderAfter = await ordersRepo.getOrder(liveOrder.id!);
+    expect(orderAfter?.status).toBe("pending");
+
+    const profileAfter = await usersRepo.getUserProfile("usr_123");
+    expect(profileAfter?.pendingProOrderId).toBe(liveOrder.id);
+  });
 });

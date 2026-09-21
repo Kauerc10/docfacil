@@ -91,7 +91,7 @@ export async function handleMercadoPagoWebhook(
 
         if (order) {
           if (payment.status === 'approved') {
-            if (order.status === 'pending') {
+            if (order.status === 'pending' || order.status === 'failed') {
               await repos.orders.markOrderPaid(orderId);
               await repos.orders.updateOrder(orderId, {
                 externalPaymentId: String(payment.id),
@@ -99,10 +99,10 @@ export async function handleMercadoPagoWebhook(
                   ? Date.parse(payment.date_approved)
                   : Date.now(),
               });
+            }
 
-              if (order.product === 'pro' && order.buyer.type === 'user') {
-                await setServerUserPlan(order.buyer.userId, 'pro');
-              }
+            if (order.product === 'pro' && order.buyer.type === 'user') {
+              await setServerUserPlan(order.buyer.userId, 'pro');
             }
           } else if (
             (payment.status === 'rejected' || payment.status === 'cancelled') &&
@@ -127,7 +127,7 @@ export async function handleMercadoPagoWebhook(
         const order = await repos.orders.getOrder(orderId);
 
         if (order) {
-          if (order.status === 'pending' || order.status === 'cancelled') {
+          if (order.status === 'pending' || order.status === 'cancelled' || order.status === 'failed') {
             await repos.orders.markOrderPaid(orderId);
             await repos.orders.updateOrder(orderId, {
               externalPaymentId: preapproval.id,

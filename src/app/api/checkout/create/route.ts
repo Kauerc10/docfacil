@@ -229,16 +229,28 @@ export async function POST(req: Request) {
           );
         }
 
-        // If the existing order failed to persist a checkoutUrl, recover by releasing the reservation
-        await repos.users.releasePendingProSubscription(user.userId, reservation.orderId).catch(() => undefined);
-        if (existingOrder && existingOrder.status === 'pending') {
-          await repos.orders.updateOrder(reservation.orderId, { status: 'failed' }).catch(() => undefined);
+        // Only reclaim a reservation proven abandoned (already failed or older than 60s without checkoutUrl).
+        // If the call may still be running (< 60s), keep the reservation intact and return 409 to prevent duplicate preapprovals!
+        const isProvenAbandoned =
+          existingOrder?.status === 'failed' ||
+          Boolean(existingOrder && !existingOrder.checkoutUrl && Date.now() - (existingOrder.createdAt || 0) > 60_000);
+
+        if (isProvenAbandoned) {
+          await repos.users.releasePendingProSubscription(user.userId, reservation.orderId).catch(() => undefined);
+          if (existingOrder && existingOrder.status === 'pending') {
+            await repos.orders.updateOrder(reservation.orderId, { status: 'failed' }).catch(() => undefined);
+          }
+          throw new BackendError(
+            'INTERNAL_ERROR',
+            500,
+            'A tentativa anterior foi abandonada. A trava foi liberada, por favor tente novamente.'
+          );
         }
 
         throw new BackendError(
-          'INTERNAL_ERROR',
-          500,
-          'A tentativa anterior de gerar o checkout não foi persistida. A trava foi liberada, por favor tente novamente.'
+          'CONFLICT',
+          409,
+          'Uma solicitação de assinatura já está em andamento. Aguarde alguns instantes.'
         );
       }
 
