@@ -66,6 +66,13 @@ export interface IOrdersRepository {
     orderId: string;
     requestId: string;
   }): Promise<void>;
+  updateOrder(orderId: string, updates: Partial<OrderRecord>): Promise<OrderRecord>;
+}
+
+export interface IWebhookEventsRepository {
+  claim(eventId: string, now: number): Promise<boolean>;
+  complete(eventId: string, now: number): Promise<void>;
+  release(eventId: string): Promise<void>;
 }
 
 export interface IGenerationRequestsRepository {

@@ -4,6 +4,7 @@ import type {
   IDocumentsRepository,
   IAccessRepository,
   IOrdersRepository,
+  IWebhookEventsRepository,
   IGenerationRequestsRepository,
   IUsersRepository,
   IGenerationCommitRepository,
@@ -35,6 +36,7 @@ declare global {
     orders: Map<string, OrderRecord>;
     generationRequests: Map<string, GenerationRequestRecord>;
     users: Map<string, { plano?: string; email?: string; nome?: string }>;
+    webhookEvents: Map<string, { status: "processing" | "completed"; claimedAt: number; completedAt?: number }>;
   } | undefined;
 }
 
@@ -47,6 +49,7 @@ function getStore() {
       orders: new Map(),
       generationRequests: new Map(),
       users: new Map(),
+      webhookEvents: new Map(),
     };
   }
   return globalThis.__inMemoryStore;
@@ -407,6 +410,51 @@ export class InMemoryOrdersRepository implements IOrdersRepository {
       order.status = "paid";
       delete order.reservedByRequestId;
       delete order.reservedAt;
+    }
+  }
+
+  public async updateOrder(orderId: string, updates: Partial<OrderRecord>): Promise<OrderRecord> {
+    const order = this.orders.get(orderId);
+    if (!order) {
+      throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido de compra não encontrado.");
+    }
+    Object.assign(order, updates);
+    return JSON.parse(JSON.stringify(order));
+  }
+}
+
+export class InMemoryWebhookEventsRepository implements IWebhookEventsRepository {
+  private readonly _events: Map<string, { status: "processing" | "completed"; claimedAt: number; completedAt?: number }> | null;
+
+  constructor(isolated = true) {
+    this._events = isolated ? new Map() : null;
+  }
+
+  private get events() {
+    return this._events ?? getStore().webhookEvents;
+  }
+
+  public async claim(eventId: string, now: number): Promise<boolean> {
+    if (this.events.has(eventId)) {
+      return false;
+    }
+    this.events.set(eventId, { status: "processing", claimedAt: now });
+    return true;
+  }
+
+  public async complete(eventId: string, now: number): Promise<void> {
+    const current = this.events.get(eventId);
+    this.events.set(eventId, {
+      status: "completed",
+      claimedAt: current?.claimedAt ?? now,
+      completedAt: now,
+    });
+  }
+
+  public async release(eventId: string): Promise<void> {
+    const current = this.events.get(eventId);
+    if (current?.status === "processing") {
+      this.events.delete(eventId);
     }
   }
 }

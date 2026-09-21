@@ -2,6 +2,8 @@ import "server-only";
 import { getAdminFirestore } from "../firebase-admin";
 import { getRepositories } from "../firestore/repositories";
 
+import { getServerEnv } from "../env";
+
 type MutableRuntimeUsersRepository = {
   getUserProfile: (
     userId: string
@@ -16,14 +18,21 @@ export async function setServerUserPlan(
   userId: string,
   plan: "gratis" | "pro"
 ): Promise<void> {
-  const db = getAdminFirestore();
-  await db.collection("users").doc(userId).set(
-    {
-      plano: plan,
-      atualizadoEm: Date.now(),
-    },
-    { merge: true }
-  );
+  const env = getServerEnv();
+  const useInMemory =
+    env.ALLOW_IN_MEMORY_REPOSITORIES ||
+    (env.NODE_ENV === "test" && !env.FIRESTORE_EMULATOR_HOST);
+
+  if (!useInMemory) {
+    const db = getAdminFirestore();
+    await db.collection("users").doc(userId).set(
+      {
+        plano: plan,
+        atualizadoEm: Date.now(),
+      },
+      { merge: true }
+    );
+  }
 
   // O sandbox E2E mantém documentos/pedidos efêmeros, mas identidade e perfil
   // no Firestore Emulator real. Quando o runtime usa um repositório de usuários

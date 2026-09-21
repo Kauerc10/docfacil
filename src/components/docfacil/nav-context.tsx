@@ -25,6 +25,7 @@ export type View =
   | "ia"
   | "planos"
   | "checkout"
+  | "pagamento-pix"
   | "dashboard"
   | "documento-detalhe"
   | "perfil"
@@ -56,6 +57,7 @@ const VALID_VIEWS = new Set<View>([
   "ia",
   "planos",
   "checkout",
+  "pagamento-pix",
   "dashboard",
   "documento-detalhe",
   "perfil",

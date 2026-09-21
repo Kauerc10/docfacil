@@ -94,21 +94,31 @@ export type OrderStatus =
   | "failed"
   | "refunded";
 
+export type PaymentProvider = "mercadopago" | "demo";
+export type PaymentMethod = "pix" | "credit_card";
+
 export interface OrderRecord {
   id?: string;
-  provider: "demo";
+  provider: PaymentProvider;
   product: "avulso" | "pro";
   amountCents: number;
   buyer:
     | { type: "guest"; email?: string; phone?: string }
     | { type: "user"; userId: string; email?: string };
   status: OrderStatus;
+  paymentMethod?: PaymentMethod;
+  externalPaymentId?: string;
+  externalReference?: string;
+  brCode?: string;
+  brCodeBase64?: string;
+  checkoutUrl?: string;
   documentId?: string;
   reservedByRequestId?: string;
   reservedAt?: number;
   createdAt: number;
   paidAt?: number;
   consumedAt?: number;
+  expiresAt?: number;
 }
 
 export const documentDraftInputSchema = z.object({

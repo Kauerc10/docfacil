@@ -45,7 +45,7 @@ describe("completeDemoCheckout", () => {
     expect(provider.lastInput?.buyer.type).toBe("guest");
   });
 
-  it("creates Pro at R$ 39,90 and activates the authenticated account", async () => {
+  it("creates Pro at R$ 34,90 and activates the authenticated account", async () => {
     const provider = new FakeBillingProvider();
     const activations: string[] = [];
 
@@ -59,7 +59,7 @@ describe("completeDemoCheckout", () => {
     });
 
     expect(order.product).toBe("pro");
-    expect(order.amountCents).toBe(3990);
+    expect(order.amountCents).toBe(3490);
     expect(order.status).toBe("paid");
     expect(activations).toEqual(["usr_pro_demo"]);
   });

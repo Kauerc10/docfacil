@@ -9,6 +9,7 @@ import type {
   IDocumentsRepository,
   IAccessRepository,
   IOrdersRepository,
+  IWebhookEventsRepository,
   IGenerationRequestsRepository,
   IUsersRepository,
   IGenerationCommitRepository,
@@ -29,6 +30,7 @@ import {
   InMemoryGenerationRequestsRepository,
   InMemoryUsersRepository,
   InMemoryGenerationCommitRepository,
+  InMemoryWebhookEventsRepository,
 } from "./in-memory-repositories";
 import {
   getDocumentStore,
@@ -434,6 +436,61 @@ export class FirestoreOrdersRepository implements IOrdersRepository {
       }
     });
   }
+
+  public async updateOrder(orderId: string, updates: Partial<OrderRecord>): Promise<OrderRecord> {
+    const docRef = this.db.collection("orders").doc(orderId);
+    await docRef.update(updates as { [x: string]: any });
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido de compra não encontrado.");
+    }
+    return { ...snap.data(), id: snap.id } as OrderRecord;
+  }
+}
+
+export class FirestoreWebhookEventsRepository implements IWebhookEventsRepository {
+  private readonly db: Firestore;
+
+  constructor(db: Firestore = getAdminFirestore()) {
+    this.db = db;
+  }
+
+  private eventRef(eventId: string) {
+    return this.db.collection("billing_webhook_events").doc(eventId);
+  }
+
+  public async claim(eventId: string, now: number): Promise<boolean> {
+    const ref = this.eventRef(eventId);
+    return await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.exists) return false;
+
+      tx.create(ref, {
+        status: "processing",
+        claimedAt: now,
+      });
+      return true;
+    });
+  }
+
+  public async complete(eventId: string, now: number): Promise<void> {
+    await this.eventRef(eventId).set(
+      {
+        status: "completed",
+        completedAt: now,
+      },
+      { merge: true }
+    );
+  }
+
+  public async release(eventId: string): Promise<void> {
+    const ref = this.eventRef(eventId);
+    await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists || snap.data()?.status !== "processing") return;
+      tx.delete(ref);
+    });
+  }
 }
 
 export class FirestoreGenerationRequestsRepository
@@ -681,6 +738,7 @@ export interface BackendRepositories {
   generationRequests: IGenerationRequestsRepository;
   users: IUsersRepository;
   generationCommit: IGenerationCommitRepository;
+  webhookEvents: IWebhookEventsRepository;
 }
 
 let repositoriesSingleton: BackendRepositories | null = null;
@@ -710,6 +768,7 @@ export function getRepositories(): BackendRepositories {
       generationRequests: store.generationRequests,
       users: store.users,
       generationCommit: store.generationCommit,
+      webhookEvents: store.webhookEvents || new InMemoryWebhookEventsRepository(false),
     };
     return repositoriesSingleton;
   }
@@ -727,6 +786,7 @@ export function getRepositories(): BackendRepositories {
     const orders = new InMemoryOrdersRepository(false);
     const generationRequests = new InMemoryGenerationRequestsRepository(false);
     const users = new InMemoryUsersRepository(false);
+    const webhookEvents = new InMemoryWebhookEventsRepository(false);
     const generationCommit = new InMemoryGenerationCommitRepository(
       docs,
       access,
@@ -741,6 +801,7 @@ export function getRepositories(): BackendRepositories {
       generationRequests,
       users,
       generationCommit,
+      webhookEvents,
     };
     setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
   } else {
@@ -751,6 +812,7 @@ export function getRepositories(): BackendRepositories {
       generationRequests: new FirestoreGenerationRequestsRepository(),
       users: new FirestoreUsersRepository(),
       generationCommit: new FirestoreGenerationCommitRepository(),
+      webhookEvents: new FirestoreWebhookEventsRepository(),
     };
     setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
   }
@@ -793,6 +855,11 @@ export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | 
         )
       : current.generationCommit);
 
+  const webhookEvents =
+    repos.webhookEvents ||
+    current.webhookEvents ||
+    new InMemoryWebhookEventsRepository(false);
+
   repositoriesSingleton = {
     documents,
     access,
@@ -800,6 +867,7 @@ export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | 
     generationRequests,
     users,
     generationCommit,
+    webhookEvents,
   };
   setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
 }

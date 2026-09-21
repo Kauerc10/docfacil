@@ -58,4 +58,5 @@ server.log
 tool-results/
 test-results/
 playwright-report/
+.agents/
 
