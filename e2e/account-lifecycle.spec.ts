@@ -159,7 +159,7 @@ test.describe("Authenticated document lifecycle E2E", () => {
       30000
     );
 
-    await page.getByRole("button", { name: /Pagar.*39,90/i }).click();
+    await page.getByRole("button", { name: /Pagar.*34,90/i }).click();
     await waitForSearchParams(
       page,
       { view: "criar", slug: FREE_SLUG, draftId: null },

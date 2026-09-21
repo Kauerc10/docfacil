@@ -19,11 +19,10 @@ export async function setServerUserPlan(
   plan: "gratis" | "pro"
 ): Promise<void> {
   const env = getServerEnv();
-  const useInMemory =
-    env.ALLOW_IN_MEMORY_REPOSITORIES ||
-    (env.NODE_ENV === "test" && !env.FIRESTORE_EMULATOR_HOST);
+  const isUnitTestWithoutEmulator =
+    env.NODE_ENV === "test" && !env.FIRESTORE_EMULATOR_HOST;
 
-  if (!useInMemory) {
+  if (!isUnitTestWithoutEmulator) {
     const db = getAdminFirestore();
     await db.collection("users").doc(userId).set(
       {
