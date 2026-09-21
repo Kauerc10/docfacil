@@ -599,7 +599,9 @@ export class InMemoryUsersRepository implements IUsersRepository {
         ? await this.ordersRepo.getOrder(user.pendingProOrderId)
         : (getStore().orders.get(user.pendingProOrderId) ?? null);
       if (order && order.status === "pending") {
-        const isStale = !order.checkoutUrl && (Date.now() - (order.createdAt || 0) > 30_000);
+        const isStale =
+          !order.checkoutUrl &&
+          Date.now() - (order.createdAt || 0) > 60_000;
         if (!isStale) {
           return {
             status: "existing_pending",

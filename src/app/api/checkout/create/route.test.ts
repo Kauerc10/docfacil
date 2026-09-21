@@ -382,4 +382,34 @@ describe("POST /api/checkout/create", () => {
     const profileAfter = await usersRepo.getUserProfile("usr_123");
     expect(profileAfter?.pendingProOrderId).toBe(liveOrder.id);
   });
+
+  it("preserva a reserva para a janela completa de 60s antes de considerar abandonada (ex: aos 45s retorna existing_pending/409)", async () => {
+    // Pedido criado há 45s sem checkoutUrl ainda (chamada ao provedor com alta latência)
+    const runningOrder = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId: "usr_123" },
+      status: "pending",
+      createdAt: Date.now() - 45_000,
+    });
+
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+      pendingProOrderId: runningOrder.id,
+    });
+
+    const res = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/já está em andamento/);
+
+    // Confirma que aos 45s a reserva NÃO foi reciclada prematuramente
+    const profileAfter = await usersRepo.getUserProfile("usr_123");
+    expect(profileAfter?.pendingProOrderId).toBe(runningOrder.id);
+  });
 });

@@ -662,5 +662,96 @@ describe("POST /api/webhooks/mercadopago", () => {
     const userProfile = await usersRepo.getUserProfile(userId);
     expect(userProfile?.plano).toBe("pro");
   });
+
+  it("não restaura o plano Pro se o pedido estiver cancelado após cancelamento da assinatura", async () => {
+    const userId = "usr_pro_cancelled";
+    usersRepo.setUserProfile(userId, {
+      plano: "gratis", // Usuário cancelou a assinatura
+      email: "pro_cancelled@docfacil.com.br",
+    });
+
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "pro_cancelled@docfacil.com.br" },
+      status: "cancelled", // Pedido foi marcado como cancelled na rota de cancelamento
+      createdAt: Date.now() - 40000,
+    });
+
+    mockMpClient = createTestMpClient({
+      getPayment: async (id) => ({
+        id: Number(id) || 998877,
+        status: "approved",
+        external_reference: order.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("pay_delayed_after_cancel", {
+      action: "payment.created",
+      data: { id: "pay_delayed_after_cancel" },
+      type: "payment",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+
+    // O pedido continua cancelado e o plano do usuário permanece 'gratis'
+    const updatedOrder = await ordersRepo.getOrder(order.id!);
+    expect(updatedOrder?.status).toBe("cancelled");
+
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.plano).toBe("gratis");
+  });
+
+  it("não sobrescreve os ponteiros da assinatura ativa B se chegar pagamento de assinatura anterior A já substituída", async () => {
+    const userId = "usr_pro_superseded";
+    usersRepo.setUserProfile(userId, {
+      plano: "pro",
+      subscriptionId: "sub_B_active",
+      subscriptionOrderId: "ord_B_active",
+      email: "pro_superseded@docfacil.com.br",
+    });
+
+    const orderA = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "pro_superseded@docfacil.com.br" },
+      status: "paid",
+      createdAt: Date.now() - 60000,
+    });
+
+    mockMpClient = createTestMpClient({
+      getPayment: async (id) => ({
+        id: Number(id) || 112233,
+        status: "approved",
+        external_reference: orderA.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("pay_order_A_superseded", {
+      action: "payment.created",
+      data: { id: "pay_order_A_superseded" },
+      type: "payment",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+
+    // A assinatura ativa B permanece intacta
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.plano).toBe("pro");
+    expect(userProfile?.subscriptionOrderId).toBe("ord_B_active");
+    expect(userProfile?.subscriptionId).toBe("sub_B_active");
+  });
 });
 

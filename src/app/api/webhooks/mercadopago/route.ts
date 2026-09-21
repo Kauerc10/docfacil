@@ -91,7 +91,11 @@ export async function handleMercadoPagoWebhook(
 
         if (order) {
           if (payment.status === 'approved') {
-            if (order.status === 'pending' || order.status === 'failed') {
+            const isPendingOrFailed =
+              order.status === 'pending' || order.status === 'failed';
+            const isPaid = order.status === 'paid';
+
+            if (isPendingOrFailed) {
               await repos.orders.markOrderPaid(orderId);
               await repos.orders.updateOrder(orderId, {
                 externalPaymentId: String(payment.id),
@@ -101,8 +105,29 @@ export async function handleMercadoPagoWebhook(
               });
             }
 
-            if (order.product === 'pro' && order.buyer.type === 'user') {
-              await setServerUserPlan(order.buyer.userId, 'pro');
+            // Apenas pedidos Pro ativos/elegíveis (não cancelados nem consumidos) podem conceder
+            // ou restaurar entitlement, evitando que notificações atrasadas de pagamentos reativem
+            // assinaturas canceladas ou sobrescrevam assinaturas ativas mais novas.
+            if (
+              order.product === 'pro' &&
+              order.buyer.type === 'user' &&
+              (isPendingOrFailed || isPaid) &&
+              order.status !== 'cancelled'
+            ) {
+              const currentProfile = await repos.users.getUserProfile(order.buyer.userId);
+              const hasDifferentActiveSubscription =
+                currentProfile?.plano === 'pro' &&
+                Boolean(currentProfile.subscriptionOrderId) &&
+                currentProfile.subscriptionOrderId !== orderId;
+
+              if (!hasDifferentActiveSubscription) {
+                await setServerUserPlan(
+                  order.buyer.userId,
+                  'pro',
+                  currentProfile?.subscriptionId || null,
+                  orderId
+                );
+              }
             }
           } else if (
             (payment.status === 'rejected' || payment.status === 'cancelled') &&
