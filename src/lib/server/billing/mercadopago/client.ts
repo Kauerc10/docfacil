@@ -102,6 +102,7 @@ export interface IMercadoPagoClient {
   createPreference(payload: MercadoPagoPreferencePayload): Promise<MercadoPagoPreferenceResponse>;
   createPreapproval(payload: MercadoPagoPreapprovalPayload): Promise<MercadoPagoPreapprovalResponse>;
   getPreapproval(id: string): Promise<MercadoPagoPreapprovalResponse>;
+  cancelPreapproval(id: string): Promise<MercadoPagoPreapprovalResponse>;
 }
 
 export class MercadoPagoClient implements IMercadoPagoClient {
@@ -178,6 +179,13 @@ export class MercadoPagoClient implements IMercadoPagoClient {
   public async getPreapproval(id: string): Promise<MercadoPagoPreapprovalResponse> {
     return this.request<MercadoPagoPreapprovalResponse>(`/preapproval/${id}`, {
       method: 'GET',
+    });
+  }
+
+  public async cancelPreapproval(id: string): Promise<MercadoPagoPreapprovalResponse> {
+    return this.request<MercadoPagoPreapprovalResponse>(`/preapproval/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'cancelled' }),
     });
   }
 }

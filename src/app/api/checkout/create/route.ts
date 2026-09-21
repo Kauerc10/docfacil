@@ -6,6 +6,8 @@ import { BackendError } from '@/lib/server/errors';
 import { requireAppCheck, resolvePrincipal, requireUser } from '@/lib/server/security';
 import { getBillingProvider } from '@/lib/server/billing/provider';
 import { getRepositories } from '@/lib/server/firestore/repositories';
+import { setServerUserPendingOrder } from '@/lib/server/billing/account-plan';
+import { getServerEnv } from '@/lib/server/env';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,12 +86,48 @@ export async function POST(req: Request) {
 
     const { product, method, guestContact, successUrl } = parsed.data;
 
-    if (product === 'pro' && principal.type === 'guest') {
-      throw new BackendError(
-        'INVALID_AUTH_TOKEN',
-        401,
-        'Faça login ou crie uma conta para assinar o Plano Pro.'
-      );
+    const repos = getRepositories();
+
+    if (product === 'pro') {
+      if (principal.type === 'guest') {
+        throw new BackendError(
+          'INVALID_AUTH_TOKEN',
+          401,
+          'Faça login ou crie uma conta para assinar o Plano Pro.'
+        );
+      }
+
+      const userProfile = await repos.users.getUserProfile(principal.userId);
+      if (userProfile?.plano === 'pro') {
+        throw new BackendError(
+          'CONFLICT',
+          409,
+          'Você já possui uma assinatura do Plano Pro ativa.'
+        );
+      }
+
+      if (userProfile?.pendingProOrderId) {
+        const existingOrder = await repos.orders.getOrder(userProfile.pendingProOrderId);
+        if (
+          existingOrder &&
+          existingOrder.status === 'pending' &&
+          existingOrder.checkoutUrl
+        ) {
+          const env = getServerEnv();
+          const isDev = env.NODE_ENV !== 'production' || env.VERCEL_ENV === 'preview';
+          return NextResponse.json(
+            {
+              kind: 'redirect',
+              orderId: existingOrder.id,
+              product: 'pro',
+              amountCents: existingOrder.amountCents,
+              checkoutUrl: existingOrder.checkoutUrl,
+              devMode: isDev,
+            },
+            { status: 200, headers: { 'Cache-Control': 'no-store' } }
+          );
+        }
+      }
     }
 
     if (product === 'avulso' && principal.type === 'guest') {
@@ -119,7 +157,6 @@ export async function POST(req: Request) {
 
     const normalizedMethod = method === 'card' ? 'credit_card' : method;
     const amountCents = planPriceToCents(product);
-    const repos = getRepositories();
 
     const order = await repos.orders.createOrder({
       provider: 'mercadopago',
@@ -159,6 +196,8 @@ export async function POST(req: Request) {
         checkoutUrl: result.checkoutUrl,
         externalPaymentId: result.providerCheckoutId,
       });
+
+      await setServerUserPendingOrder(user.userId, order.id);
 
       return NextResponse.json(
         {

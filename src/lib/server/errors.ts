@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 export type BackendErrorCode =
   | "INVALID_REQUEST"
   | "INVALID_AUTH_TOKEN"
+  | "CONFLICT"
   | "APP_CHECK_REQUIRED"
   | "APP_CHECK_INVALID"
   | "DOCUMENT_NOT_FOUND"

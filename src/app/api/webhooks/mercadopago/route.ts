@@ -117,16 +117,21 @@ export async function handleMercadoPagoWebhook(
         const order = await repos.orders.getOrder(orderId);
 
         if (order) {
-          if (order.status === 'pending') {
+          if (order.status === 'pending' || order.status === 'cancelled') {
             await repos.orders.markOrderPaid(orderId);
             await repos.orders.updateOrder(orderId, {
               externalPaymentId: preapproval.id,
               paidAt: Date.now(),
             });
+          }
 
-            if (order.product === 'pro' && order.buyer.type === 'user') {
-              await setServerUserPlan(order.buyer.userId, 'pro');
-            }
+          if (order.product === 'pro' && order.buyer.type === 'user') {
+            await setServerUserPlan(
+              order.buyer.userId,
+              'pro',
+              preapproval.id,
+              orderId
+            );
           }
         }
       } else if (
@@ -142,7 +147,7 @@ export async function handleMercadoPagoWebhook(
           });
 
           if (order.product === 'pro' && order.buyer.type === 'user') {
-            await setServerUserPlan(order.buyer.userId, 'gratis');
+            await setServerUserPlan(order.buyer.userId, 'gratis', null, null);
           }
         }
       }

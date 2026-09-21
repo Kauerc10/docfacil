@@ -7,6 +7,7 @@ import type {
   IWebhookEventsRepository,
   IGenerationRequestsRepository,
   IUsersRepository,
+  UserProfileRecord,
   IGenerationCommitRepository,
   CommitGeneratedArtifactInput,
 } from "./interfaces";
@@ -549,7 +550,7 @@ export class InMemoryGenerationRequestsRepository
 }
 
 export class InMemoryUsersRepository implements IUsersRepository {
-  private readonly _users: Map<string, { plano?: string; email?: string; nome?: string }> | null;
+  private readonly _users: Map<string, UserProfileRecord> | null;
 
   constructor(isolated = true) {
     this._users = isolated ? new Map() : null;
@@ -559,21 +560,21 @@ export class InMemoryUsersRepository implements IUsersRepository {
 
   public setUser(
     userId: string,
-    profile: { plano?: string; email?: string; nome?: string }
+    profile: UserProfileRecord
   ): void {
     this.users.set(userId, { ...profile });
   }
 
   public setUserProfile(
     userId: string,
-    profile: { plano?: string; email?: string; nome?: string }
+    profile: UserProfileRecord
   ): void {
     this.users.set(userId, { ...profile });
   }
 
   public async getUserProfile(
     userId: string
-  ): Promise<{ plano?: string; email?: string; nome?: string } | null> {
+  ): Promise<UserProfileRecord | null> {
     const u = this.users.get(userId);
     return u ? JSON.parse(JSON.stringify(u)) : null;
   }

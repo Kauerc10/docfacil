@@ -29,6 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { getPerfil, listPagamentos } from "@/lib/services/users-service";
+import { apiFetch } from "@/lib/auth/api-fetch";
 import { PLAN_BILLING_DESC } from "@/lib/pricing";
 import type { Pagamento, PerfilUsuario } from "@/lib/types";
 
@@ -97,7 +98,7 @@ export function PerfilView() {
 
 function PerfilContent() {
   const { navigate } = useNav();
-  const { user, updateProfileData } = useAuth();
+  const { user, updateProfileData, refreshProfile } = useAuth();
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -107,6 +108,8 @@ function PerfilContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelMsg, setCancelMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -155,12 +158,35 @@ function PerfilContent() {
     }
   }
 
-  function handleCancelSubscription() {
-    const proximaData = new Date();
-    proximaData.setMonth(proximaData.getMonth() + 1);
-    const fmt = proximaData.toLocaleDateString("pt-BR");
-    setCancelMsg(`Assinatura cancelada. Você manterá acesso até ${fmt}.`);
-    toast.success("Assinatura cancelada. Sem multas, sem burocracia.");
+  async function handleCancelSubscription() {
+    if (!user || cancelling) return;
+    setCancelling(true);
+    try {
+      const res = await apiFetch("/api/subscription/cancel", {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.error?.message || data.message || "Erro ao cancelar assinatura."
+        );
+      }
+      await refreshProfile();
+      const updatedPerfil = await getPerfil(user.uid);
+      setPerfil(updatedPerfil);
+      setConfirmOpen(false);
+      setCancelMsg("Assinatura cancelada com sucesso. Você não terá novas cobranças.");
+      toast.success("Assinatura cancelada com sucesso. Sem multas, sem burocracia.");
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível cancelar sua assinatura. Tente novamente."
+      );
+    } finally {
+      setCancelling(false);
+    }
   }
 
   const plano = perfil?.plano ?? user?.plano ?? "gratis";
@@ -379,7 +405,7 @@ function PerfilContent() {
                 Cancelar assinatura
               </h2>
               <p className="mt-2 text-sm text-ink/65 leading-relaxed text-pretty">
-                Você manterá acesso até o fim do período já pago. Sem multas, sem burocracia.
+                Sua conta voltará ao plano Grátis e você não terá novas cobranças recorrentes. Sem multas, sem burocracia.
               </p>
 
               {plano !== "pro" ? (
@@ -391,7 +417,7 @@ function PerfilContent() {
                   Sua assinatura já foi cancelada.
                 </p>
               ) : (
-                <AlertDialog>
+                <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                   <AlertDialogTrigger asChild>
                     <button
                       type="button"
@@ -404,17 +430,20 @@ function PerfilContent() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Cancelar assinatura do Plano Pro?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Você continuará com acesso até o fim do período já pago. Depois disso, sua conta voltará ao plano Grátis automaticamente. Sem multas, sem burocracia.
+                        Você não terá novas cobranças recorrentes. Sua conta voltará ao plano Grátis automaticamente. Sem multas, sem burocracia.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Manter assinatura</AlertDialogCancel>
-                      <AlertDialogAction
+                      <AlertDialogCancel disabled={cancelling}>Manter assinatura</AlertDialogCancel>
+                      <button
+                        type="button"
                         onClick={handleCancelSubscription}
-                        className="bg-[var(--coral)] text-white hover:bg-[var(--coral-hover)]"
+                        disabled={cancelling}
+                        className="inline-flex items-center justify-center rounded-md text-sm font-medium px-4 py-2 bg-[var(--coral)] text-white hover:bg-[var(--coral-hover)] disabled:opacity-60 transition"
                       >
-                        Sim, cancelar
-                      </AlertDialogAction>
+                        {cancelling && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        {cancelling ? "Cancelando..." : "Sim, cancelar"}
+                      </button>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>

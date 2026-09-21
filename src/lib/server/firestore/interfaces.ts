@@ -95,10 +95,19 @@ export interface IGenerationRequestsRepository {
   markFailed(requestId: string, errorCode: string): Promise<void>;
 }
 
+export interface UserProfileRecord {
+  plano?: string;
+  email?: string;
+  nome?: string;
+  subscriptionId?: string | null;
+  subscriptionOrderId?: string | null;
+  pendingProOrderId?: string | null;
+}
+
 export interface IUsersRepository {
   getUserProfile(
     userId: string
-  ): Promise<{ plano?: string; email?: string; nome?: string } | null>;
+  ): Promise<UserProfileRecord | null>;
 }
 
 export interface CommitGeneratedArtifactInput {

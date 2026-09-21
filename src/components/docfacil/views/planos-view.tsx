@@ -15,6 +15,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { formatPlanPrice } from "@/lib/pricing";
+import { useAuth } from "@/lib/auth-context";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -113,6 +114,8 @@ const FAQ = [
 
 export function PlanosView() {
   const { navigate } = useNav();
+  const { user } = useAuth();
+  const isPro = user?.plano === "pro";
   const root = useRef<HTMLDivElement>(null);
 
   useGSAP(
@@ -152,17 +155,25 @@ export function PlanosView() {
           data-planos-grid
           className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-stretch"
         >
-          {PLANOS.map((plano) => (
-            <PlanCard
-              key={plano.id}
-              plano={plano}
-              onSelect={() =>
-                plano.destino === "checkout"
-                  ? navigate("checkout", { plan: plano.checkoutPlan })
-                  : navigate(plano.destino)
-              }
-            />
-          ))}
+          {PLANOS.map((plano) => {
+            const isCurrentPlan = Boolean(isPro && plano.id === "pro");
+            return (
+              <PlanCard
+                key={plano.id}
+                plano={plano}
+                isCurrentPlan={isCurrentPlan}
+                onSelect={() => {
+                  if (isCurrentPlan) {
+                    navigate("perfil");
+                  } else if (plano.destino === "checkout") {
+                    navigate("checkout", { plan: plano.checkoutPlan });
+                  } else {
+                    navigate(plano.destino);
+                  }
+                }}
+              />
+            );
+          })}
         </div>
 
         <p className="mt-6 text-center text-xs text-ink/50">
@@ -215,24 +226,39 @@ export function PlanosView() {
   );
 }
 
-function PlanCard({ plano, onSelect }: { plano: Plano; onSelect: () => void }) {
+function PlanCard({
+  plano,
+  onSelect,
+  isCurrentPlan,
+}: {
+  plano: Plano;
+  onSelect: () => void;
+  isCurrentPlan?: boolean;
+}) {
   const isCoral = plano.ctaVariant === "coral";
   return (
     <div
       data-planos-card
       className={[
         "relative flex flex-col rounded-2xl p-7 transition-shadow",
-        plano.destaque
+        isCurrentPlan
+          ? "bg-[var(--surface)] border-2 border-[var(--selo-green)] shadow-[0_18px_40px_-18px_rgba(16,185,129,0.25)] md:-translate-y-2"
+          : plano.destaque
           ? "bg-[var(--surface)] border-2 border-[var(--blue-royal)] shadow-[0_18px_40px_-18px_rgba(37,84,199,0.35)] md:-translate-y-2"
           : "bg-[var(--surface)] border border-[var(--border)]",
       ].join(" ")}
     >
-      {plano.destaque && (
+      {isCurrentPlan ? (
+        <span className="absolute -top-3 right-6 inline-flex items-center gap-1 rounded-full bg-[var(--selo-green)] px-3 py-1 text-xs font-semibold text-white shadow-sm">
+          <Check className="w-3.5 h-3.5" aria-hidden="true" />
+          Seu Plano Atual
+        </span>
+      ) : plano.destaque ? (
         <span className="absolute -top-3 right-6 inline-flex items-center gap-1 rounded-full bg-[var(--selo-green)] px-3 py-1 text-xs font-semibold text-white shadow-sm">
           <Check className="w-3.5 h-3.5" aria-hidden="true" />
           Mais Popular
         </span>
-      )}
+      ) : null}
 
       <h3 className="font-[family-name:var(--font-jakarta)] text-xl font-bold text-ink">
         {plano.nome}
@@ -269,13 +295,15 @@ function PlanCard({ plano, onSelect }: { plano: Plano; onSelect: () => void }) {
         onClick={onSelect}
         className={[
           "mt-7 w-full inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--blue-royal)] focus-visible:ring-offset-[var(--paper)]",
-          isCoral
+          isCurrentPlan
+            ? "border border-[var(--selo-green)] text-[var(--selo-green)] bg-[var(--green-tint)]/40 hover:bg-[var(--green-tint)]"
+            : isCoral
             ? "bg-[var(--coral)] text-white hover:bg-[var(--coral-hover)]"
             : "border border-[var(--blue-royal)] text-[var(--blue-royal)] bg-transparent hover:bg-[var(--blue-soft)]",
         ].join(" ")}
-        aria-label={`${plano.cta}, plano ${plano.nome}`}
+        aria-label={isCurrentPlan ? `Gerenciar plano ${plano.nome} no perfil` : `${plano.cta}, plano ${plano.nome}`}
       >
-        {plano.cta}
+        {isCurrentPlan ? "Gerenciar no perfil" : plano.cta}
       </button>
     </div>
   );

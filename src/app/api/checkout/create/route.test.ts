@@ -7,13 +7,15 @@ import { setAdminAuthForTesting } from "@/lib/server/firebase-admin";
 
 describe("POST /api/checkout/create", () => {
   let ordersRepo: InMemoryOrdersRepository;
+  let usersRepo: InMemoryUsersRepository;
   let mockProvider: BillingProvider;
 
   beforeEach(() => {
     ordersRepo = new InMemoryOrdersRepository(true);
+    usersRepo = new InMemoryUsersRepository(true);
     setRepositoriesForTesting({
       orders: ordersRepo,
-      users: new InMemoryUsersRepository(true),
+      users: usersRepo,
     });
 
     setAdminAuthForTesting({
@@ -185,5 +187,60 @@ describe("POST /api/checkout/create", () => {
     expect(parsed.searchParams.get("billingReturn")).toBe("1");
     expect(parsed.searchParams.get("slug")).toBe("locacao-residencial");
     expect(parsed.searchParams.get("orderId")).toBeDefined();
+  });
+
+  it("rejeita compra de plano Pro quando o usuário já possui assinatura Pro ativa com 409 Conflict", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "pro",
+      email: "usuario@exemplo.com",
+    });
+
+    const res = await POST(
+      makeRequest(
+        { product: "pro" },
+        "Bearer valid_user_token"
+      )
+    );
+
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/já possui uma assinatura do Plano Pro ativa/);
+  });
+
+  it("reaproveita pedido Pro pendente e sua URL de checkout sem criar assinatura duplicada", async () => {
+    const existingOrder = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId: "usr_123" },
+      status: "pending",
+      checkoutUrl: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=existing_pref",
+      createdAt: Date.now() - 5000,
+    });
+
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+      pendingProOrderId: existingOrder.id,
+    });
+
+    let subscriptionCreated = false;
+    mockProvider.createSubscription = async () => {
+      subscriptionCreated = true;
+      throw new Error("Should not be called");
+    };
+
+    const res = await POST(
+      makeRequest(
+        { product: "pro" },
+        "Bearer valid_user_token"
+      )
+    );
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.orderId).toBe(existingOrder.id);
+    expect(data.checkoutUrl).toBe("https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=existing_pref");
+    expect(subscriptionCreated).toBe(false);
   });
 });

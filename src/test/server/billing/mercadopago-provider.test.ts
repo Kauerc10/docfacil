@@ -38,6 +38,10 @@ describe('MercadoPagoBillingProvider', () => {
       status: 'authorized',
       external_reference: 'ord_pro_456',
     }),
+    cancelPreapproval: async (id) => ({
+      id,
+      status: 'cancelled',
+    }),
   };
 
   it('cria pagamento avulso via Pix retornando copia-e-cola e qrCode base64', async () => {

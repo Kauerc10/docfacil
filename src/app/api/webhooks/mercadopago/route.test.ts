@@ -81,6 +81,7 @@ describe("POST /api/webhooks/mercadopago", () => {
       createPreapproval: async () => ({} as any),
       getPayment: async () => ({} as any),
       getPreapproval: async () => ({} as any),
+      cancelPreapproval: async () => ({} as any),
       ...overrides,
     };
   }
@@ -382,4 +383,49 @@ describe("POST /api/webhooks/mercadopago", () => {
     const userProfile = await usersRepo.getUserProfile(userId);
     expect(userProfile?.plano).toBe("gratis"); // Revogado
   });
+
+  it("restaura o plano Pro e marca o pedido como pago quando uma assinatura cancelada ou pausada é retomada como authorized", async () => {
+    const userId = "usr_resumed_sub";
+    usersRepo.setUserProfile(userId, {
+      plano: "gratis",
+      email: "resumed@docfacil.com.br",
+    });
+
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "resumed@docfacil.com.br" },
+      status: "cancelled", // Estava cancelada/pausada
+      createdAt: Date.now() - 7200000,
+    });
+
+    mockMpClient = createTestMpClient({
+      getPreapproval: async (id) => ({
+        id,
+        status: "authorized", // Retomada
+        external_reference: order.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("preapp_resume_1", {
+      action: "updated",
+      data: { id: "preapp_resume_1" },
+      type: "subscription_preapproval",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+    const updatedOrder = await ordersRepo.getOrder(order.id!);
+    expect(updatedOrder?.status).toBe("paid");
+    expect(updatedOrder?.externalPaymentId).toBe("preapp_resume_1");
+
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.plano).toBe("pro");
+  });
 });
+

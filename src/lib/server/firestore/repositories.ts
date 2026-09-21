@@ -12,6 +12,7 @@ import type {
   IWebhookEventsRepository,
   IGenerationRequestsRepository,
   IUsersRepository,
+  UserProfileRecord,
   IGenerationCommitRepository,
   CommitGeneratedArtifactInput,
 } from "./interfaces";
@@ -596,10 +597,10 @@ export class FirestoreUsersRepository implements IUsersRepository {
 
   public async getUserProfile(
     userId: string
-  ): Promise<{ plano?: string; email?: string; nome?: string } | null> {
+  ): Promise<UserProfileRecord | null> {
     const snap = await this.db.collection("users").doc(userId).get();
     if (!snap.exists) return null;
-    return snap.data() as { plano?: string; email?: string; nome?: string };
+    return snap.data() as UserProfileRecord;
   }
 }
 
