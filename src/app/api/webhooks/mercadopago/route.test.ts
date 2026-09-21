@@ -305,4 +305,81 @@ describe("POST /api/webhooks/mercadopago", () => {
     const userProfile = await usersRepo.getUserProfile(userId);
     expect(userProfile?.plano).toBe("pro");
   });
+
+  it("não regride pedido já consumido para pago ao receber notificação de aprovação posterior", async () => {
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "avulso",
+      amountCents: 1990,
+      buyer: { type: "guest", email: "cliente@exemplo.com" },
+      status: "consumed",
+      createdAt: Date.now() - 60000,
+    });
+
+    mockMpClient = createTestMpClient({
+      getPayment: async (id) => ({
+        id: Number(id),
+        status: "approved",
+        external_reference: order.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("late_pay_1", {
+      action: "payment.updated",
+      data: { id: "late_pay_1" },
+      type: "payment",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+    const orderAfter = await ordersRepo.getOrder(order.id!);
+    expect(orderAfter?.status).toBe("consumed"); // Permanece consumed, não regride para paid
+  });
+
+  it("revoga o plano Pro e cancela o pedido quando recebe subscription_preapproval cancelada", async () => {
+    const userId = "usr_cancelled_sub";
+    usersRepo.setUserProfile(userId, {
+      plano: "pro",
+      email: "cancelled@docfacil.com.br",
+    });
+
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "cancelled@docfacil.com.br" },
+      status: "paid",
+      createdAt: Date.now() - 3600000,
+    });
+
+    mockMpClient = createTestMpClient({
+      getPreapproval: async (id) => ({
+        id,
+        status: "cancelled",
+        external_reference: order.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("preapp_cancel_1", {
+      action: "updated",
+      data: { id: "preapp_cancel_1" },
+      type: "subscription_preapproval",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+    const updatedOrder = await ordersRepo.getOrder(order.id!);
+    expect(updatedOrder?.status).toBe("cancelled");
+
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.plano).toBe("gratis"); // Revogado
+  });
 });

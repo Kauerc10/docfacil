@@ -92,7 +92,8 @@ export type OrderStatus =
   | "reserved"
   | "consumed"
   | "failed"
-  | "refunded";
+  | "refunded"
+  | "cancelled";
 
 export type PaymentProvider = "mercadopago" | "demo";
 export type PaymentMethod = "pix" | "credit_card";

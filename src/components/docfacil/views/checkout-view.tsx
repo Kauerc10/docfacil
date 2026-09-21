@@ -38,6 +38,62 @@ import {
 } from "@/lib/documents/client";
 import { finalizeClientDraft } from "@/lib/documents/client-document";
 
+function getStoredGuestContact(
+  orderId?: string,
+  slug?: string
+): { email?: string; phone?: string } | undefined {
+  if (typeof window === "undefined") return undefined;
+  const keys = [
+    orderId ? `docfacil:guest_contact:${orderId}` : null,
+    slug ? `docfacil:guest_contact:${slug}` : null,
+    "docfacil:last_guest_contact",
+  ].filter(Boolean) as string[];
+
+  for (const key of keys) {
+    try {
+      const raw = sessionStorage.getItem(key) || localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.email || parsed?.phone) return parsed;
+      }
+    } catch {
+      // continue
+    }
+  }
+
+  if (slug) {
+    const draft = loadGuestDraft(slug);
+    if (draft?.guestContact?.email || draft?.guestContact?.phone) {
+      return draft.guestContact;
+    }
+  }
+
+  return undefined;
+}
+
+function persistGuestContact(
+  contact: { email?: string; phone?: string },
+  orderId?: string,
+  slug?: string
+) {
+  if (typeof window === "undefined") return;
+  try {
+    const data = JSON.stringify(contact);
+    sessionStorage.setItem("docfacil:last_guest_contact", data);
+    localStorage.setItem("docfacil:last_guest_contact", data);
+    if (slug) {
+      sessionStorage.setItem(`docfacil:guest_contact:${slug}`, data);
+      localStorage.setItem(`docfacil:guest_contact:${slug}`, data);
+    }
+    if (orderId) {
+      sessionStorage.setItem(`docfacil:guest_contact:${orderId}`, data);
+      localStorage.setItem(`docfacil:guest_contact:${orderId}`, data);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function CheckoutView() {
   const { params, navigate } = useNav();
   const { user, loading, refreshProfile } = useAuth();
@@ -52,6 +108,8 @@ export function CheckoutView() {
   const [guestEmail, setGuestEmail] = useState("");
   const [method, setMethod] = useState<CheckoutMethod>("pix");
   const [verifyingPayment, setVerifyingPayment] = useState(false);
+  const [needsManualRetry, setNeedsManualRetry] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const handledPaidOrderId = useRef<string | null>(null);
 
   const userId = user?.uid ?? "guest";
@@ -151,30 +209,69 @@ export function CheckoutView() {
 
     let cancelled = false;
     setVerifyingPayment(true);
+    setNeedsManualRetry(false);
+
+    if (!user) {
+      const stored = getStoredGuestContact(returnOrderId, params.slug);
+      if (stored?.email && !guestEmail) {
+        setGuestEmail(stored.email);
+      }
+    }
 
     const verify = async () => {
-      try {
-        const status = await checkOrderStatus({
-          orderId: returnOrderId,
-          authenticated: Boolean(user),
-          email: userEmail || undefined,
-        });
+      const maxAttempts = 5;
+      const delayMs = 2000;
 
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         if (cancelled) return;
-        if (status.status === "paid" || status.status === "consumed") {
-          await continueAfterPaidOrder(status);
-        } else {
-          toast.info("Aguardando confirmação do pagamento pelo Mercado Pago.");
+
+        try {
+          const effectiveContact = !user
+            ? getStoredGuestContact(returnOrderId, params.slug)
+            : undefined;
+
+          const effectiveEmail = userEmail || effectiveContact?.email;
+          const effectivePhone = effectiveContact?.phone;
+
+          const status = await checkOrderStatus({
+            orderId: returnOrderId,
+            authenticated: Boolean(user),
+            email: effectiveEmail || undefined,
+            phone: effectivePhone || undefined,
+          });
+
+          if (cancelled) return;
+
+          if (status.status === "paid" || status.status === "consumed") {
+            setVerifyingPayment(false);
+            await continueAfterPaidOrder(status);
+            return;
+          }
+
+          if (attempt === 1) {
+            toast.info("Aguardando confirmação do pagamento pelo Mercado Pago…");
+          }
+
+          if (attempt < maxAttempts) {
+            await new Promise((res) => setTimeout(res, delayMs));
+          }
+        } catch (err) {
+          if (attempt === maxAttempts) {
+            if (!cancelled) {
+              console.error("[CheckoutView] falha ao verificar retorno de billing:", err);
+            }
+          } else {
+            await new Promise((res) => setTimeout(res, delayMs));
+          }
         }
-      } catch (err) {
-        if (!cancelled) {
-          console.error("[CheckoutView] falha ao verificar retorno de billing:", err);
-          toast.error("Não foi possível confirmar o pagamento automaticamente.");
-        }
-      } finally {
-        if (!cancelled) {
-          setVerifyingPayment(false);
-        }
+      }
+
+      if (!cancelled) {
+        setVerifyingPayment(false);
+        setNeedsManualRetry(true);
+        toast.info(
+          "Pagamento ainda em processamento. Se você já concluiu no Mercado Pago, clique em 'Verificar novamente'."
+        );
       }
     };
 
@@ -182,7 +279,7 @@ export function CheckoutView() {
     return () => {
       cancelled = true;
     };
-  }, [returnOrderId, loading, user, userEmail, continueAfterPaidOrder]);
+  }, [returnOrderId, loading, user, userEmail, continueAfterPaidOrder, retryCount]);
 
   const handleAcceptConsent = useCallback(async () => {
     setConsentOpen(false);
@@ -192,6 +289,7 @@ export function CheckoutView() {
       const draftId = params.draftId;
 
       if (slug && !user && guestEmail.trim()) {
+        persistGuestContact({ email: guestEmail.trim() }, undefined, slug);
         const draft = loadGuestDraft(slug);
         if (draft) {
           saveGuestDraft(slug, {
@@ -220,6 +318,10 @@ export function CheckoutView() {
         successUrl,
       });
 
+      if (!user && guestEmail.trim() && result.orderId) {
+        persistGuestContact({ email: guestEmail.trim() }, result.orderId, slug);
+      }
+
       if (result.kind === "pix") {
         setSubmitting(false);
         toast.success("Código Pix gerado com sucesso.");
@@ -242,47 +344,58 @@ export function CheckoutView() {
         return;
       }
 
-      if (result.provider === "demo" && plan === "avulso" && user && draftId) {
-        const draft = await getAccountDraft(draftId);
-        if (!draft) {
-          throw new Error("O rascunho associado ao checkout não foi encontrado.");
+      if (result.provider === "demo" && plan === "avulso") {
+        if (user && draftId) {
+          const draft = await getAccountDraft(draftId);
+          if (!draft) {
+            throw new Error("O rascunho associado ao checkout não foi encontrado.");
+          }
+
+          const isNovaVersao = Boolean(draft.sourceDocumentId);
+          const finalized = await finalizeClientDraft({
+            draft: {
+              id: draft.id,
+              modeloSlug: draft.modeloSlug,
+              sourceDocumentId: draft.sourceDocumentId,
+              respostas: draft.respostas,
+              stepIndex: draft.stepIndex,
+              clausulasSelecionadas: draft.clausulasSelecionadas,
+              extrasPorClausula: draft.extrasPorClausula,
+            },
+            orderId: result.orderId,
+            versionCreator: draft.sourceDocumentId
+              ? (id, p) =>
+                  createDocumentVersion(draft.sourceDocumentId!, {
+                    ...p,
+                    orderId: result.orderId,
+                  })
+              : undefined,
+            user,
+          });
+
+          await deleteAccountDraft(draft.id);
+
+          toast.success(
+            isNovaVersao
+              ? "Pagamento demo aprovado e nova versão liberada."
+              : "Pagamento demo aprovado e documento liberado."
+          );
+          setSubmitting(false);
+          navigate("sucesso", {
+            slug: draft.modeloSlug,
+            id: finalized.document.id,
+          });
+          return;
         }
 
-        const isNovaVersao = Boolean(draft.sourceDocumentId);
-        const finalized = await finalizeClientDraft({
-          draft: {
-            id: draft.id,
-            modeloSlug: draft.modeloSlug,
-            sourceDocumentId: draft.sourceDocumentId,
-            respostas: draft.respostas,
-            stepIndex: draft.stepIndex,
-            clausulasSelecionadas: draft.clausulasSelecionadas,
-            extrasPorClausula: draft.extrasPorClausula,
-          },
-          orderId: result.orderId,
-          versionCreator: draft.sourceDocumentId
-            ? (id, p) =>
-                createDocumentVersion(draft.sourceDocumentId!, {
-                  ...p,
-                  orderId: result.orderId,
-                })
-            : undefined,
-          user,
-        });
-
-        await deleteAccountDraft(draft.id);
-
-        toast.success(
-          isNovaVersao
-            ? "Pagamento demo aprovado e nova versão liberada."
-            : "Pagamento demo aprovado e documento liberado."
-        );
-        setSubmitting(false);
-        navigate("sucesso", {
-          slug: draft.modeloSlug,
-          id: finalized.document.id,
-        });
-        return;
+        if (slug) {
+          setSubmitting(false);
+          navigate("sucesso", {
+            slug,
+            orderId: result.orderId,
+          });
+          return;
+        }
       }
 
       toast.success(
@@ -428,8 +541,12 @@ export function CheckoutView() {
           </div>
 
           <div className="px-6 sm:px-7 py-5">
-            {verifyingPayment && (
-              <PaymentVerificationPanel verifying={verifyingPayment} />
+            {(verifyingPayment || needsManualRetry) && (
+              <PaymentVerificationPanel
+                verifying={verifyingPayment}
+                isPendingRetry={needsManualRetry}
+                onRetry={() => setRetryCount((prev) => prev + 1)}
+              />
             )}
 
             <button
@@ -628,7 +745,15 @@ function PaymentMethodSelector({
   );
 }
 
-function PaymentVerificationPanel({ verifying }: { verifying: boolean }) {
+function PaymentVerificationPanel({
+  verifying,
+  isPendingRetry,
+  onRetry,
+}: {
+  verifying: boolean;
+  isPendingRetry?: boolean;
+  onRetry?: () => void;
+}) {
   return (
     <div className="mb-4 rounded-xl border border-[var(--blue-royal)]/20 bg-[var(--blue-soft)]/30 p-4 text-center">
       <span className="mx-auto grid place-items-center w-9 h-9 rounded-full bg-surface text-[var(--blue-royal)]">
@@ -638,10 +763,24 @@ function PaymentVerificationPanel({ verifying }: { verifying: boolean }) {
           <ShieldCheck className="w-4 h-4" aria-hidden="true" />
         )}
       </span>
-      <p className="mt-2 font-semibold text-sm text-ink">Confirmando seu pagamento</p>
-      <p className="mt-0.5 text-xs text-ink/60">
-        Estamos consultando a autorização do pagamento no Mercado Pago…
+      <p className="mt-2 font-semibold text-sm text-ink">
+        {verifying ? "Confirmando seu pagamento" : "Aguardando confirmação do Mercado Pago"}
       </p>
+      <p className="mt-0.5 text-xs text-ink/60">
+        {verifying
+          ? "Estamos consultando a autorização do pagamento no Mercado Pago…"
+          : "O pagamento ainda está sendo processado. Se você já concluiu no Mercado Pago, clique abaixo:"}
+      </p>
+      {isPendingRetry && !verifying && onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[var(--blue-royal)] hover:bg-[var(--navy)] rounded-lg transition cursor-pointer"
+        >
+          <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+          Verificar novamente
+        </button>
+      )}
     </div>
   );
 }

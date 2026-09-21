@@ -90,7 +90,7 @@ export async function handleMercadoPagoWebhook(
         const order = await repos.orders.getOrder(orderId);
 
         if (order) {
-          if (order.status !== 'paid') {
+          if (order.status === 'pending') {
             await repos.orders.markOrderPaid(orderId);
             await repos.orders.updateOrder(orderId, {
               externalPaymentId: String(payment.id),
@@ -117,7 +117,7 @@ export async function handleMercadoPagoWebhook(
         const order = await repos.orders.getOrder(orderId);
 
         if (order) {
-          if (order.status !== 'paid') {
+          if (order.status === 'pending') {
             await repos.orders.markOrderPaid(orderId);
             await repos.orders.updateOrder(orderId, {
               externalPaymentId: preapproval.id,
@@ -127,6 +127,22 @@ export async function handleMercadoPagoWebhook(
             if (order.product === 'pro' && order.buyer.type === 'user') {
               await setServerUserPlan(order.buyer.userId, 'pro');
             }
+          }
+        }
+      } else if (
+        (preapproval.status === 'cancelled' || preapproval.status === 'paused') &&
+        preapproval.external_reference
+      ) {
+        const orderId = preapproval.external_reference;
+        const order = await repos.orders.getOrder(orderId);
+
+        if (order) {
+          await repos.orders.updateOrder(orderId, {
+            status: 'cancelled',
+          });
+
+          if (order.product === 'pro' && order.buyer.type === 'user') {
+            await setServerUserPlan(order.buyer.userId, 'gratis');
           }
         }
       }

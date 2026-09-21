@@ -205,10 +205,10 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
     }
 
     const data = await res.json();
-    const baseSuccessUrl =
-      params.successUrl ||
-      `${typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}/?view=sucesso`;
-    const successUrl = buildCheckoutReturnUrl(baseSuccessUrl, data.order.id);
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const demoUrl = new URL(params.successUrl || "/?view=sucesso", origin);
+    demoUrl.searchParams.set("view", "sucesso");
+    const successUrl = buildCheckoutReturnUrl(demoUrl.toString(), data.order.id);
 
     return {
       kind: "redirect",
