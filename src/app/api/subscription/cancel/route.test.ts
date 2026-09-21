@@ -136,4 +136,99 @@ describe("POST /api/subscription/cancel", () => {
     const updatedOrder = await ordersRepo.getOrder(order.id!);
     expect(updatedOrder?.status).toBe("cancelled");
   });
+
+  it("recupera o identificador da assinatura a partir do pedido associado quando profile.subscriptionId está ausente", async () => {
+    const userId = "usr_pro_subscriber";
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "pro@exemplo.com" },
+      status: "paid",
+      externalPaymentId: "preapp_recovered_from_order",
+      createdAt: Date.now() - 3600000,
+    });
+
+    usersRepo.setUserProfile(userId, {
+      plano: "pro",
+      email: "pro@exemplo.com",
+      subscriptionId: null, // Ausente no perfil
+      subscriptionOrderId: order.id,
+    });
+
+    const res = await handleCancelSubscription(
+      makeRequest("Bearer valid_user_token"),
+      { client: mockMpClient }
+    );
+
+    expect(res.status).toBe(200);
+    expect(cancelledPreapprovalId).toBe("preapp_recovered_from_order");
+
+    const updatedProfile = await usersRepo.getUserProfile(userId);
+    expect(updatedProfile?.plano).toBe("gratis");
+  });
+
+  it("recusa o cancelamento com 400 se o identificador da assinatura não for localizado nem no perfil nem no pedido", async () => {
+    const userId = "usr_pro_subscriber";
+    usersRepo.setUserProfile(userId, {
+      plano: "pro",
+      email: "pro@exemplo.com",
+      subscriptionId: null,
+      subscriptionOrderId: null,
+    });
+
+    const res = await handleCancelSubscription(
+      makeRequest("Bearer valid_user_token"),
+      { client: mockMpClient }
+    );
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/Não foi possível localizar o identificador da assinatura/);
+
+    // Garante que o usuário NÃO foi rebaixado sem cancelar no Mercado Pago
+    const updatedProfile = await usersRepo.getUserProfile(userId);
+    expect(updatedProfile?.plano).toBe("pro");
+  });
+
+  it("não rebaixa o usuário nem cancela o pedido se o cancelamento no Mercado Pago falhar", async () => {
+    const userId = "usr_pro_subscriber";
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "pro@exemplo.com" },
+      status: "paid",
+      externalPaymentId: "preapp_fails",
+      createdAt: Date.now() - 3600000,
+    });
+
+    usersRepo.setUserProfile(userId, {
+      plano: "pro",
+      email: "pro@exemplo.com",
+      subscriptionId: "preapp_fails",
+      subscriptionOrderId: order.id,
+    });
+
+    const failingClient: IMercadoPagoClient = {
+      ...mockMpClient,
+      cancelPreapproval: async () => {
+        throw new Error("Mercado Pago API indisponível");
+      },
+    };
+
+    const res = await handleCancelSubscription(
+      makeRequest("Bearer valid_user_token"),
+      { client: failingClient }
+    );
+
+    expect(res.status).toBe(500);
+
+    // O usuário continua no plano Pro e o pedido continua paid
+    const updatedProfile = await usersRepo.getUserProfile(userId);
+    expect(updatedProfile?.plano).toBe("pro");
+
+    const updatedOrder = await ordersRepo.getOrder(order.id!);
+    expect(updatedOrder?.status).toBe("paid");
+  });
 });

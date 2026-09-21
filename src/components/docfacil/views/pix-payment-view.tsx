@@ -141,7 +141,7 @@ export function PixPaymentView() {
           return;
         }
 
-        if (status.status === "failed" || status.status === "refunded") {
+        if (status.status === "failed" || status.status === "refunded" || status.status === "cancelled") {
           setPaymentState("failed");
           return;
         }

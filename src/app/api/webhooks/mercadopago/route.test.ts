@@ -753,5 +753,103 @@ describe("POST /api/webhooks/mercadopago", () => {
     expect(userProfile?.subscriptionOrderId).toBe("ord_B_active");
     expect(userProfile?.subscriptionId).toBe("sub_B_active");
   });
+
+  it("ativa entitlement Pro no perfil antes de marcar o pedido como paid no webhook authorized de preapproval", async () => {
+    const userId = "usr_pro_entitlement_order";
+    usersRepo.setUserProfile(userId, {
+      plano: "gratis",
+      email: "order_first@docfacil.com.br",
+    });
+
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "order_first@docfacil.com.br" },
+      status: "pending",
+      createdAt: Date.now() - 10000,
+    });
+
+    let profileWasProWhenOrderBecamePaid = false;
+    const originalMarkOrderPaid = ordersRepo.markOrderPaid.bind(ordersRepo);
+    ordersRepo.markOrderPaid = async (orderId) => {
+      const p = await usersRepo.getUserProfile(userId);
+      if (p?.plano === "pro") {
+        profileWasProWhenOrderBecamePaid = true;
+      }
+      return originalMarkOrderPaid(orderId);
+    };
+
+    mockMpClient = createTestMpClient({
+      getPreapproval: async () => ({
+        id: "preapp_order_test_123",
+        status: "authorized",
+        external_reference: order.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("sub_preapp_order_123", {
+      action: "created",
+      data: { id: "sub_preapp_order_123" },
+      type: "subscription_preapproval",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+    expect(profileWasProWhenOrderBecamePaid).toBe(true);
+
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.plano).toBe("pro");
+    expect(userProfile?.subscriptionId).toBe("preapp_order_test_123");
+  });
+
+  it("armazena externalPaymentId do pedido como subscriptionId no perfil quando evento payment chega antes de preapproval", async () => {
+    const userId = "usr_pro_early_payment";
+    usersRepo.setUserProfile(userId, {
+      plano: "gratis",
+      email: "early_payment@docfacil.com.br",
+    });
+
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "early_payment@docfacil.com.br" },
+      status: "pending",
+      externalPaymentId: "preapp_created_at_checkout_456",
+      createdAt: Date.now() - 15000,
+    });
+
+    mockMpClient = createTestMpClient({
+      getPayment: async (id) => ({
+        id: Number(id) || 445566,
+        status: "approved",
+        external_reference: order.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("pay_early_sub_payment", {
+      action: "payment.created",
+      data: { id: "pay_early_sub_payment" },
+      type: "payment",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.plano).toBe("pro");
+    // O subscriptionId foi recuperado com sucesso a partir de order.externalPaymentId
+    expect(userProfile?.subscriptionId).toBe("preapp_created_at_checkout_456");
+    expect(userProfile?.subscriptionOrderId).toBe(order.id);
+  });
 });
 

@@ -72,7 +72,7 @@ export interface StatusRequestInput extends GuestContactInput {
 
 export interface CheckoutStatusResult {
   orderId: string;
-  status: "pending" | "paid" | "reserved" | "consumed" | "failed" | "refunded";
+  status: "pending" | "paid" | "reserved" | "consumed" | "failed" | "cancelled" | "refunded";
   product: "avulso" | "pro";
   method?: "pix" | "credit_card";
   amountCents: number;

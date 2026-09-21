@@ -95,19 +95,11 @@ export async function handleMercadoPagoWebhook(
               order.status === 'pending' || order.status === 'failed';
             const isPaid = order.status === 'paid';
 
-            if (isPendingOrFailed) {
-              await repos.orders.markOrderPaid(orderId);
-              await repos.orders.updateOrder(orderId, {
-                externalPaymentId: String(payment.id),
-                paidAt: payment.date_approved
-                  ? Date.parse(payment.date_approved)
-                  : Date.now(),
-              });
-            }
-
             // Apenas pedidos Pro ativos/elegíveis (não cancelados nem consumidos) podem conceder
             // ou restaurar entitlement, evitando que notificações atrasadas de pagamentos reativem
             // assinaturas canceladas ou sobrescrevam assinaturas ativas mais novas.
+            // Executamos a concessão ANTES de marcar o pedido como pago para que qualquer consumidor
+            // de polling (ex: tela de retorno) que veja order.status === 'paid' já encontre o perfil Pro ativado.
             if (
               order.product === 'pro' &&
               order.buyer.type === 'user' &&
@@ -124,10 +116,20 @@ export async function handleMercadoPagoWebhook(
                 await setServerUserPlan(
                   order.buyer.userId,
                   'pro',
-                  currentProfile?.subscriptionId || null,
+                  currentProfile?.subscriptionId || order.externalPaymentId || null,
                   orderId
                 );
               }
+            }
+
+            if (isPendingOrFailed) {
+              await repos.orders.markOrderPaid(orderId);
+              await repos.orders.updateOrder(orderId, {
+                externalPaymentId: String(payment.id),
+                paidAt: payment.date_approved
+                  ? Date.parse(payment.date_approved)
+                  : Date.now(),
+              });
             }
           } else if (
             (payment.status === 'rejected' || payment.status === 'cancelled') &&
@@ -152,14 +154,6 @@ export async function handleMercadoPagoWebhook(
         const order = await repos.orders.getOrder(orderId);
 
         if (order) {
-          if (order.status === 'pending' || order.status === 'cancelled' || order.status === 'failed') {
-            await repos.orders.markOrderPaid(orderId);
-            await repos.orders.updateOrder(orderId, {
-              externalPaymentId: preapproval.id,
-              paidAt: Date.now(),
-            });
-          }
-
           if (order.product === 'pro' && order.buyer.type === 'user') {
             const currentProfile = await repos.users.getUserProfile(order.buyer.userId);
             const hasDifferentActiveSubscription =
@@ -175,6 +169,14 @@ export async function handleMercadoPagoWebhook(
                 orderId
               );
             }
+          }
+
+          if (order.status === 'pending' || order.status === 'cancelled' || order.status === 'failed') {
+            await repos.orders.markOrderPaid(orderId);
+            await repos.orders.updateOrder(orderId, {
+              externalPaymentId: preapproval.id,
+              paidAt: Date.now(),
+            });
           }
         }
       } else if (

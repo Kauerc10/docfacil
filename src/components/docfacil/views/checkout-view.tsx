@@ -261,7 +261,7 @@ export function CheckoutView() {
             return;
           }
 
-          if (status.status === "failed") {
+          if (status.status === "failed" || status.status === "cancelled") {
             setVerifyingPayment(false);
             toast.error("O pagamento não foi aprovado ou foi cancelado no Mercado Pago.", {
               description: "Você pode tentar novamente com outro cartão ou via Pix.",

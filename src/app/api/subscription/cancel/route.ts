@@ -29,14 +29,28 @@ export async function handleCancelSubscription(
       );
     }
 
-    const subscriptionId = profile.subscriptionId;
-    if (subscriptionId) {
-      if (deps.client) {
-        await deps.client.cancelPreapproval(subscriptionId);
-      } else if (!subscriptionId.startsWith('demo_')) {
-        const client = new MercadoPagoClient();
-        await client.cancelPreapproval(subscriptionId);
+    let subscriptionId = profile.subscriptionId;
+
+    if (!subscriptionId && profile.subscriptionOrderId) {
+      const order = await repos.orders.getOrder(profile.subscriptionOrderId);
+      if (order?.externalPaymentId) {
+        subscriptionId = order.externalPaymentId;
       }
+    }
+
+    if (!subscriptionId) {
+      throw new BackendError(
+        'INVALID_REQUEST',
+        400,
+        'Não foi possível localizar o identificador da assinatura no Mercado Pago para cancelamento. Entre em contato com o suporte.'
+      );
+    }
+
+    if (deps.client) {
+      await deps.client.cancelPreapproval(subscriptionId);
+    } else if (!subscriptionId.startsWith('demo_')) {
+      const client = new MercadoPagoClient();
+      await client.cancelPreapproval(subscriptionId);
     }
 
     if (profile.subscriptionOrderId) {
