@@ -161,22 +161,32 @@ export async function handleMercadoPagoWebhook(
               Boolean(currentProfile.subscriptionId) &&
               currentProfile.subscriptionId !== preapproval.id;
 
-            if (!hasDifferentActiveSubscription) {
+            if (hasDifferentActiveSubscription) {
+              // Se o usuário já possui outra assinatura Pro ativa B, a assinatura A é conflitante/substituída.
+              // Cancela a assinatura A no Mercado Pago para não cobrar o cliente duplamente todo mês
+              // e atualiza o pedido A como cancelled sem rebaixar o plano ou marcar como pago.
+              const client = deps.client || new MercadoPagoClient();
+              await client.cancelPreapproval(preapproval.id).catch(() => undefined);
+              await repos.orders.updateOrder(orderId, {
+                status: 'cancelled',
+                externalPaymentId: preapproval.id,
+              }).catch(() => undefined);
+            } else {
               await setServerUserPlan(
                 order.buyer.userId,
                 'pro',
                 preapproval.id,
                 orderId
               );
-            }
-          }
 
-          if (order.status === 'pending' || order.status === 'cancelled' || order.status === 'failed') {
-            await repos.orders.markOrderPaid(orderId);
-            await repos.orders.updateOrder(orderId, {
-              externalPaymentId: preapproval.id,
-              paidAt: Date.now(),
-            });
+              if (order.status === 'pending' || order.status === 'cancelled' || order.status === 'failed') {
+                await repos.orders.markOrderPaid(orderId);
+                await repos.orders.updateOrder(orderId, {
+                  externalPaymentId: preapproval.id,
+                  paidAt: Date.now(),
+                });
+              }
+            }
           }
         }
       } else if (
@@ -193,13 +203,23 @@ export async function handleMercadoPagoWebhook(
 
           if (order.product === 'pro' && order.buyer.type === 'user') {
             const currentProfile = await repos.users.getUserProfile(order.buyer.userId);
+            const hasDifferentPending =
+              Boolean(currentProfile?.pendingProOrderId) &&
+              currentProfile?.pendingProOrderId !== orderId;
+
             const isCurrentSubscription =
               (currentProfile?.subscriptionId && currentProfile.subscriptionId === preapproval.id) ||
               (currentProfile?.subscriptionOrderId && currentProfile.subscriptionOrderId === orderId) ||
-              (!currentProfile?.subscriptionId && !currentProfile?.subscriptionOrderId);
+              (!currentProfile?.subscriptionId && !currentProfile?.subscriptionOrderId && !hasDifferentPending);
 
             if (isCurrentSubscription) {
-              await setServerUserPlan(order.buyer.userId, 'gratis', null, null);
+              await setServerUserPlan(
+                order.buyer.userId,
+                'gratis',
+                null,
+                null,
+                hasDifferentPending
+              );
             }
           }
         }

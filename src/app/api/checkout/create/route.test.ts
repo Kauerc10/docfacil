@@ -315,7 +315,7 @@ describe("POST /api/checkout/create", () => {
     expect(data2.checkoutUrl).toBe("https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=mp_sub_retry");
   });
 
-  it("libera a reserva pendente se a persistência do pedido falhar após createSubscription ter sucesso", async () => {
+  it("preserva a reserva e recupera a persistência com retentativa quando createSubscription tiver sucesso", async () => {
     usersRepo.setUserProfile("usr_123", {
       plano: "gratis",
       email: "usuario@exemplo.com",
@@ -326,27 +326,25 @@ describe("POST /api/checkout/create", () => {
     ordersRepo.updateOrder = async (orderId, updates) => {
       if (failUpdateOnce && updates.checkoutUrl) {
         failUpdateOnce = false;
-        throw new Error("Falha simulada no Firestore ao atualizar pedido com checkoutUrl");
+        throw new Error("Falha simulada transitória no Firestore ao atualizar pedido com checkoutUrl");
       }
       return originalUpdateOrder(orderId, updates);
     };
 
-    const res1 = await POST(
+    const res = await POST(
       makeRequest({ product: "pro" }, "Bearer valid_user_token")
     );
-    expect(res1.status).toBe(500);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.checkoutUrl).toContain("mercadopago");
 
-    // A reserva pendente foi liberada e não bloqueia novas tentativas
-    const profileAfterFail = await usersRepo.getUserProfile("usr_123");
-    expect(profileAfterFail?.pendingProOrderId).toBeFalsy();
+    // O pedido NÃO foi marcado como failed e a reserva do pedido original permaneceu intacta
+    const profile = await usersRepo.getUserProfile("usr_123");
+    expect(profile?.pendingProOrderId).toBe(data.orderId);
 
-    // A próxima tentativa consegue adquirir a trava e concluir o checkout com sucesso
-    const res2 = await POST(
-      makeRequest({ product: "pro" }, "Bearer valid_user_token")
-    );
-    expect(res2.status).toBe(200);
-    const data2 = await res2.json();
-    expect(data2.checkoutUrl).toContain("mercadopago");
+    const order = await ordersRepo.getOrder(data.orderId);
+    expect(order?.status).toBe("pending");
+    expect(order?.checkoutUrl).toBe(data.checkoutUrl);
   });
 
   it("mantém a reserva viva quando outra requisição concorrente aguarda chamada em andamento ao provedor (< 60s), retornando 409 sem invalidar a primeira", async () => {

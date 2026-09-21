@@ -513,13 +513,18 @@ describe("POST /api/webhooks/mercadopago", () => {
       subscriptionOrderId: orderNew.id,
     });
 
-    // Webhook de retomada da assinatura antiga A
+    // Webhook de retomada da assinatura antiga A quando B já está ativa
+    let cancelledConflictingId = "";
     mockMpClient = createTestMpClient({
       getPreapproval: async (id) => ({
         id: "preapp_A",
         status: "authorized",
         external_reference: orderOld.id,
       }),
+      cancelPreapproval: async (id) => {
+        cancelledConflictingId = id;
+        return { id, status: "cancelled" } as any;
+      },
     });
 
     const req = makeWebhookRequest("preapp_A", {
@@ -535,9 +540,12 @@ describe("POST /api/webhooks/mercadopago", () => {
 
     expect(res.status).toBe(200);
 
-    // O pedido antigo pode ir para paid no histórico
+    // A assinatura conflitante A é cancelada no Mercado Pago para não gerar cobrança duplicada
+    expect(cancelledConflictingId).toBe("preapp_A");
+
+    // O pedido antigo A é marcado como cancelled
     const updatedOldOrder = await ordersRepo.getOrder(orderOld.id!);
-    expect(updatedOldOrder?.status).toBe("paid");
+    expect(updatedOldOrder?.status).toBe("cancelled");
 
     // Mas os ponteiros do usuário PERMANECEM apontando para a assinatura B ativa!
     const userProfile = await usersRepo.getUserProfile(userId);
@@ -850,6 +858,52 @@ describe("POST /api/webhooks/mercadopago", () => {
     // O subscriptionId foi recuperado com sucesso a partir de order.externalPaymentId
     expect(userProfile?.subscriptionId).toBe("preapp_created_at_checkout_456");
     expect(userProfile?.subscriptionOrderId).toBe(order.id);
+  });
+
+  it("não limpa a reserva pendente de uma assinatura de substituição B ao receber webhook de cancelamento da assinatura A", async () => {
+    const userId = "usr_pro_replacement";
+    const orderA = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "replacement@docfacil.com.br" },
+      status: "cancelled",
+      createdAt: Date.now() - 60000,
+    });
+
+    // Usuário já cancelou A e iniciou o checkout para a assinatura B
+    usersRepo.setUserProfile(userId, {
+      plano: "gratis",
+      email: "replacement@docfacil.com.br",
+      subscriptionId: null,
+      subscriptionOrderId: null,
+      pendingProOrderId: "order_B_pending",
+    });
+
+    mockMpClient = createTestMpClient({
+      getPreapproval: async () => ({
+        id: "preapp_A_cancelled",
+        status: "cancelled",
+        external_reference: orderA.id,
+      }),
+    });
+
+    const req = makeWebhookRequest("preapp_A_cancelled", {
+      action: "updated",
+      data: { id: "preapp_A_cancelled" },
+      type: "subscription_preapproval",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    expect(res.status).toBe(200);
+
+    // A reserva pendente da assinatura B NÃO foi apagada
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.pendingProOrderId).toBe("order_B_pending");
   });
 });
 

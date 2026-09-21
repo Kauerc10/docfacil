@@ -266,15 +266,35 @@ export async function POST(req: Request) {
           },
           completionUrl,
         });
+      } catch (err) {
+        // Falha antes de criar a assinatura externa: libera a trava com segurança
+        await repos.users.releasePendingProSubscription(user.userId, order.id).catch(() => undefined);
+        await repos.orders.updateOrder(order.id, { status: 'failed' }).catch(() => undefined);
+        throw err;
+      }
 
+      // createSubscription teve sucesso: a assinatura recorrente já existe no Mercado Pago!
+      // Atualizamos o pedido com checkoutUrl e externalPaymentId, retentando em caso de falha transitória.
+      // Nunca marcamos o pedido como failed nem liberamos a trava, garantindo que o estado do provedor
+      // seja retido e nenhuma segunda assinatura recorrente seja criada em novas requisições.
+      try {
         await repos.orders.updateOrder(order.id, {
           checkoutUrl: result.checkoutUrl,
           externalPaymentId: result.providerCheckoutId,
         });
-      } catch (err) {
-        await repos.users.releasePendingProSubscription(user.userId, order.id).catch(() => undefined);
-        await repos.orders.updateOrder(order.id, { status: 'failed' }).catch(() => undefined);
-        throw err;
+      } catch {
+        for (let i = 0; i < 3; i++) {
+          await new Promise((r) => setTimeout(r, 100));
+          try {
+            await repos.orders.updateOrder(order.id, {
+              checkoutUrl: result.checkoutUrl,
+              externalPaymentId: result.providerCheckoutId,
+            });
+            break;
+          } catch {
+            // retry
+          }
+        }
       }
 
       return NextResponse.json(

@@ -20,7 +20,8 @@ export async function setServerUserPlan(
   userId: string,
   plan: "gratis" | "pro",
   subscriptionId?: string | null,
-  subscriptionOrderId?: string | null
+  subscriptionOrderId?: string | null,
+  preservePendingOrder: boolean = false
 ): Promise<void> {
   const env = getServerEnv();
   const isUnitTestWithoutEmulator =
@@ -37,7 +38,7 @@ export async function setServerUserPlan(
   if (subscriptionOrderId !== undefined) {
     dataToSet.subscriptionOrderId = subscriptionOrderId;
   }
-  if (plan === "pro" || plan === "gratis") {
+  if (!preservePendingOrder && (plan === "pro" || plan === "gratis")) {
     dataToSet.pendingProOrderId = null;
   }
 
@@ -58,7 +59,9 @@ export async function setServerUserPlan(
       plano: plan,
       ...(subscriptionId !== undefined ? { subscriptionId } : {}),
       ...(subscriptionOrderId !== undefined ? { subscriptionOrderId } : {}),
-      ...((plan === "pro" || plan === "gratis") ? { pendingProOrderId: null } : {}),
+      ...(!preservePendingOrder && (plan === "pro" || plan === "gratis")
+        ? { pendingProOrderId: null }
+        : {}),
     });
   }
 }
