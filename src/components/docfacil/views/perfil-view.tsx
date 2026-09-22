@@ -29,6 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { getPerfil, listPagamentos } from "@/lib/services/users-service";
+import { apiFetch } from "@/lib/auth/api-fetch";
 import { PLAN_BILLING_DESC } from "@/lib/pricing";
 import type { Pagamento, PerfilUsuario } from "@/lib/types";
 
@@ -97,7 +98,7 @@ export function PerfilView() {
 
 function PerfilContent() {
   const { navigate } = useNav();
-  const { user, updateProfileData } = useAuth();
+  const { user, updateProfileData, refreshProfile } = useAuth();
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -107,6 +108,8 @@ function PerfilContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelMsg, setCancelMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -155,15 +158,45 @@ function PerfilContent() {
     }
   }
 
-  function handleCancelSubscription() {
-    const proximaData = new Date();
-    proximaData.setMonth(proximaData.getMonth() + 1);
-    const fmt = proximaData.toLocaleDateString("pt-BR");
-    setCancelMsg(`Assinatura cancelada. Você manterá acesso até ${fmt}.`);
-    toast.success("Assinatura cancelada. Sem multas, sem burocracia.");
+  async function handleCancelSubscription() {
+    if (!user || cancelling) return;
+    setCancelling(true);
+    try {
+      const res = await apiFetch("/api/subscription/cancel", {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.error?.message || data.message || "Erro ao cancelar assinatura."
+        );
+      }
+      await refreshProfile();
+      const updatedPerfil = await getPerfil(user.uid);
+      setPerfil(updatedPerfil);
+      setConfirmOpen(false);
+      setCancelMsg("Assinatura cancelada com sucesso. Você não terá novas cobranças.");
+      toast.success("Assinatura cancelada com sucesso. Sem multas, sem burocracia.");
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível cancelar sua assinatura. Tente novamente."
+      );
+    } finally {
+      setCancelling(false);
+    }
   }
 
   const plano = perfil?.plano ?? user?.plano ?? "gratis";
+  const subscriptionStatus = perfil?.subscriptionStatus ?? user?.subscriptionStatus;
+  const subscriptionExpiresAt = perfil?.subscriptionExpiresAt ?? user?.subscriptionExpiresAt;
+  const isCancelledWithPendingAccess =
+    plano === "pro" &&
+    subscriptionStatus === "cancelled" &&
+    Boolean(subscriptionExpiresAt && subscriptionExpiresAt > Date.now());
+
   const initials = (nome || user?.nome || "U")
     .trim()
     .split(/\s+/)
@@ -307,16 +340,27 @@ function PerfilContent() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--selo-green)]">
-                    Plano atual
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--selo-green)]">
+                      Plano atual
+                    </p>
+                    {isCancelledWithPendingAccess && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                        Cancelamento agendado
+                      </span>
+                    )}
+                  </div>
                   <h2
                     id="perfil-plano-heading"
                     className="mt-1 font-[family-name:var(--font-jakarta)] text-2xl font-extrabold text-ink"
                   >
                     Plano {PLANO_LABEL[plano]}
                   </h2>
-                  <p className="mt-1 text-sm text-ink/65">{PLANO_PRICE[plano]}</p>
+                  <p className="mt-1 text-sm text-ink/65">
+                    {isCancelledWithPendingAccess
+                      ? `Acesso Pro garantido até ${new Date(subscriptionExpiresAt!).toLocaleDateString("pt-BR")}`
+                      : PLANO_PRICE[plano]}
+                  </p>
                 </div>
                 <CreditCard
                   className="w-7 h-7 text-[var(--blue-royal)] shrink-0"
@@ -379,19 +423,36 @@ function PerfilContent() {
                 Cancelar assinatura
               </h2>
               <p className="mt-2 text-sm text-ink/65 leading-relaxed text-pretty">
-                Você manterá acesso até o fim do período já pago. Sem multas, sem burocracia.
+                Sua conta voltará ao plano Grátis ao final do ciclo pago e você não terá novas cobranças recorrentes. Sem multas, sem burocracia.
               </p>
 
               {plano !== "pro" ? (
                 <p className="mt-4 text-sm text-ink/50 italic">
                   Você não tem uma assinatura Pro ativa para cancelar.
                 </p>
+              ) : isCancelledWithPendingAccess ? (
+                <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-4">
+                  <p className="text-sm text-amber-900 font-medium">
+                    Cancelamento agendado — acesso Pro ativo até{" "}
+                    <span className="font-bold">
+                      {new Date(subscriptionExpiresAt!).toLocaleDateString("pt-BR")}
+                    </span>
+                    .
+                  </p>
+                  <p className="mt-1 text-xs text-amber-700">
+                    Nenhuma nova cobrança recorrente será realizada. Seu acesso completo permanece disponível durante todo o período mensal já pago.
+                  </p>
+                </div>
+              ) : subscriptionStatus === "cancelled" ? (
+                <p className="mt-4 text-sm text-ink/50 italic">
+                  Sua assinatura Pro expirou e nenhuma nova cobrança será realizada.
+                </p>
               ) : cancelMsg ? (
                 <p className="mt-4 text-sm text-[var(--selo-green)] font-medium">
                   Sua assinatura já foi cancelada.
                 </p>
               ) : (
-                <AlertDialog>
+                <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                   <AlertDialogTrigger asChild>
                     <button
                       type="button"
@@ -404,17 +465,20 @@ function PerfilContent() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Cancelar assinatura do Plano Pro?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Você continuará com acesso até o fim do período já pago. Depois disso, sua conta voltará ao plano Grátis automaticamente. Sem multas, sem burocracia.
+                        Você não terá novas cobranças recorrentes. Seu acesso Pro continuará ativo até o fim do período mensal já pago, voltando ao plano Grátis em seguida.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Manter assinatura</AlertDialogCancel>
-                      <AlertDialogAction
+                      <AlertDialogCancel disabled={cancelling}>Manter assinatura</AlertDialogCancel>
+                      <button
+                        type="button"
                         onClick={handleCancelSubscription}
-                        className="bg-[var(--coral)] text-white hover:bg-[var(--coral-hover)]"
+                        disabled={cancelling}
+                        className="inline-flex items-center justify-center rounded-md text-sm font-medium px-4 py-2 bg-[var(--coral)] text-white hover:bg-[var(--coral-hover)] disabled:opacity-60 transition"
                       >
-                        Sim, cancelar
-                      </AlertDialogAction>
+                        {cancelling && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        {cancelling ? "Cancelando..." : "Sim, cancelar"}
+                      </button>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>

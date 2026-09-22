@@ -95,10 +95,43 @@ export interface IGenerationRequestsRepository {
   markFailed(requestId: string, errorCode: string): Promise<void>;
 }
 
+export interface UserProfileRecord {
+  plano?: string;
+  email?: string;
+  nome?: string;
+  subscriptionId?: string | null;
+  subscriptionOrderId?: string | null;
+  pendingProOrderId?: string | null;
+  pendingProCheckoutUrl?: string | null;
+  pendingProExternalPaymentId?: string | null;
+  subscriptionStatus?: "active" | "cancelled";
+  subscriptionExpiresAt?: number | null;
+  cancelledAt?: number | null;
+}
+
+export type ReservePendingProSubscriptionResult =
+  | { status: "active_pro" }
+  | { status: "existing_pending"; orderId: string }
+  | { status: "acquired" };
+
 export interface IUsersRepository {
   getUserProfile(
     userId: string
-  ): Promise<{ plano?: string; email?: string; nome?: string } | null>;
+  ): Promise<UserProfileRecord | null>;
+  reservePendingProSubscription(
+    userId: string,
+    orderId: string
+  ): Promise<ReservePendingProSubscriptionResult>;
+  releasePendingProSubscription(
+    userId: string,
+    orderId: string
+  ): Promise<void>;
+  savePendingProSubscriptionResult?(
+    userId: string,
+    orderId: string,
+    checkoutUrl: string,
+    externalPaymentId: string
+  ): Promise<void>;
 }
 
 export interface CommitGeneratedArtifactInput {

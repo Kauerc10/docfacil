@@ -11,7 +11,7 @@ import {
   type CheckoutPixPayload,
 } from "./pix-payment-session";
 
-export type CheckoutProvider = "mercadopago" | "demo" | "kirvano" | "perfectpay" | "stripe";
+export type CheckoutProvider = "mercadopago" | "demo";
 export type CheckoutPlan = PaidPlan;
 export type CheckoutMethod = "pix" | "card" | "credit_card";
 
@@ -72,7 +72,7 @@ export interface StatusRequestInput extends GuestContactInput {
 
 export interface CheckoutStatusResult {
   orderId: string;
-  status: "pending" | "paid" | "reserved" | "consumed" | "failed" | "refunded";
+  status: "pending" | "paid" | "reserved" | "consumed" | "failed" | "cancelled" | "refunded";
   product: "avulso" | "pro";
   method?: "pix" | "credit_card";
   amountCents: number;
@@ -205,10 +205,10 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
     }
 
     const data = await res.json();
-    const baseSuccessUrl =
-      params.successUrl ||
-      `${typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}/?view=sucesso`;
-    const successUrl = buildCheckoutReturnUrl(baseSuccessUrl, data.order.id);
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const demoUrl = new URL(params.successUrl || "/?view=sucesso", origin);
+    demoUrl.searchParams.set("view", "sucesso");
+    const successUrl = buildCheckoutReturnUrl(demoUrl.toString(), data.order.id);
 
     return {
       kind: "redirect",

@@ -72,10 +72,38 @@ export interface MercadoPagoPreferenceResponse {
   sandbox_init_point: string;
 }
 
+export interface MercadoPagoPreapprovalPayload {
+  reason: string;
+  auto_recurring: {
+    frequency: number;
+    frequency_type: 'months' | 'days';
+    transaction_amount: number;
+    currency_id: 'BRL';
+  };
+  payer_email: string;
+  back_url: string;
+  external_reference: string;
+  status?: string;
+}
+
+export interface MercadoPagoPreapprovalResponse {
+  id: string;
+  init_point?: string;
+  sandbox_init_point?: string;
+  status: 'pending' | 'authorized' | 'paused' | 'cancelled';
+  reason?: string;
+  external_reference?: string;
+  payer_email?: string;
+  next_payment_date?: string;
+}
+
 export interface IMercadoPagoClient {
   createPayment(payload: MercadoPagoPaymentPayload): Promise<MercadoPagoPaymentResponse>;
   getPayment(id: string | number): Promise<MercadoPagoPaymentResponse>;
   createPreference(payload: MercadoPagoPreferencePayload): Promise<MercadoPagoPreferenceResponse>;
+  createPreapproval(payload: MercadoPagoPreapprovalPayload, idempotencyKey?: string): Promise<MercadoPagoPreapprovalResponse>;
+  getPreapproval(id: string): Promise<MercadoPagoPreapprovalResponse>;
+  cancelPreapproval(id: string): Promise<MercadoPagoPreapprovalResponse>;
 }
 
 export class MercadoPagoClient implements IMercadoPagoClient {
@@ -137,6 +165,30 @@ export class MercadoPagoClient implements IMercadoPagoClient {
     return this.request<MercadoPagoPreferenceResponse>('/checkout/preferences', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  }
+
+  public async createPreapproval(
+    payload: MercadoPagoPreapprovalPayload,
+    idempotencyKey?: string
+  ): Promise<MercadoPagoPreapprovalResponse> {
+    return this.request<MercadoPagoPreapprovalResponse>('/preapproval', {
+      method: 'POST',
+      headers: idempotencyKey ? { 'X-Idempotency-Key': idempotencyKey } : undefined,
+      body: JSON.stringify(payload),
+    });
+  }
+
+  public async getPreapproval(id: string): Promise<MercadoPagoPreapprovalResponse> {
+    return this.request<MercadoPagoPreapprovalResponse>(`/preapproval/${id}`, {
+      method: 'GET',
+    });
+  }
+
+  public async cancelPreapproval(id: string): Promise<MercadoPagoPreapprovalResponse> {
+    return this.request<MercadoPagoPreapprovalResponse>(`/preapproval/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'cancelled' }),
     });
   }
 }

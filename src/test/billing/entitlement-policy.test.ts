@@ -8,6 +8,8 @@ import {
   evaluateCreationEntitlement,
   canCreateDocument,
   remainingDocumentsThisMonth,
+  isPro,
+  getPlan,
 } from "@/lib/billing/entitlement-policy";
 import { FREE_MONTHLY_LIMIT } from "@/lib/document-access-policy";
 
@@ -164,5 +166,37 @@ describe("entitlement-policy: avaliação de elegibilidade e cotas de criação"
     expect(canCreateDocument({ plano: "gratis" }, 0, "procuracao-simples")).toBe(false);
     expect(canCreateDocument({ plano: "gratis" }, 1, "declaracao-residencia")).toBe(false);
     expect(canCreateDocument({ plano: "pro" }, 5, "procuracao-simples")).toBe(true);
+  });
+
+  it("isPro e getPlan consideram plano Pro expirado quando subscriptionExpiresAt está no passado", () => {
+    const now = 1770000000000;
+    const future = now + 100000;
+    const past = now - 100000;
+
+    expect(isPro({ plano: "pro", subscriptionExpiresAt: future }, now)).toBe(true);
+    expect(isPro({ plano: "pro", subscriptionExpiresAt: past }, now)).toBe(false);
+    expect(isPro({ plano: "pro", subscriptionExpiresAt: null }, now)).toBe(true);
+
+    expect(getPlan({ plano: "pro", subscriptionExpiresAt: future }, now)).toBe("pro");
+    expect(getPlan({ plano: "pro", subscriptionExpiresAt: past }, now)).toBe("gratis");
+  });
+
+  it("evaluateCreationEntitlement bloqueia acesso Pro e aplica cota grátis quando plano Pro expirou", () => {
+    const now = 1770000000000;
+    const past = now - 100000;
+
+    const res = evaluateCreationEntitlement({
+      isUserLoggedIn: true,
+      userPlan: "pro",
+      subscriptionExpiresAt: past,
+      modelSlug: "declaracao-residencia",
+      monthDocCount: 0,
+      now,
+    });
+
+    // Como o Pro expirou, cai para a regra do plano grátis (declaracao-residencia é gratuito no mês)
+    expect(res.allowed).toBe(true);
+    expect(res.entitlement).toBe("free");
+    expect(res.watermarked).toBe(true);
   });
 });

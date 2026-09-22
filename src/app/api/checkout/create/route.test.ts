@@ -1,19 +1,34 @@
-import { describe, expect, it, beforeEach } from "bun:test";
-import { POST } from "./route";
+import { describe, expect, it, beforeEach, afterEach } from "bun:test";
+import { POST, handleCreateCheckout } from "./route";
 import { setRepositoriesForTesting } from "@/lib/server/firestore/repositories";
 import { InMemoryOrdersRepository, InMemoryUsersRepository } from "@/lib/server/firestore/in-memory-repositories";
 import { setBillingProviderForTesting, type BillingProvider } from "@/lib/server/billing/provider";
+import { setAdminAuthForTesting } from "@/lib/server/firebase-admin";
 
 describe("POST /api/checkout/create", () => {
   let ordersRepo: InMemoryOrdersRepository;
+  let usersRepo: InMemoryUsersRepository;
   let mockProvider: BillingProvider;
 
   beforeEach(() => {
     ordersRepo = new InMemoryOrdersRepository(true);
+    usersRepo = new InMemoryUsersRepository(true);
     setRepositoriesForTesting({
       orders: ordersRepo,
-      users: new InMemoryUsersRepository(true),
+      users: usersRepo,
     });
+
+    setAdminAuthForTesting({
+      verifyIdToken: async (token: string) => {
+        if (token === "valid_user_token") {
+          return {
+            uid: "usr_123",
+            email: "usuario@exemplo.com",
+          } as any;
+        }
+        throw new Error("Invalid token");
+      },
+    } as any);
 
     mockProvider = {
       createOneTimePayment: async (input) => ({
@@ -34,6 +49,10 @@ describe("POST /api/checkout/create", () => {
       }),
     };
     setBillingProviderForTesting(mockProvider);
+  });
+
+  afterEach(() => {
+    setAdminAuthForTesting(null);
   });
 
   function makeRequest(body: any, authHeader?: string): Request {
@@ -101,5 +120,424 @@ describe("POST /api/checkout/create", () => {
     expect(savedOrder?.status).toBe("pending");
     expect(savedOrder?.amountCents).toBe(1990);
     expect(savedOrder?.brCode).toBe(data.pix.brCode);
+  });
+
+  it("cria pedido avulso com cartão de crédito retornando redirect e checkoutUrl", async () => {
+    let capturedMethod: string | undefined;
+    mockProvider.createOneTimePayment = async (input) => {
+      capturedMethod = input.method;
+      return {
+        kind: "hosted",
+        providerCheckoutId: "pref_card_123",
+        providerStatus: "pending",
+        checkoutUrl: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_card_123",
+        devMode: true,
+      };
+    };
+
+    const res = await POST(
+      makeRequest({
+        product: "avulso",
+        method: "credit_card",
+        guestContact: {
+          email: "cartao@exemplo.com",
+          phone: "11999998888",
+        },
+      })
+    );
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.kind).toBe("redirect");
+    expect(data.checkoutUrl).toContain("pref_card_123");
+    expect(capturedMethod).toBe("credit_card");
+
+    const savedOrder = await ordersRepo.getOrder(data.orderId);
+    expect(savedOrder?.checkoutUrl).toContain("pref_card_123");
+  });
+
+  it("força view=checkout na completionUrl mesmo quando caller envia view=sucesso", async () => {
+    let capturedCompletionUrl: string | undefined;
+    mockProvider.createSubscription = async (input) => {
+      capturedCompletionUrl = input.completionUrl;
+      return {
+        kind: "hosted",
+        providerCheckoutId: "pref_pro_123",
+        providerStatus: "pending",
+        checkoutUrl: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_pro_123",
+        devMode: true,
+      };
+    };
+
+    const res = await POST(
+      makeRequest(
+        {
+          product: "pro",
+          successUrl: "https://docfacil.com.br/?view=sucesso&slug=locacao-residencial",
+        },
+        "Bearer valid_user_token"
+      )
+    );
+
+    expect(res.status).toBe(200);
+    expect(capturedCompletionUrl).toBeDefined();
+    const parsed = new URL(capturedCompletionUrl!);
+    expect(parsed.searchParams.get("view")).toBe("checkout");
+    expect(parsed.searchParams.get("plan")).toBe("pro");
+    expect(parsed.searchParams.get("billingReturn")).toBe("1");
+    expect(parsed.searchParams.get("slug")).toBe("locacao-residencial");
+    expect(parsed.searchParams.get("orderId")).toBeDefined();
+  });
+
+  it("rejeita compra de plano Pro quando o usuário já possui assinatura Pro ativa com 409 Conflict", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "pro",
+      email: "usuario@exemplo.com",
+    });
+
+    const res = await POST(
+      makeRequest(
+        { product: "pro" },
+        "Bearer valid_user_token"
+      )
+    );
+
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/já possui uma assinatura do Plano Pro ativa/);
+  });
+
+  it("permite novo checkout Pro quando usuário possui plano Pro com assinatura cancelada (re-assinatura)", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "pro",
+      email: "usuario@exemplo.com",
+      subscriptionStatus: "cancelled",
+      subscriptionExpiresAt: Date.now() + 86400000,
+    });
+
+    const res = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.kind).toBe("redirect");
+    expect(data.checkoutUrl).toBeDefined();
+  });
+
+  it("reaproveita pedido Pro pendente e sua URL de checkout sem criar assinatura duplicada", async () => {
+    const existingOrder = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId: "usr_123" },
+      status: "pending",
+      checkoutUrl: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=existing_pref",
+      createdAt: Date.now() - 5000,
+    });
+
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+      pendingProOrderId: existingOrder.id,
+    });
+
+    let subscriptionCreated = false;
+    mockProvider.createSubscription = async () => {
+      subscriptionCreated = true;
+      throw new Error("Should not be called");
+    };
+
+    const res = await POST(
+      makeRequest(
+        { product: "pro" },
+        "Bearer valid_user_token"
+      )
+    );
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.orderId).toBe(existingOrder.id);
+    expect(data.checkoutUrl).toBe("https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=existing_pref");
+    expect(subscriptionCreated).toBe(false);
+  });
+
+  it("protege atomicamente contra chamadas concorrentes ao assinar Pro, criando apenas uma assinatura externa e retornando o mesmo checkout", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+    });
+
+    let calls = 0;
+    mockProvider.createSubscription = async (input) => {
+      calls++;
+      // Simula latência de rede na criação externa
+      await new Promise((r) => setTimeout(r, 100));
+      return {
+        kind: "hosted",
+        providerCheckoutId: `mp_sub_${input.orderId}`,
+        providerStatus: "pending",
+        checkoutUrl: `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=mp_sub_${input.orderId}`,
+        devMode: true,
+      };
+    };
+
+    const [res1, res2] = await Promise.all([
+      POST(makeRequest({ product: "pro" }, "Bearer valid_user_token")),
+      POST(makeRequest({ product: "pro" }, "Bearer valid_user_token")),
+    ]);
+
+    expect(calls).toBe(1);
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+
+    const data1 = await res1.json();
+    const data2 = await res2.json();
+
+    expect(data1.orderId).toBe(data2.orderId);
+    expect(data1.checkoutUrl).toBe(data2.checkoutUrl);
+  });
+
+  it("libera a reserva pendente se a chamada para criar assinatura no provedor falhar", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+    });
+
+    mockProvider.createSubscription = async () => {
+      throw new Error("Mercado Pago API indisponível");
+    };
+
+    const res1 = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+    expect(res1.status).toBe(500);
+
+    const profileAfterFail = await usersRepo.getUserProfile("usr_123");
+    expect(profileAfterFail?.pendingProOrderId).toBeFalsy();
+
+    // Uma nova tentativa agora tem sucesso
+    mockProvider.createSubscription = async (input) => ({
+      kind: "hosted",
+      providerCheckoutId: `mp_sub_retry_${input.orderId}`,
+      providerStatus: "pending",
+      checkoutUrl: `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=mp_sub_retry`,
+      devMode: true,
+    });
+
+    const res2 = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+    expect(res2.status).toBe(200);
+    const data2 = await res2.json();
+    expect(data2.checkoutUrl).toBe("https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=mp_sub_retry");
+  });
+
+  it("preserva a reserva e recupera a persistência com retentativa quando createSubscription tiver sucesso", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+    });
+
+    const originalUpdateOrder = ordersRepo.updateOrder.bind(ordersRepo);
+    let failUpdateOnce = true;
+    ordersRepo.updateOrder = async (orderId, updates) => {
+      if (failUpdateOnce && updates.checkoutUrl) {
+        failUpdateOnce = false;
+        throw new Error("Falha simulada transitória no Firestore ao atualizar pedido com checkoutUrl");
+      }
+      return originalUpdateOrder(orderId, updates);
+    };
+
+    const res = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.checkoutUrl).toContain("mercadopago");
+
+    // O pedido NÃO foi marcado como failed e a reserva do pedido original permaneceu intacta
+    const profile = await usersRepo.getUserProfile("usr_123");
+    expect(profile?.pendingProOrderId).toBe(data.orderId);
+
+    const order = await ordersRepo.getOrder(data.orderId);
+    expect(order?.status).toBe("pending");
+    expect(order?.checkoutUrl).toBe(data.checkoutUrl);
+  });
+
+  it("mantém a reserva viva quando outra requisição concorrente aguarda chamada em andamento ao provedor (< 60s), retornando 409 sem invalidar a primeira", async () => {
+    const liveOrder = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId: "usr_123" },
+      status: "pending",
+      // Sem checkoutUrl ainda, pois a primeira requisição está chamando o gateway
+      createdAt: Date.now() - 2000,
+    });
+
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+      pendingProOrderId: liveOrder.id,
+    });
+
+    const res = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+
+    // Retorna 409 sem cancelar a requisição original
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/já está em andamento/);
+
+    // O pedido original PERMANECE pendente e a reserva no perfil NÃO foi apagada
+    const orderAfter = await ordersRepo.getOrder(liveOrder.id!);
+    expect(orderAfter?.status).toBe("pending");
+
+    const profileAfter = await usersRepo.getUserProfile("usr_123");
+    expect(profileAfter?.pendingProOrderId).toBe(liveOrder.id);
+  });
+
+  it("preserva a reserva para a janela completa de 60s antes de considerar abandonada (ex: aos 45s retorna existing_pending/409)", async () => {
+    // Pedido criado há 45s sem checkoutUrl ainda (chamada ao provedor com alta latência)
+    const runningOrder = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId: "usr_123" },
+      status: "pending",
+      createdAt: Date.now() - 45_000,
+    });
+
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+      pendingProOrderId: runningOrder.id,
+    });
+
+    const res = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/já está em andamento/);
+
+    // Confirma que aos 45s a reserva NÃO foi reciclada prematuramente
+    const profileAfter = await usersRepo.getUserProfile("usr_123");
+    expect(profileAfter?.pendingProOrderId).toBe(runningOrder.id);
+  });
+
+  it("grava resultado no documento do usuário se a persistência em orders falhar e permite recuperação de checkoutUrl", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+    });
+
+    // Simula falha permanente em updateOrder ao gravar checkoutUrl
+    const originalUpdateOrder = ordersRepo.updateOrder.bind(ordersRepo);
+    ordersRepo.updateOrder = async (orderId, updates) => {
+      if (updates.checkoutUrl) {
+        throw new Error("Falha permanente de gravação em orders");
+      }
+      return originalUpdateOrder(orderId, updates);
+    };
+
+    const res = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.checkoutUrl).toBe("https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=mp_pref_98765");
+
+    // O resultado foi salvo no perfil do usuário
+    const profile = await usersRepo.getUserProfile("usr_123");
+    expect(profile?.pendingProCheckoutUrl).toBe(data.checkoutUrl);
+    expect(profile?.pendingProExternalPaymentId).toBe("mp_pref_98765");
+
+    // Uma segunda chamada concorrente ou re-tentativa recupera o checkoutUrl gravado no perfil
+    const res2 = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+    expect(res2.status).toBe(200);
+    const data2 = await res2.json();
+    expect(data2.checkoutUrl).toBe(data.checkoutUrl);
+  });
+
+  it("cancela preapproval no gateway, libera trava e retorna 500 quando toda persistência falhar, evitando preapprovals órfãos", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+    });
+
+    // Simula falha permanente em orders E em users para persistir o resultado
+    const originalUpdateOrder = ordersRepo.updateOrder.bind(ordersRepo);
+    ordersRepo.updateOrder = async (orderId, updates) => {
+      if (updates.checkoutUrl) {
+        throw new Error("Falha fatal em orders");
+      }
+      return originalUpdateOrder(orderId, updates);
+    };
+
+    usersRepo.savePendingProSubscriptionResult = async () => {
+      throw new Error("Falha fatal em users");
+    };
+
+    let cancelledPreapprovalId = "";
+    const mockMpClient = {
+      cancelPreapproval: async (id: string) => {
+        cancelledPreapprovalId = id;
+        return {} as any;
+      },
+    } as any;
+
+    const res = await handleCreateCheckout(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token"),
+      { client: mockMpClient }
+    );
+
+    expect(res.status).toBe(500);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/A cobrança foi cancelada/);
+
+    // Cancelamento do preapproval foi acionado no gateway
+    expect(cancelledPreapprovalId).toBe("mp_pref_98765");
+
+    // A trava pendente foi liberada
+    const profile = await usersRepo.getUserProfile("usr_123");
+    expect(profile?.pendingProOrderId).toBeFalsy();
+  });
+
+  it("não considera reserva com externalPaymentId ou resultado persistido como abandonada (> 60s)", async () => {
+    const existingOrder = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId: "usr_123" },
+      status: "pending",
+      externalPaymentId: "preapp_created_at_mp",
+      createdAt: Date.now() - 70_000, // Criado há mais de 60s
+    });
+
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+      pendingProOrderId: existingOrder.id,
+      pendingProExternalPaymentId: "preapp_created_at_mp",
+    });
+
+    const res = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+
+    // Retorna 409 em vez de liberar a trava e criar segundo preapproval
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/já está em andamento/);
+
+    // A reserva no perfil permanece protegida
+    const profileAfter = await usersRepo.getUserProfile("usr_123");
+    expect(profileAfter?.pendingProOrderId).toBe(existingOrder.id);
   });
 });

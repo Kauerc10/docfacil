@@ -183,6 +183,9 @@ export interface PerfilUsuario {
   fotoUrl?: string;
   telefone?: string;
   plano: "gratis" | "avulso" | "pro";
+  subscriptionStatus?: "active" | "cancelled";
+  subscriptionExpiresAt?: number | null;
+  cancelledAt?: number | null;
   /** timestamps */
   criadoEm: number;
   atualizadoEm: number;
@@ -195,6 +198,9 @@ export interface AppUser {
   email: string;
   fotoUrl?: string;
   plano: "gratis" | "avulso" | "pro";
+  subscriptionStatus?: "active" | "cancelled";
+  subscriptionExpiresAt?: number | null;
+  cancelledAt?: number | null;
 }
 
 export interface Pagamento {

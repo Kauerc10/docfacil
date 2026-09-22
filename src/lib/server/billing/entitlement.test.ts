@@ -199,4 +199,41 @@ describe("resolveEntitlement", () => {
     expect(decision.entitlement).toBe("free");
     expect(decision.watermarked).toBe(true);
   });
+
+  it("permite acesso Pro irrestrito quando usuário cancelado ainda está dentro do período de vigência", () => {
+    const now = 1770000000000;
+    const future = now + 86400000; // 1 dia no futuro
+
+    const decision = resolveEntitlement({
+      principal: { type: "user", userId: "usr_pro_cancelling" },
+      modeloSlug: NON_ELIGIBLE_MODEL, // modelo Pro
+      userProfile: {
+        plano: "pro",
+        subscriptionExpiresAt: future,
+      },
+      currentMonthlyCount: 10,
+      now,
+    });
+
+    expect(decision.entitlement).toBe("pro");
+    expect(decision.watermarked).toBe(false);
+  });
+
+  it("bloqueia acesso a modelos Pro quando período de vigência expirou", () => {
+    const now = 1770000000000;
+    const past = now - 86400000; // 1 dia no passado
+
+    expect(() =>
+      resolveEntitlement({
+        principal: { type: "user", userId: "usr_pro_expired" },
+        modeloSlug: NON_ELIGIBLE_MODEL, // modelo não elegível para Free
+        userProfile: {
+          plano: "pro",
+          subscriptionExpiresAt: past,
+        },
+        currentMonthlyCount: 0,
+        now,
+      })
+    ).toThrow(BackendError);
+  });
 });

@@ -6,6 +6,9 @@ import { BackendError } from '@/lib/server/errors';
 import { requireAppCheck, resolvePrincipal, requireUser } from '@/lib/server/security';
 import { getBillingProvider } from '@/lib/server/billing/provider';
 import { getRepositories } from '@/lib/server/firestore/repositories';
+import { getServerEnv } from '@/lib/server/env';
+import { DEFAULT_PIX_EXPIRATION_MS, RESERVATION_STALENESS_MS } from '@/lib/server/billing/constants';
+import { MercadoPagoClient, type IMercadoPagoClient } from '@/lib/server/billing/mercadopago/client';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +39,8 @@ const createCheckoutSchema = z.object({
 function buildCompletionUrl(
   requestUrl: string,
   successUrl: string | undefined,
-  orderId: string
+  orderId: string,
+  product?: string
 ): string {
   const origin = new URL(requestUrl).origin;
   const target = successUrl
@@ -51,12 +55,24 @@ function buildCompletionUrl(
     );
   }
 
+  const currentView = target.searchParams.get('view');
+  if (!currentView || currentView === 'sucesso') {
+    target.searchParams.set('view', 'checkout');
+  }
+
+  if (product) {
+    target.searchParams.set('plan', product);
+  }
+
   target.searchParams.set('billingReturn', '1');
   target.searchParams.set('orderId', orderId);
   return target.toString();
 }
 
-export async function POST(req: Request) {
+export async function handleCreateCheckout(
+  req: Request,
+  deps: { client?: IMercadoPagoClient } = {}
+) {
   try {
     await requireAppCheck(req);
     const principal = await resolvePrincipal(req);
@@ -74,12 +90,51 @@ export async function POST(req: Request) {
 
     const { product, method, guestContact, successUrl } = parsed.data;
 
-    if (product === 'pro' && principal.type === 'guest') {
-      throw new BackendError(
-        'INVALID_AUTH_TOKEN',
-        401,
-        'Faça login ou crie uma conta para assinar o Plano Pro.'
-      );
+    const repos = getRepositories();
+
+    if (product === 'pro') {
+      if (principal.type === 'guest') {
+        throw new BackendError(
+          'INVALID_AUTH_TOKEN',
+          401,
+          'Faça login ou crie uma conta para assinar o Plano Pro.'
+        );
+      }
+
+      const userProfile = await repos.users.getUserProfile(principal.userId);
+      const isCancelledSubscription = userProfile?.subscriptionStatus === 'cancelled';
+      if (userProfile?.plano === 'pro' && !isCancelledSubscription) {
+        throw new BackendError(
+          'CONFLICT',
+          409,
+          'Você já possui uma assinatura do Plano Pro ativa.'
+        );
+      }
+
+      if (userProfile?.pendingProOrderId) {
+        const existingOrder = await repos.orders.getOrder(userProfile.pendingProOrderId);
+        const effectiveCheckoutUrl =
+          existingOrder?.checkoutUrl || userProfile.pendingProCheckoutUrl;
+        if (
+          existingOrder &&
+          existingOrder.status === 'pending' &&
+          effectiveCheckoutUrl
+        ) {
+          const env = getServerEnv();
+          const isDev = env.NODE_ENV !== 'production' || env.VERCEL_ENV === 'preview';
+          return NextResponse.json(
+            {
+              kind: 'redirect',
+              orderId: existingOrder.id,
+              product: 'pro',
+              amountCents: existingOrder.amountCents,
+              checkoutUrl: effectiveCheckoutUrl,
+              devMode: isDev,
+            },
+            { status: 200, headers: { 'Cache-Control': 'no-store' } }
+          );
+        }
+      }
     }
 
     if (product === 'avulso' && principal.type === 'guest') {
@@ -109,7 +164,6 @@ export async function POST(req: Request) {
 
     const normalizedMethod = method === 'card' ? 'credit_card' : method;
     const amountCents = planPriceToCents(product);
-    const repos = getRepositories();
 
     const order = await repos.orders.createOrder({
       provider: 'mercadopago',
@@ -129,26 +183,179 @@ export async function POST(req: Request) {
       );
     }
 
-    const completionUrl = buildCompletionUrl(req.url, successUrl, order.id);
+    const completionUrl = buildCompletionUrl(req.url, successUrl, order.id, product);
     const provider = getBillingProvider();
 
     if (product === 'pro') {
       const user = requireUser(principal);
-      const result = await provider.createSubscription({
-        orderId: order.id,
-        product: 'pro',
-        amountCents,
-        payer: {
-          email: user.email || 'cliente@docfacil.com.br',
-          userId: user.userId,
-        },
-        completionUrl,
-      });
 
-      await repos.orders.updateOrder(order.id, {
-        checkoutUrl: result.checkoutUrl,
-        externalPaymentId: result.providerCheckoutId,
-      });
+      const reservation = await repos.users.reservePendingProSubscription(
+        user.userId,
+        order.id
+      );
+
+      if (reservation.status === 'active_pro') {
+        await repos.orders.updateOrder(order.id, { status: 'cancelled' });
+        throw new BackendError(
+          'CONFLICT',
+          409,
+          'Você já possui uma assinatura do Plano Pro ativa.'
+        );
+      }
+
+      if (reservation.status === 'existing_pending') {
+        await repos.orders.updateOrder(order.id, { status: 'cancelled' });
+
+        let existingOrder = await repos.orders.getOrder(reservation.orderId);
+        let currentUser = await repos.users.getUserProfile(user.userId);
+
+        if (!existingOrder?.checkoutUrl && !currentUser?.pendingProCheckoutUrl) {
+          for (let i = 0; i < 6; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            existingOrder = await repos.orders.getOrder(reservation.orderId);
+            currentUser = await repos.users.getUserProfile(user.userId);
+            if (existingOrder?.checkoutUrl || currentUser?.pendingProCheckoutUrl) {
+              break;
+            }
+          }
+        }
+
+        const effectiveCheckoutUrl =
+          existingOrder?.checkoutUrl || currentUser?.pendingProCheckoutUrl;
+
+        if (
+          existingOrder &&
+          existingOrder.status === 'pending' &&
+          effectiveCheckoutUrl
+        ) {
+          if (!existingOrder.checkoutUrl && effectiveCheckoutUrl) {
+            await repos.orders.updateOrder(reservation.orderId, {
+              checkoutUrl: effectiveCheckoutUrl,
+              externalPaymentId: currentUser?.pendingProExternalPaymentId || undefined,
+            }).catch(() => undefined);
+          }
+
+          const env = getServerEnv();
+          const isDev = env.NODE_ENV !== 'production' || env.VERCEL_ENV === 'preview';
+          return NextResponse.json(
+            {
+              kind: 'redirect',
+              orderId: existingOrder.id,
+              product: 'pro',
+              amountCents: existingOrder.amountCents,
+              checkoutUrl: effectiveCheckoutUrl,
+              devMode: isDev,
+            },
+            { status: 200, headers: { 'Cache-Control': 'no-store' } }
+          );
+        }
+
+        // Apenas recicla reserva comprovadamente abandonada (status failed ou mais de 60s sem nenhum resultado do provedor).
+        const hasProviderResult = Boolean(
+          effectiveCheckoutUrl ||
+          existingOrder?.externalPaymentId ||
+          currentUser?.pendingProExternalPaymentId
+        );
+
+        const isProvenAbandoned =
+          existingOrder?.status === 'failed' ||
+          Boolean(
+            existingOrder &&
+            !hasProviderResult &&
+            Date.now() - (existingOrder.createdAt || 0) > RESERVATION_STALENESS_MS
+          );
+
+        if (isProvenAbandoned) {
+          await repos.users.releasePendingProSubscription(user.userId, reservation.orderId).catch(() => undefined);
+          if (existingOrder && existingOrder.status === 'pending') {
+            await repos.orders.updateOrder(reservation.orderId, { status: 'failed' }).catch(() => undefined);
+          }
+          throw new BackendError(
+            'INTERNAL_ERROR',
+            500,
+            'A tentativa anterior foi abandonada. A trava foi liberada, por favor tente novamente.'
+          );
+        }
+
+        throw new BackendError(
+          'CONFLICT',
+          409,
+          'Uma solicitação de assinatura já está em andamento. Aguarde alguns instantes.'
+        );
+      }
+
+      let result;
+      try {
+        result = await provider.createSubscription({
+          orderId: order.id,
+          product: 'pro',
+          amountCents,
+          payer: {
+            email: user.email || 'cliente@docfacil.com.br',
+            userId: user.userId,
+          },
+          completionUrl,
+        });
+      } catch (err) {
+        // Falha antes de criar a assinatura externa: libera a trava com segurança
+        await repos.users.releasePendingProSubscription(user.userId, order.id).catch(() => undefined);
+        await repos.orders.updateOrder(order.id, { status: 'failed' }).catch(() => undefined);
+        throw err;
+      }
+
+      // createSubscription teve sucesso: a assinatura recorrente já existe no Mercado Pago!
+      // Atualizamos o pedido com checkoutUrl e externalPaymentId, retentando em caso de falha transitória.
+      let persisted = false;
+      try {
+        await repos.orders.updateOrder(order.id, {
+          checkoutUrl: result.checkoutUrl,
+          externalPaymentId: result.providerCheckoutId,
+        });
+        persisted = true;
+      } catch {
+        for (let i = 0; i < 3; i++) {
+          await new Promise((r) => setTimeout(r, 100));
+          try {
+            await repos.orders.updateOrder(order.id, {
+              checkoutUrl: result.checkoutUrl,
+              externalPaymentId: result.providerCheckoutId,
+            });
+            persisted = true;
+            break;
+          } catch {
+            // retry
+          }
+        }
+      }
+
+      // Se a gravação no pedido falhou após retentativas, grava no perfil do usuário para garantir durabilidade
+      if (!persisted) {
+        try {
+          await repos.users.savePendingProSubscriptionResult?.(
+            user.userId,
+            order.id,
+            result.checkoutUrl,
+            result.providerCheckoutId
+          );
+          persisted = true;
+        } catch {
+          // fallback failed
+        }
+      }
+
+      // Se todas as tentativas de persistência falharam, cancela a assinatura no Mercado Pago para
+      // não criar cobrança recorrente órfã e lança erro 500 em vez de cair silenciosamente.
+      if (!persisted) {
+        const client = deps.client || new MercadoPagoClient();
+        await client.cancelPreapproval(result.providerCheckoutId).catch(() => undefined);
+        await repos.users.releasePendingProSubscription(user.userId, order.id).catch(() => undefined);
+        await repos.orders.updateOrder(order.id, { status: 'failed' }).catch(() => undefined);
+        throw new BackendError(
+          'INTERNAL_ERROR',
+          500,
+          'Não foi possível registrar a assinatura criada. A cobrança foi cancelada, por favor tente novamente.'
+        );
+      }
 
       return NextResponse.json(
         {
@@ -183,7 +390,7 @@ export async function POST(req: Request) {
 
     if (result.kind === 'pix') {
       const expiresAt =
-        Date.parse(result.expiresAt) || Date.now() + 30 * 60 * 1000;
+        Date.parse(result.expiresAt) || Date.now() + DEFAULT_PIX_EXPIRATION_MS;
 
       await repos.orders.updateOrder(order.id, {
         brCode: result.brCode,
@@ -231,4 +438,8 @@ export async function POST(req: Request) {
     }
     return BackendError.fromUnknown(err).toResponse();
   }
+}
+
+export async function POST(req: Request) {
+  return handleCreateCheckout(req);
 }

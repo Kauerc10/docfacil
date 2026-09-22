@@ -7,6 +7,8 @@ import type {
   IWebhookEventsRepository,
   IGenerationRequestsRepository,
   IUsersRepository,
+  UserProfileRecord,
+  ReservePendingProSubscriptionResult,
   IGenerationCommitRepository,
   CommitGeneratedArtifactInput,
 } from "./interfaces";
@@ -20,6 +22,7 @@ import type {
 } from "../domain/documents";
 import { BackendError } from "../errors";
 import { createOrderBuyerPrincipalKey } from "../billing/order-identity";
+import { RESERVATION_STALENESS_MS } from "../billing/constants";
 
 /**
  * globalThis store — garante que page.tsx (Server Component) e API routes
@@ -35,7 +38,7 @@ declare global {
     accessLinks: Map<string, AccessLinkRecord>;
     orders: Map<string, OrderRecord>;
     generationRequests: Map<string, GenerationRequestRecord>;
-    users: Map<string, { plano?: string; email?: string; nome?: string }>;
+    users: Map<string, UserProfileRecord>;
     webhookEvents: Map<string, { status: "processing" | "completed"; claimedAt: number; completedAt?: number }>;
   } | undefined;
 }
@@ -549,33 +552,110 @@ export class InMemoryGenerationRequestsRepository
 }
 
 export class InMemoryUsersRepository implements IUsersRepository {
-  private readonly _users: Map<string, { plano?: string; email?: string; nome?: string }> | null;
+  private readonly _users: Map<string, UserProfileRecord> | null;
+  private ordersRepo?: IOrdersRepository;
 
   constructor(isolated = true) {
     this._users = isolated ? new Map() : null;
+  }
+
+  public setOrdersRepository(ordersRepo: IOrdersRepository): void {
+    this.ordersRepo = ordersRepo;
   }
 
   private get users() { return this._users ?? getStore().users; }
 
   public setUser(
     userId: string,
-    profile: { plano?: string; email?: string; nome?: string }
+    profile: UserProfileRecord
   ): void {
     this.users.set(userId, { ...profile });
   }
 
   public setUserProfile(
     userId: string,
-    profile: { plano?: string; email?: string; nome?: string }
+    profile: UserProfileRecord
   ): void {
     this.users.set(userId, { ...profile });
   }
 
   public async getUserProfile(
     userId: string
-  ): Promise<{ plano?: string; email?: string; nome?: string } | null> {
+  ): Promise<UserProfileRecord | null> {
     const u = this.users.get(userId);
     return u ? JSON.parse(JSON.stringify(u)) : null;
+  }
+
+  public async reservePendingProSubscription(
+    userId: string,
+    orderId: string
+  ): Promise<ReservePendingProSubscriptionResult> {
+    const user = this.users.get(userId);
+    if (user?.plano === "pro" && user.subscriptionStatus !== "cancelled") {
+      return { status: "active_pro" };
+    }
+
+    if (user?.pendingProOrderId) {
+      const order = this.ordersRepo
+        ? await this.ordersRepo.getOrder(user.pendingProOrderId)
+        : (getStore().orders.get(user.pendingProOrderId) ?? null);
+      if (order && order.status === "pending") {
+        const hasProviderResult = Boolean(
+          order.checkoutUrl ||
+          order.externalPaymentId ||
+          (user.pendingProOrderId === order.id && user.pendingProCheckoutUrl)
+        );
+        const isStale =
+          !hasProviderResult &&
+          Date.now() - (order.createdAt || 0) > RESERVATION_STALENESS_MS;
+        if (!isStale) {
+          return {
+            status: "existing_pending",
+            orderId: user.pendingProOrderId,
+          };
+        }
+      }
+    }
+
+    const current = user ?? {};
+    this.users.set(userId, {
+      ...current,
+      pendingProOrderId: orderId,
+      pendingProCheckoutUrl: null,
+      pendingProExternalPaymentId: null,
+    });
+    return { status: "acquired" };
+  }
+
+  public async releasePendingProSubscription(
+    userId: string,
+    orderId: string
+  ): Promise<void> {
+    const user = this.users.get(userId);
+    if (user && user.pendingProOrderId === orderId) {
+      this.users.set(userId, {
+        ...user,
+        pendingProOrderId: null,
+        pendingProCheckoutUrl: null,
+        pendingProExternalPaymentId: null,
+      });
+    }
+  }
+
+  public async savePendingProSubscriptionResult(
+    userId: string,
+    orderId: string,
+    checkoutUrl: string,
+    externalPaymentId: string
+  ): Promise<void> {
+    const user = this.users.get(userId);
+    if (user && user.pendingProOrderId === orderId) {
+      this.users.set(userId, {
+        ...user,
+        pendingProCheckoutUrl: checkoutUrl,
+        pendingProExternalPaymentId: externalPaymentId,
+      });
+    }
   }
 }
 

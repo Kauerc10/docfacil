@@ -1,6 +1,7 @@
 import 'server-only';
 import crypto from 'crypto';
 import { BackendError } from '../../errors';
+import { WEBHOOK_REPLAY_TOLERANCE_MS } from '../constants';
 
 export interface MercadoPagoWebhookParts {
   ts: string;
@@ -36,7 +37,7 @@ export function verifyMercadoPagoSignature(params: {
     requestIdHeader,
     dataId,
     secret,
-    maxAgeMs = 10 * 60 * 1000,
+    maxAgeMs = WEBHOOK_REPLAY_TOLERANCE_MS,
     now = Date.now(),
   } = params;
 

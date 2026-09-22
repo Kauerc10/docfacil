@@ -118,6 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: fbUser.email || "",
         fotoUrl: perfil?.fotoUrl || fbUser.photoURL || undefined,
         plano: perfil?.plano || "gratis",
+        subscriptionStatus: perfil?.subscriptionStatus,
+        subscriptionExpiresAt: perfil?.subscriptionExpiresAt,
+        cancelledAt: perfil?.cancelledAt,
       });
       pendingSignupNameRef.current = null;
       setLoading(false);
@@ -246,6 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: fbUser.email || user.email,
       fotoUrl: perfil.fotoUrl || fbUser.photoURL || undefined,
       plano: perfil.plano || "gratis",
+      subscriptionStatus: perfil.subscriptionStatus,
+      subscriptionExpiresAt: perfil.subscriptionExpiresAt,
+      cancelledAt: perfil.cancelledAt,
     });
   }, [user]);
 
