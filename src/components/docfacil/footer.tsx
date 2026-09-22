@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Script from "next/script";
 import { Logo } from "./logo";
 import { useNav } from "./nav-context";
 import { COMPANY, COMPANY_DATA_IS_PLACEHOLDER } from "@/lib/company";
+
 
 const COLS = [
   {
@@ -138,25 +140,10 @@ export function Footer() {
               </a>
               . Todos os direitos reservados.
             </p>
-            <a
-              href={COMPANY.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Visitar site da ${COMPANY.name}`}
-              className="group inline-flex items-center gap-2 text-[0.7rem] text-white/40 hover:text-white/70 transition-colors"
-            >
-              <span>Powered by</span>
-              <span className="inline-flex items-center gap-1.5 font-semibold tracking-wide">
-                <span
-                  aria-hidden="true"
-                  className="inline-block w-5 h-5 rounded-md bg-gradient-to-br from-[var(--blue-royal)] to-[var(--selo-green)] grid place-items-center text-[0.5rem] text-white font-black shadow-sm group-hover:scale-110 transition-transform"
-                >
-                  K
-                </span>
-                {COMPANY.shortName}
-              </span>
-            </a>
+            <Script src="https://ruon.dev/badge.js" strategy="lazyOnload" />
+            <ruon-badge ref="docfacil" theme="dark" size="sm"></ruon-badge>
           </div>
+
         </div>
       </div>
     </footer>
