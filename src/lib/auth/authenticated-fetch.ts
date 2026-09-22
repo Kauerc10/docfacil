@@ -72,20 +72,65 @@ async function addAppCheckHeader(
   }
 }
 
+function isFatalSessionError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as { code?: unknown }).code;
+  if (typeof code !== "string") return false;
+  return (
+    code === "auth/user-disabled" ||
+    code === "auth/user-token-expired" ||
+    code === "auth/user-not-found"
+  );
+}
+
+let activeRefreshPromise: Promise<string> | null = null;
+
 async function getRequiredUserToken(
   user: AuthenticatedFetchUser,
   forceRefresh: boolean
 ): Promise<string> {
+  if (forceRefresh) {
+    if (!activeRefreshPromise) {
+      activeRefreshPromise = (async () => {
+        try {
+          const token = await user.getIdToken(true);
+          if (!token) throw new Error("empty token");
+          return token;
+        } finally {
+          activeRefreshPromise = null;
+        }
+      })();
+    }
+    try {
+      return await activeRefreshPromise;
+    } catch (err: unknown) {
+      if (isFatalSessionError(err)) {
+        throw new AuthSessionError(
+          "AUTH_SESSION_EXPIRED",
+          "Sua sessão expirou. Entre novamente para continuar."
+        );
+      }
+      throw new AuthSessionError(
+        "AUTH_TOKEN_UNAVAILABLE",
+        "Não foi possível validar sua sessão. Tente novamente."
+      );
+    }
+  }
+
   try {
-    const token = await user.getIdToken(forceRefresh);
+    const token = await user.getIdToken(false);
     if (!token) throw new Error("empty token");
     return token;
-  } catch {
+  } catch (err: unknown) {
+    if (isFatalSessionError(err)) {
+      throw new AuthSessionError(
+        "AUTH_SESSION_EXPIRED",
+        "Sua sessão expirou. Entre novamente para continuar."
+      );
+    }
     throw new AuthSessionError(
-      forceRefresh ? "AUTH_SESSION_EXPIRED" : "AUTH_TOKEN_UNAVAILABLE",
-      forceRefresh
-        ? "Sua sessão expirou. Entre novamente para continuar."
-        : "Não foi possível validar sua sessão. Tente novamente."
+      "AUTH_TOKEN_UNAVAILABLE",
+      "Não foi possível validar sua sessão. Tente novamente."
     );
   }
 }
@@ -104,7 +149,16 @@ export async function firebaseAuthenticatedFetch(
     return fetchImpl(input, requestInit);
   }
 
-  const initialToken = await getRequiredUserToken(user, false);
+  let initialToken: string;
+  try {
+    initialToken = await getRequiredUserToken(user, false);
+  } catch (error) {
+    if (error instanceof AuthSessionError && error.code === "AUTH_SESSION_EXPIRED") {
+      await options.signOutUser?.().catch(() => undefined);
+    }
+    throw error;
+  }
+
   requestInit = withHeader(
     requestInit,
     "Authorization",
@@ -122,7 +176,9 @@ export async function firebaseAuthenticatedFetch(
   try {
     refreshedToken = await getRequiredUserToken(user, true);
   } catch (error) {
-    await options.signOutUser?.().catch(() => undefined);
+    if (error instanceof AuthSessionError && error.code === "AUTH_SESSION_EXPIRED") {
+      await options.signOutUser?.().catch(() => undefined);
+    }
     throw error;
   }
 
@@ -132,15 +188,8 @@ export async function firebaseAuthenticatedFetch(
     `Bearer ${refreshedToken}`
   );
   const retryResponse = await fetchImpl(input, retryInit);
-  const retryErrorCode = await readBackendErrorCode(retryResponse);
 
-  if (retryErrorCode === "INVALID_AUTH_TOKEN") {
-    await options.signOutUser?.().catch(() => undefined);
-    throw new AuthSessionError(
-      "AUTH_SESSION_EXPIRED",
-      "Sua sessão expirou. Entre novamente para continuar."
-    );
-  }
-
+  // Se o backend persistir na rejeição com 401, preservamos a sessão do usuário
+  // no client (evitando loop de logout) e propagamos a resposta para tratamento do caller.
   return retryResponse;
 }

@@ -113,6 +113,36 @@ function subscribeToLocation(onStoreChange: () => void) {
   };
 }
 
+export type NavAction =
+  | { type: "assign"; url: string }
+  | { type: "pushState"; url: string };
+
+export function resolveNavAction(
+  next: View,
+  p: NavParams = {},
+  currentPath: string = "/"
+): NavAction {
+  if (next === "modelos") {
+    return { type: "assign", url: "/documentos" };
+  }
+  if (next === "modelo-detalhe" && p.slug) {
+    return { type: "assign", url: `/documentos/${p.slug}` };
+  }
+
+  const search = new URLSearchParams();
+  search.set("view", next);
+  for (const [key, value] of Object.entries(p)) {
+    if (value) search.set(key, value);
+  }
+  const target = `/?${search.toString()}`;
+
+  if (currentPath !== "/") {
+    return { type: "assign", url: target };
+  }
+
+  return { type: "pushState", url: target };
+}
+
 export function NavProvider({ children }: { children: React.ReactNode }) {
   // getServerSnapshot mantém o primeiro render do browser idêntico ao SSR.
   // Depois da hidratação, o React lê a URL real e atualiza a view sem o
@@ -127,31 +157,19 @@ export function NavProvider({ children }: { children: React.ReactNode }) {
   const navigate = useCallback((next: View, p: NavParams = {}) => {
     if (typeof window === "undefined") return;
 
-    if (next === "modelos") {
+    const currentPath = window.location.pathname || "/";
+    const action = resolveNavAction(next, p, currentPath);
+
+    if (action.type === "assign") {
       if (typeof window.location?.assign === "function") {
-        window.location.assign("/documentos");
+        window.location.assign(action.url);
       } else if (window.location) {
-        window.location.href = "/documentos";
-      }
-      return;
-    }
-    if (next === "modelo-detalhe" && p.slug) {
-      const target = `/documentos/${p.slug}`;
-      if (typeof window.location?.assign === "function") {
-        window.location.assign(target);
-      } else if (window.location) {
-        window.location.href = target;
+        window.location.href = action.url;
       }
       return;
     }
 
-    const search = new URLSearchParams();
-    search.set("view", next);
-    for (const [key, value] of Object.entries(p)) {
-      if (value) search.set(key, value);
-    }
-
-    window.history.pushState({}, "", `/?${search.toString()}`);
+    window.history.pushState({}, "", action.url);
     window.dispatchEvent(new Event(NAV_EVENT));
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, []);
