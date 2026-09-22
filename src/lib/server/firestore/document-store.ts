@@ -8,8 +8,8 @@ import type {
   ArtifactState,
 } from "../domain/documents";
 import type { CommitGeneratedArtifactInput } from "./interfaces";
-import { getServerEnv } from "../env";
-import { assertProductionServerConfig } from "../config/assert-production-config";
+import { getRepositories } from "./repositories";
+import { InMemoryGenerationCommitRepository } from "./in-memory-repositories";
 
 export interface DocumentStore {
   // Idempotency & Generation Requests
@@ -114,8 +114,6 @@ export function getDocumentStore(): DocumentStore {
     return storeSingleton;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { getRepositories } = require("./repositories");
   return adaptRepositoriesToStore(getRepositories());
 }
 
@@ -134,8 +132,6 @@ export function adaptRepositoriesToStore(repos: any): DocumentStore {
 
   let generationCommit = repos.generationCommit;
   if (!generationCommit && repos.documents && repos.orders) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { InMemoryGenerationCommitRepository } = require("./in-memory-repositories");
     generationCommit = new InMemoryGenerationCommitRepository(
       repos.documents,
       repos.access,
