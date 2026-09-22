@@ -554,6 +554,68 @@ describe("POST /api/webhooks/mercadopago", () => {
     expect(userProfile?.subscriptionOrderId).toBe(orderNew.id);
   });
 
+  it("propaga erro e libera claim do webhook quando cancelPreapproval falhar para assinatura conflitante", async () => {
+    const userId = "usr_concurrent_conflict_fail";
+    const orderOld = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId },
+      status: "pending",
+      createdAt: Date.now(),
+    });
+    const orderNew = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId },
+      status: "paid",
+      externalPaymentId: "preapp_B",
+      createdAt: Date.now(),
+    });
+
+    usersRepo.setUserProfile(userId, {
+      plano: "pro",
+      email: "user@docfacil.com.br",
+      subscriptionId: "preapp_B",
+      subscriptionOrderId: orderNew.id,
+    });
+
+    mockMpClient = createTestMpClient({
+      getPreapproval: async () => ({
+        id: "preapp_A",
+        status: "authorized",
+        external_reference: orderOld.id,
+      }),
+      cancelPreapproval: async () => {
+        throw new Error("Mercado Pago API indisponível temporariamente");
+      },
+    });
+
+    const req = makeWebhookRequest("preapp_A", {
+      action: "updated",
+      data: { id: "preapp_A" },
+      type: "subscription_preapproval",
+    });
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+    });
+
+    // Erro é propagado como 500 para que o webhook seja retentado pelo gateway
+    expect(res.status).toBe(500);
+
+    // O pedido antigo A NÃO foi marcado como cancelled
+    const updatedOldOrder = await ordersRepo.getOrder(orderOld.id!);
+    expect(updatedOldOrder?.status).toBe("pending");
+
+    // A claim do evento foi liberada para permitir retry
+    const eventKey = "subscription_preapproval:preapp_A:updated";
+    const canReclaim = await webhookEventsRepo.claim(eventKey, Date.now());
+    expect(canReclaim).toBe(true);
+  });
+
   it("marca pedido como failed quando recebe evento payment com status rejected", async () => {
     const order = await ordersRepo.createOrder({
       provider: "mercadopago",

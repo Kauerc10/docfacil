@@ -600,8 +600,13 @@ export class InMemoryUsersRepository implements IUsersRepository {
         ? await this.ordersRepo.getOrder(user.pendingProOrderId)
         : (getStore().orders.get(user.pendingProOrderId) ?? null);
       if (order && order.status === "pending") {
+        const hasProviderResult = Boolean(
+          order.checkoutUrl ||
+          order.externalPaymentId ||
+          (user.pendingProOrderId === order.id && user.pendingProCheckoutUrl)
+        );
         const isStale =
-          !order.checkoutUrl &&
+          !hasProviderResult &&
           Date.now() - (order.createdAt || 0) > RESERVATION_STALENESS_MS;
         if (!isStale) {
           return {
@@ -616,6 +621,8 @@ export class InMemoryUsersRepository implements IUsersRepository {
     this.users.set(userId, {
       ...current,
       pendingProOrderId: orderId,
+      pendingProCheckoutUrl: null,
+      pendingProExternalPaymentId: null,
     });
     return { status: "acquired" };
   }
@@ -629,6 +636,24 @@ export class InMemoryUsersRepository implements IUsersRepository {
       this.users.set(userId, {
         ...user,
         pendingProOrderId: null,
+        pendingProCheckoutUrl: null,
+        pendingProExternalPaymentId: null,
+      });
+    }
+  }
+
+  public async savePendingProSubscriptionResult(
+    userId: string,
+    orderId: string,
+    checkoutUrl: string,
+    externalPaymentId: string
+  ): Promise<void> {
+    const user = this.users.get(userId);
+    if (user && user.pendingProOrderId === orderId) {
+      this.users.set(userId, {
+        ...user,
+        pendingProCheckoutUrl: checkoutUrl,
+        pendingProExternalPaymentId: externalPaymentId,
       });
     }
   }

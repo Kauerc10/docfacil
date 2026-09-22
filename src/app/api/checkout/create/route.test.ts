@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
-import { POST } from "./route";
+import { POST, handleCreateCheckout } from "./route";
 import { setRepositoriesForTesting } from "@/lib/server/firestore/repositories";
 import { InMemoryOrdersRepository, InMemoryUsersRepository } from "@/lib/server/firestore/in-memory-repositories";
 import { setBillingProviderForTesting, type BillingProvider } from "@/lib/server/billing/provider";
@@ -427,5 +427,117 @@ describe("POST /api/checkout/create", () => {
     // Confirma que aos 45s a reserva NÃO foi reciclada prematuramente
     const profileAfter = await usersRepo.getUserProfile("usr_123");
     expect(profileAfter?.pendingProOrderId).toBe(runningOrder.id);
+  });
+
+  it("grava resultado no documento do usuário se a persistência em orders falhar e permite recuperação de checkoutUrl", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+    });
+
+    // Simula falha permanente em updateOrder ao gravar checkoutUrl
+    const originalUpdateOrder = ordersRepo.updateOrder.bind(ordersRepo);
+    ordersRepo.updateOrder = async (orderId, updates) => {
+      if (updates.checkoutUrl) {
+        throw new Error("Falha permanente de gravação em orders");
+      }
+      return originalUpdateOrder(orderId, updates);
+    };
+
+    const res = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.checkoutUrl).toBe("https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=mp_pref_98765");
+
+    // O resultado foi salvo no perfil do usuário
+    const profile = await usersRepo.getUserProfile("usr_123");
+    expect(profile?.pendingProCheckoutUrl).toBe(data.checkoutUrl);
+    expect(profile?.pendingProExternalPaymentId).toBe("mp_pref_98765");
+
+    // Uma segunda chamada concorrente ou re-tentativa recupera o checkoutUrl gravado no perfil
+    const res2 = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+    expect(res2.status).toBe(200);
+    const data2 = await res2.json();
+    expect(data2.checkoutUrl).toBe(data.checkoutUrl);
+  });
+
+  it("cancela preapproval no gateway, libera trava e retorna 500 quando toda persistência falhar, evitando preapprovals órfãos", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+    });
+
+    // Simula falha permanente em orders E em users para persistir o resultado
+    const originalUpdateOrder = ordersRepo.updateOrder.bind(ordersRepo);
+    ordersRepo.updateOrder = async (orderId, updates) => {
+      if (updates.checkoutUrl) {
+        throw new Error("Falha fatal em orders");
+      }
+      return originalUpdateOrder(orderId, updates);
+    };
+
+    usersRepo.savePendingProSubscriptionResult = async () => {
+      throw new Error("Falha fatal em users");
+    };
+
+    let cancelledPreapprovalId = "";
+    const mockMpClient = {
+      cancelPreapproval: async (id: string) => {
+        cancelledPreapprovalId = id;
+        return {} as any;
+      },
+    } as any;
+
+    const res = await handleCreateCheckout(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token"),
+      { client: mockMpClient }
+    );
+
+    expect(res.status).toBe(500);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/A cobrança foi cancelada/);
+
+    // Cancelamento do preapproval foi acionado no gateway
+    expect(cancelledPreapprovalId).toBe("mp_pref_98765");
+
+    // A trava pendente foi liberada
+    const profile = await usersRepo.getUserProfile("usr_123");
+    expect(profile?.pendingProOrderId).toBeFalsy();
+  });
+
+  it("não considera reserva com externalPaymentId ou resultado persistido como abandonada (> 60s)", async () => {
+    const existingOrder = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId: "usr_123" },
+      status: "pending",
+      externalPaymentId: "preapp_created_at_mp",
+      createdAt: Date.now() - 70_000, // Criado há mais de 60s
+    });
+
+    usersRepo.setUserProfile("usr_123", {
+      plano: "gratis",
+      email: "usuario@exemplo.com",
+      pendingProOrderId: existingOrder.id,
+      pendingProExternalPaymentId: "preapp_created_at_mp",
+    });
+
+    const res = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+
+    // Retorna 409 em vez de liberar a trava e criar segundo preapproval
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/já está em andamento/);
+
+    // A reserva no perfil permanece protegida
+    const profileAfter = await usersRepo.getUserProfile("usr_123");
+    expect(profileAfter?.pendingProOrderId).toBe(existingOrder.id);
   });
 });

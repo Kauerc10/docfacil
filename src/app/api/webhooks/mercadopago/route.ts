@@ -172,12 +172,13 @@ export async function handleMercadoPagoWebhook(
               // Se o usuário já possui outra assinatura Pro ativa B, a assinatura A é conflitante/substituída.
               // Cancela a assinatura A no Mercado Pago para não cobrar o cliente duplamente todo mês
               // e atualiza o pedido A como cancelled sem rebaixar o plano ou marcar como pago.
+              // O erro de cancelamento no gateway deve propagar para liberar a claim do webhook e permitir retry.
               const client = deps.client || new MercadoPagoClient();
-              await client.cancelPreapproval(preapproval.id).catch(() => undefined);
+              await client.cancelPreapproval(preapproval.id);
               await repos.orders.updateOrder(orderId, {
                 status: 'cancelled',
                 externalPaymentId: preapproval.id,
-              }).catch(() => undefined);
+              });
             } else {
               await setServerUserPlan(
                 order.buyer.userId,

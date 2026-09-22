@@ -102,6 +102,8 @@ export interface UserProfileRecord {
   subscriptionId?: string | null;
   subscriptionOrderId?: string | null;
   pendingProOrderId?: string | null;
+  pendingProCheckoutUrl?: string | null;
+  pendingProExternalPaymentId?: string | null;
   subscriptionStatus?: "active" | "cancelled";
   subscriptionExpiresAt?: number | null;
   cancelledAt?: number | null;
@@ -123,6 +125,12 @@ export interface IUsersRepository {
   releasePendingProSubscription(
     userId: string,
     orderId: string
+  ): Promise<void>;
+  savePendingProSubscriptionResult?(
+    userId: string,
+    orderId: string,
+    checkoutUrl: string,
+    externalPaymentId: string
   ): Promise<void>;
 }
 

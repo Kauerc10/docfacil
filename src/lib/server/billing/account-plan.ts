@@ -47,6 +47,8 @@ export async function setServerUserPlan(
   }
   if (!preservePendingOrder && (plan === "pro" || plan === "gratis")) {
     dataToSet.pendingProOrderId = null;
+    dataToSet.pendingProCheckoutUrl = null;
+    dataToSet.pendingProExternalPaymentId = null;
   }
 
   if (options?.subscriptionStatus !== undefined) {
@@ -91,7 +93,11 @@ export async function setServerUserPlan(
       ...(subscriptionId !== undefined ? { subscriptionId } : {}),
       ...(subscriptionOrderId !== undefined ? { subscriptionOrderId } : {}),
       ...(!preservePendingOrder && (plan === "pro" || plan === "gratis")
-        ? { pendingProOrderId: null }
+        ? {
+            pendingProOrderId: null,
+            pendingProCheckoutUrl: null,
+            pendingProExternalPaymentId: null,
+          }
         : {}),
       subscriptionStatus: (dataToSet.subscriptionStatus as "active" | "cancelled" | undefined) ?? undefined,
       subscriptionExpiresAt: (dataToSet.subscriptionExpiresAt as number | undefined) ?? undefined,

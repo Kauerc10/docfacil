@@ -626,8 +626,13 @@ export class FirestoreUsersRepository implements IUsersRepository {
         if (orderSnap.exists) {
           const order = orderSnap.data() as OrderRecord;
           if (order.status === "pending") {
+            const hasProviderResult = Boolean(
+              order.checkoutUrl ||
+              order.externalPaymentId ||
+              (user.pendingProOrderId === order.id && user.pendingProCheckoutUrl)
+            );
             const isStale =
-              !order.checkoutUrl &&
+              !hasProviderResult &&
               Date.now() - (order.createdAt || 0) > RESERVATION_STALENESS_MS;
             if (!isStale) {
               return {
@@ -643,6 +648,8 @@ export class FirestoreUsersRepository implements IUsersRepository {
         userRef,
         {
           pendingProOrderId: orderId,
+          pendingProCheckoutUrl: null,
+          pendingProExternalPaymentId: null,
           atualizadoEm: Date.now(),
         },
         { merge: true }
@@ -666,6 +673,34 @@ export class FirestoreUsersRepository implements IUsersRepository {
             userRef,
             {
               pendingProOrderId: null,
+              pendingProCheckoutUrl: null,
+              pendingProExternalPaymentId: null,
+              atualizadoEm: Date.now(),
+            },
+            { merge: true }
+          );
+        }
+      }
+    });
+  }
+
+  public async savePendingProSubscriptionResult(
+    userId: string,
+    orderId: string,
+    checkoutUrl: string,
+    externalPaymentId: string
+  ): Promise<void> {
+    const userRef = this.db.collection("users").doc(userId);
+    await this.db.runTransaction(async (tx) => {
+      const userSnap = await tx.get(userRef);
+      if (userSnap.exists) {
+        const user = userSnap.data() as UserProfileRecord;
+        if (user.pendingProOrderId === orderId) {
+          tx.set(
+            userRef,
+            {
+              pendingProCheckoutUrl: checkoutUrl,
+              pendingProExternalPaymentId: externalPaymentId,
               atualizadoEm: Date.now(),
             },
             { merge: true }

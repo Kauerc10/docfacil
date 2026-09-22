@@ -7,7 +7,8 @@ import { requireAppCheck, resolvePrincipal, requireUser } from '@/lib/server/sec
 import { getBillingProvider } from '@/lib/server/billing/provider';
 import { getRepositories } from '@/lib/server/firestore/repositories';
 import { getServerEnv } from '@/lib/server/env';
-import { DEFAULT_PIX_EXPIRATION_MS } from '@/lib/server/billing/constants';
+import { DEFAULT_PIX_EXPIRATION_MS, RESERVATION_STALENESS_MS } from '@/lib/server/billing/constants';
+import { MercadoPagoClient, type IMercadoPagoClient } from '@/lib/server/billing/mercadopago/client';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,7 +69,10 @@ function buildCompletionUrl(
   return target.toString();
 }
 
-export async function POST(req: Request) {
+export async function handleCreateCheckout(
+  req: Request,
+  deps: { client?: IMercadoPagoClient } = {}
+) {
   try {
     await requireAppCheck(req);
     const principal = await resolvePrincipal(req);
@@ -109,10 +113,12 @@ export async function POST(req: Request) {
 
       if (userProfile?.pendingProOrderId) {
         const existingOrder = await repos.orders.getOrder(userProfile.pendingProOrderId);
+        const effectiveCheckoutUrl =
+          existingOrder?.checkoutUrl || userProfile.pendingProCheckoutUrl;
         if (
           existingOrder &&
           existingOrder.status === 'pending' &&
-          existingOrder.checkoutUrl
+          effectiveCheckoutUrl
         ) {
           const env = getServerEnv();
           const isDev = env.NODE_ENV !== 'production' || env.VERCEL_ENV === 'preview';
@@ -122,7 +128,7 @@ export async function POST(req: Request) {
               orderId: existingOrder.id,
               product: 'pro',
               amountCents: existingOrder.amountCents,
-              checkoutUrl: existingOrder.checkoutUrl,
+              checkoutUrl: effectiveCheckoutUrl,
               devMode: isDev,
             },
             { status: 200, headers: { 'Cache-Control': 'no-store' } }
@@ -201,21 +207,34 @@ export async function POST(req: Request) {
         await repos.orders.updateOrder(order.id, { status: 'cancelled' });
 
         let existingOrder = await repos.orders.getOrder(reservation.orderId);
-        if (!existingOrder?.checkoutUrl) {
+        let currentUser = await repos.users.getUserProfile(user.userId);
+
+        if (!existingOrder?.checkoutUrl && !currentUser?.pendingProCheckoutUrl) {
           for (let i = 0; i < 6; i++) {
             await new Promise((resolve) => setTimeout(resolve, 500));
             existingOrder = await repos.orders.getOrder(reservation.orderId);
-            if (existingOrder?.checkoutUrl) {
+            currentUser = await repos.users.getUserProfile(user.userId);
+            if (existingOrder?.checkoutUrl || currentUser?.pendingProCheckoutUrl) {
               break;
             }
           }
         }
 
+        const effectiveCheckoutUrl =
+          existingOrder?.checkoutUrl || currentUser?.pendingProCheckoutUrl;
+
         if (
           existingOrder &&
           existingOrder.status === 'pending' &&
-          existingOrder.checkoutUrl
+          effectiveCheckoutUrl
         ) {
+          if (!existingOrder.checkoutUrl && effectiveCheckoutUrl) {
+            await repos.orders.updateOrder(reservation.orderId, {
+              checkoutUrl: effectiveCheckoutUrl,
+              externalPaymentId: currentUser?.pendingProExternalPaymentId || undefined,
+            }).catch(() => undefined);
+          }
+
           const env = getServerEnv();
           const isDev = env.NODE_ENV !== 'production' || env.VERCEL_ENV === 'preview';
           return NextResponse.json(
@@ -224,18 +243,27 @@ export async function POST(req: Request) {
               orderId: existingOrder.id,
               product: 'pro',
               amountCents: existingOrder.amountCents,
-              checkoutUrl: existingOrder.checkoutUrl,
+              checkoutUrl: effectiveCheckoutUrl,
               devMode: isDev,
             },
             { status: 200, headers: { 'Cache-Control': 'no-store' } }
           );
         }
 
-        // Only reclaim a reservation proven abandoned (already failed or older than 60s without checkoutUrl).
-        // If the call may still be running (< 60s), keep the reservation intact and return 409 to prevent duplicate preapprovals!
+        // Apenas recicla reserva comprovadamente abandonada (status failed ou mais de 60s sem nenhum resultado do provedor).
+        const hasProviderResult = Boolean(
+          effectiveCheckoutUrl ||
+          existingOrder?.externalPaymentId ||
+          currentUser?.pendingProExternalPaymentId
+        );
+
         const isProvenAbandoned =
           existingOrder?.status === 'failed' ||
-          Boolean(existingOrder && !existingOrder.checkoutUrl && Date.now() - (existingOrder.createdAt || 0) > 60_000);
+          Boolean(
+            existingOrder &&
+            !hasProviderResult &&
+            Date.now() - (existingOrder.createdAt || 0) > RESERVATION_STALENESS_MS
+          );
 
         if (isProvenAbandoned) {
           await repos.users.releasePendingProSubscription(user.userId, reservation.orderId).catch(() => undefined);
@@ -277,13 +305,13 @@ export async function POST(req: Request) {
 
       // createSubscription teve sucesso: a assinatura recorrente já existe no Mercado Pago!
       // Atualizamos o pedido com checkoutUrl e externalPaymentId, retentando em caso de falha transitória.
-      // Nunca marcamos o pedido como failed nem liberamos a trava, garantindo que o estado do provedor
-      // seja retido e nenhuma segunda assinatura recorrente seja criada em novas requisições.
+      let persisted = false;
       try {
         await repos.orders.updateOrder(order.id, {
           checkoutUrl: result.checkoutUrl,
           externalPaymentId: result.providerCheckoutId,
         });
+        persisted = true;
       } catch {
         for (let i = 0; i < 3; i++) {
           await new Promise((r) => setTimeout(r, 100));
@@ -292,11 +320,41 @@ export async function POST(req: Request) {
               checkoutUrl: result.checkoutUrl,
               externalPaymentId: result.providerCheckoutId,
             });
+            persisted = true;
             break;
           } catch {
             // retry
           }
         }
+      }
+
+      // Se a gravação no pedido falhou após retentativas, grava no perfil do usuário para garantir durabilidade
+      if (!persisted) {
+        try {
+          await repos.users.savePendingProSubscriptionResult?.(
+            user.userId,
+            order.id,
+            result.checkoutUrl,
+            result.providerCheckoutId
+          );
+          persisted = true;
+        } catch {
+          // fallback failed
+        }
+      }
+
+      // Se todas as tentativas de persistência falharam, cancela a assinatura no Mercado Pago para
+      // não criar cobrança recorrente órfã e lança erro 500 em vez de cair silenciosamente.
+      if (!persisted) {
+        const client = deps.client || new MercadoPagoClient();
+        await client.cancelPreapproval(result.providerCheckoutId).catch(() => undefined);
+        await repos.users.releasePendingProSubscription(user.userId, order.id).catch(() => undefined);
+        await repos.orders.updateOrder(order.id, { status: 'failed' }).catch(() => undefined);
+        throw new BackendError(
+          'INTERNAL_ERROR',
+          500,
+          'Não foi possível registrar a assinatura criada. A cobrança foi cancelada, por favor tente novamente.'
+        );
       }
 
       return NextResponse.json(
@@ -380,4 +438,8 @@ export async function POST(req: Request) {
     }
     return BackendError.fromUnknown(err).toResponse();
   }
+}
+
+export async function POST(req: Request) {
+  return handleCreateCheckout(req);
 }
