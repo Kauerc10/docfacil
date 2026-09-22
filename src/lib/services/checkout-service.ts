@@ -11,7 +11,7 @@ import {
   type CheckoutPixPayload,
 } from "./pix-payment-session";
 
-export type CheckoutProvider = "mercadopago" | "demo" | "kirvano" | "perfectpay" | "stripe";
+export type CheckoutProvider = "mercadopago" | "demo";
 export type CheckoutPlan = PaidPlan;
 export type CheckoutMethod = "pix" | "card" | "credit_card";
 

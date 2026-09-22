@@ -22,6 +22,7 @@ import type {
 } from "../domain/documents";
 import { BackendError } from "../errors";
 import { createOrderBuyerPrincipalKey } from "../billing/order-identity";
+import { RESERVATION_STALENESS_MS } from "../billing/constants";
 
 /**
  * globalThis store — garante que page.tsx (Server Component) e API routes
@@ -601,7 +602,7 @@ export class InMemoryUsersRepository implements IUsersRepository {
       if (order && order.status === "pending") {
         const isStale =
           !order.checkoutUrl &&
-          Date.now() - (order.createdAt || 0) > 60_000;
+          Date.now() - (order.createdAt || 0) > RESERVATION_STALENESS_MS;
         if (!isStale) {
           return {
             status: "existing_pending",

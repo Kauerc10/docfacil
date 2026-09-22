@@ -95,8 +95,9 @@ describe("POST /api/subscription/cancel", () => {
     expect(data.error?.message).toMatch(/não possui uma assinatura Pro ativa/);
   });
 
-  it("cancela assinatura ativa no Mercado Pago, rebaixa para gratis e cancela pedido", async () => {
+  it("cancela assinatura ativa no Mercado Pago, preserva plano Pro até fim do ciclo e cancela pedido", async () => {
     const userId = "usr_pro_subscriber";
+    const now = 1770000000000;
     const order = await ordersRepo.createOrder({
       provider: "mercadopago",
       product: "pro",
@@ -104,7 +105,8 @@ describe("POST /api/subscription/cancel", () => {
       buyer: { type: "user", userId, email: "pro@exemplo.com" },
       status: "paid",
       externalPaymentId: "preapp_active_123",
-      createdAt: Date.now() - 3600000,
+      paidAt: now - 3600000,
+      createdAt: now - 3600000,
     });
 
     usersRepo.setUserProfile(userId, {
@@ -116,21 +118,25 @@ describe("POST /api/subscription/cancel", () => {
 
     const res = await handleCancelSubscription(
       makeRequest("Bearer valid_user_token"),
-      { client: mockMpClient }
+      { client: mockMpClient, now: () => now }
     );
 
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.ok).toBe(true);
     expect(data.message).toMatch(/cancelada com sucesso/);
+    expect(typeof data.expiresAt).toBe("number");
+    expect(data.expiresAt).toBeGreaterThan(now);
 
     // Verifica chamada ao client do Mercado Pago
     expect(cancelledPreapprovalId).toBe("preapp_active_123");
 
-    // Verifica rebaixamento do usuário para grátis
+    // Verifica que o plano Pro foi preservado com status de cancelado e data de expiração
     const updatedProfile = await usersRepo.getUserProfile(userId);
-    expect(updatedProfile?.plano).toBe("gratis");
-    expect(updatedProfile?.subscriptionId).toBeNull();
+    expect(updatedProfile?.plano).toBe("pro");
+    expect(updatedProfile?.subscriptionStatus).toBe("cancelled");
+    expect(updatedProfile?.subscriptionExpiresAt).toBe(data.expiresAt);
+    expect(updatedProfile?.cancelledAt).toBe(now);
 
     // Verifica cancelamento do pedido associado
     const updatedOrder = await ordersRepo.getOrder(order.id!);
@@ -139,6 +145,7 @@ describe("POST /api/subscription/cancel", () => {
 
   it("recupera o identificador da assinatura a partir do pedido associado quando profile.subscriptionId está ausente", async () => {
     const userId = "usr_pro_subscriber";
+    const now = 1770000000000;
     const order = await ordersRepo.createOrder({
       provider: "mercadopago",
       product: "pro",
@@ -146,7 +153,8 @@ describe("POST /api/subscription/cancel", () => {
       buyer: { type: "user", userId, email: "pro@exemplo.com" },
       status: "paid",
       externalPaymentId: "preapp_recovered_from_order",
-      createdAt: Date.now() - 3600000,
+      paidAt: now - 3600000,
+      createdAt: now - 3600000,
     });
 
     usersRepo.setUserProfile(userId, {
@@ -158,14 +166,60 @@ describe("POST /api/subscription/cancel", () => {
 
     const res = await handleCancelSubscription(
       makeRequest("Bearer valid_user_token"),
-      { client: mockMpClient }
+      { client: mockMpClient, now: () => now }
     );
 
     expect(res.status).toBe(200);
     expect(cancelledPreapprovalId).toBe("preapp_recovered_from_order");
 
     const updatedProfile = await usersRepo.getUserProfile(userId);
-    expect(updatedProfile?.plano).toBe("gratis");
+    expect(updatedProfile?.plano).toBe("pro");
+    expect(updatedProfile?.subscriptionStatus).toBe("cancelled");
+  });
+
+  it("utiliza next_payment_date retornado pelo Mercado Pago para definir subscriptionExpiresAt", async () => {
+    const userId = "usr_pro_subscriber";
+    const now = 1770000000000;
+    const nextPaymentDate = "2026-10-15T12:00:00.000Z";
+    const expectedExpiry = Date.parse(nextPaymentDate);
+
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "pro@exemplo.com" },
+      status: "paid",
+      externalPaymentId: "preapp_with_next_date",
+      createdAt: now - 3600000,
+    });
+
+    usersRepo.setUserProfile(userId, {
+      plano: "pro",
+      email: "pro@exemplo.com",
+      subscriptionId: "preapp_with_next_date",
+      subscriptionOrderId: order.id,
+    });
+
+    const clientWithNextDate: IMercadoPagoClient = {
+      ...mockMpClient,
+      getPreapproval: async () => ({
+        id: "preapp_with_next_date",
+        status: "authorized",
+        next_payment_date: nextPaymentDate,
+      }),
+    };
+
+    const res = await handleCancelSubscription(
+      makeRequest("Bearer valid_user_token"),
+      { client: clientWithNextDate, now: () => now }
+    );
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.expiresAt).toBe(expectedExpiry);
+
+    const updatedProfile = await usersRepo.getUserProfile(userId);
+    expect(updatedProfile?.subscriptionExpiresAt).toBe(expectedExpiry);
   });
 
   it("recusa o cancelamento com 400 se o identificador da assinatura não for localizado nem no perfil nem no pedido", async () => {

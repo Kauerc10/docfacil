@@ -5,6 +5,7 @@ import { BackendError } from "../errors";
 import { getServerEnv } from "../env";
 import { assertProductionServerConfig } from "../config/assert-production-config";
 import { createOrderBuyerPrincipalKey } from "../billing/order-identity";
+import { RESERVATION_STALENESS_MS } from "../billing/constants";
 import type {
   IDocumentsRepository,
   IAccessRepository,
@@ -627,7 +628,7 @@ export class FirestoreUsersRepository implements IUsersRepository {
           if (order.status === "pending") {
             const isStale =
               !order.checkoutUrl &&
-              Date.now() - (order.createdAt || 0) > 60_000;
+              Date.now() - (order.createdAt || 0) > RESERVATION_STALENESS_MS;
             if (!isStale) {
               return {
                 status: "existing_pending",

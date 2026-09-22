@@ -905,5 +905,66 @@ describe("POST /api/webhooks/mercadopago", () => {
     const userProfile = await usersRepo.getUserProfile(userId);
     expect(userProfile?.pendingProOrderId).toBe("order_B_pending");
   });
+
+  it("preserva plano Pro até subscriptionExpiresAt ao receber webhook de cancelamento de preapproval vigente", async () => {
+    const userId = "usr_pro_future_expiry";
+    const now = 1770000000000;
+    const futureExpiry = now + 15 * 24 * 60 * 60 * 1000; // 15 dias no futuro
+
+    const order = await ordersRepo.createOrder({
+      provider: "mercadopago",
+      product: "pro",
+      amountCents: 3490,
+      buyer: { type: "user", userId, email: "future@docfacil.com.br" },
+      status: "paid",
+      externalPaymentId: "preapp_future_cancel",
+      paidAt: now - 15 * 24 * 60 * 60 * 1000,
+      createdAt: now - 15 * 24 * 60 * 60 * 1000,
+    });
+
+    usersRepo.setUserProfile(userId, {
+      plano: "pro",
+      email: "future@docfacil.com.br",
+      subscriptionId: "preapp_future_cancel",
+      subscriptionOrderId: order.id,
+      subscriptionExpiresAt: futureExpiry,
+    });
+
+    mockMpClient = createTestMpClient({
+      getPreapproval: async () => ({
+        id: "preapp_future_cancel",
+        status: "cancelled",
+        external_reference: order.id,
+      }),
+    });
+
+    const req = makeWebhookRequest(
+      "preapp_future_cancel",
+      {
+        action: "updated",
+        data: { id: "preapp_future_cancel" },
+        type: "subscription_preapproval",
+      },
+      { ts: Math.floor(now / 1000).toString() }
+    );
+
+    const res = await handleMercadoPagoWebhook(req, {
+      secret,
+      client: mockMpClient,
+      now: () => now,
+    });
+
+    expect(res.status).toBe(200);
+
+    // O pedido foi marcado como cancelado
+    const updatedOrder = await ordersRepo.getOrder(order.id!);
+    expect(updatedOrder?.status).toBe("cancelled");
+
+    // O usuário retém o plano Pro com status cancelled e data de expiração preservada
+    const userProfile = await usersRepo.getUserProfile(userId);
+    expect(userProfile?.plano).toBe("pro");
+    expect(userProfile?.subscriptionStatus).toBe("cancelled");
+    expect(userProfile?.subscriptionExpiresAt).toBe(futureExpiry);
+  });
 });
 

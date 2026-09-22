@@ -9,6 +9,7 @@ import {
 } from '@/lib/server/billing/mercadopago/webhook';
 import { MercadoPagoClient, type IMercadoPagoClient } from '@/lib/server/billing/mercadopago/client';
 import { setServerUserPlan } from '@/lib/server/billing/account-plan';
+import { DEFAULT_SUBSCRIPTION_CYCLE_MS } from '@/lib/server/billing/constants';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -117,7 +118,13 @@ export async function handleMercadoPagoWebhook(
                   order.buyer.userId,
                   'pro',
                   currentProfile?.subscriptionId || order.externalPaymentId || null,
-                  orderId
+                  orderId,
+                  false,
+                  {
+                    subscriptionStatus: 'active',
+                    subscriptionExpiresAt: null,
+                    cancelledAt: null,
+                  }
                 );
               }
             }
@@ -176,7 +183,13 @@ export async function handleMercadoPagoWebhook(
                 order.buyer.userId,
                 'pro',
                 preapproval.id,
-                orderId
+                orderId,
+                false,
+                {
+                  subscriptionStatus: 'active',
+                  subscriptionExpiresAt: null,
+                  cancelledAt: null,
+                }
               );
 
               if (order.status === 'pending' || order.status === 'cancelled' || order.status === 'failed') {
@@ -213,13 +226,34 @@ export async function handleMercadoPagoWebhook(
               (!currentProfile?.subscriptionId && !currentProfile?.subscriptionOrderId && !hasDifferentPending);
 
             if (isCurrentSubscription) {
-              await setServerUserPlan(
-                order.buyer.userId,
-                'gratis',
-                null,
-                null,
-                hasDifferentPending
-              );
+              let expiry = currentProfile?.subscriptionExpiresAt;
+              if (!expiry && order.paidAt) {
+                expiry = order.paidAt + DEFAULT_SUBSCRIPTION_CYCLE_MS;
+              }
+
+              if (expiry && expiry > now) {
+                // Preserva o acesso Pro até o término do ciclo mensal pago
+                await setServerUserPlan(
+                  order.buyer.userId,
+                  'pro',
+                  preapproval.id,
+                  orderId,
+                  hasDifferentPending,
+                  {
+                    subscriptionStatus: 'cancelled',
+                    subscriptionExpiresAt: expiry,
+                    cancelledAt: currentProfile?.cancelledAt ?? now,
+                  }
+                );
+              } else {
+                await setServerUserPlan(
+                  order.buyer.userId,
+                  'gratis',
+                  null,
+                  null,
+                  hasDifferentPending
+                );
+              }
             }
           }
         }

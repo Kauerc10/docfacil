@@ -84,22 +84,29 @@ export function countBillingMonthDocuments(
   }).length;
 }
 
-export type UserLike = { plano?: string | null } | null | undefined;
+export type UserLike = {
+  plano?: string | null;
+  subscriptionExpiresAt?: number | null;
+} | null | undefined;
 
-export function isPro(user: UserLike): boolean {
-  return user?.plano === "pro";
+export function isPro(user: UserLike, now = Date.now()): boolean {
+  if (user?.plano !== "pro") return false;
+  if (user.subscriptionExpiresAt && user.subscriptionExpiresAt <= now) {
+    return false;
+  }
+  return true;
 }
 
 export function isAvulso(user: UserLike): boolean {
   return user?.plano === "avulso";
 }
 
-export function hasPaidPlan(user: UserLike): boolean {
-  return user?.plano === "avulso" || user?.plano === "pro";
+export function hasPaidPlan(user: UserLike, now = Date.now()): boolean {
+  return isAvulso(user) || isPro(user, now);
 }
 
-export function getPlan(user: UserLike): "gratis" | "avulso" | "pro" {
-  if (user?.plano === "pro") return "pro";
+export function getPlan(user: UserLike, now = Date.now()): "gratis" | "avulso" | "pro" {
+  if (isPro(user, now)) return "pro";
   if (user?.plano === "avulso") return "avulso";
   return "gratis";
 }
@@ -161,9 +168,11 @@ export type EntitlementFailureReason =
 export interface EvaluateCreationEntitlementParams {
   isUserLoggedIn: boolean;
   userPlan?: string | null;
+  subscriptionExpiresAt?: number | null;
   modelSlug: string;
   monthDocCount: number;
   hasPaidOrder?: boolean;
+  now?: number;
 }
 
 export interface CreationEntitlementResult {
@@ -179,7 +188,15 @@ export interface CreationEntitlementResult {
 export function evaluateCreationEntitlement(
   params: EvaluateCreationEntitlementParams
 ): CreationEntitlementResult {
-  const { isUserLoggedIn, userPlan, modelSlug, monthDocCount, hasPaidOrder } = params;
+  const {
+    isUserLoggedIn,
+    userPlan,
+    subscriptionExpiresAt,
+    modelSlug,
+    monthDocCount,
+    hasPaidOrder,
+    now = Date.now(),
+  } = params;
 
   if (hasPaidOrder) {
     return { allowed: true, entitlement: "single_purchase", watermarked: false };
@@ -189,7 +206,11 @@ export function evaluateCreationEntitlement(
     return { allowed: false, reason: "login_or_payment_required" };
   }
 
-  if (userPlan === "pro") {
+  const isProActive =
+    userPlan === "pro" &&
+    (!subscriptionExpiresAt || subscriptionExpiresAt > now);
+
+  if (isProActive) {
     return { allowed: true, entitlement: "pro", watermarked: false };
   }
 

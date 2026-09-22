@@ -102,6 +102,9 @@ export interface UserProfileRecord {
   subscriptionId?: string | null;
   subscriptionOrderId?: string | null;
   pendingProOrderId?: string | null;
+  subscriptionStatus?: "active" | "cancelled";
+  subscriptionExpiresAt?: number | null;
+  cancelledAt?: number | null;
 }
 
 export type ReservePendingProSubscriptionResult =

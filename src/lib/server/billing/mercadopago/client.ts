@@ -94,6 +94,7 @@ export interface MercadoPagoPreapprovalResponse {
   reason?: string;
   external_reference?: string;
   payer_email?: string;
+  next_payment_date?: string;
 }
 
 export interface IMercadoPagoClient {

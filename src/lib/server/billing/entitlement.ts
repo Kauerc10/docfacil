@@ -3,6 +3,7 @@ import type { Principal } from "../security";
 import type { OrderRecord, DocumentEntitlement } from "../domain/documents";
 import { BackendError } from "../errors";
 import { evaluateCreationEntitlement } from "@/lib/billing/entitlement-policy";
+import { setServerUserPlan } from "./account-plan";
 
 export type AccountPlan = "gratis" | "pro";
 export type PurchaseProduct = "avulso" | "pro";
@@ -12,8 +13,12 @@ export interface ResolveEntitlementParams {
   modeloSlug: string;
   orderId?: string;
   order?: OrderRecord | null;
-  userProfile?: { plano?: string } | null;
+  userProfile?: {
+    plano?: string;
+    subscriptionExpiresAt?: number | null;
+  } | null;
   currentMonthlyCount?: number;
+  now?: number;
 }
 
 export interface EntitlementDecision {
@@ -24,6 +29,7 @@ export interface EntitlementDecision {
 
 export function resolveEntitlement(params: ResolveEntitlementParams): EntitlementDecision {
   const { principal, modeloSlug, orderId, order, userProfile, currentMonthlyCount = 0 } = params;
+  const nowMs = params.now ?? Date.now();
 
   if (orderId) {
     if (!order) {
@@ -51,9 +57,22 @@ export function resolveEntitlement(params: ResolveEntitlementParams): Entitlemen
   const decision = evaluateCreationEntitlement({
     isUserLoggedIn: principal.type === "user",
     userPlan: userProfile?.plano,
+    subscriptionExpiresAt: userProfile?.subscriptionExpiresAt,
     modelSlug: modeloSlug,
     monthDocCount: currentMonthlyCount,
+    now: nowMs,
   });
+
+  // Lazy downgrade em background: se a conta ainda constar como 'pro' no Firestore
+  // mas o período de expiração já passou, dispara sincronização silenciosa
+  if (
+    principal.type === "user" &&
+    userProfile?.plano === "pro" &&
+    userProfile.subscriptionExpiresAt &&
+    userProfile.subscriptionExpiresAt <= nowMs
+  ) {
+    setServerUserPlan(principal.userId, "gratis", null, null).catch(() => undefined);
+  }
 
   if (!decision.allowed) {
     if (decision.reason === "login_or_payment_required") {

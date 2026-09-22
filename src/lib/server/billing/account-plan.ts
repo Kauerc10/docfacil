@@ -16,12 +16,19 @@ type MutableRuntimeUsersRepository = {
   ) => void | Promise<void>;
 };
 
+export interface SetServerUserPlanOptions {
+  subscriptionStatus?: "active" | "cancelled" | null;
+  subscriptionExpiresAt?: number | null;
+  cancelledAt?: number | null;
+}
+
 export async function setServerUserPlan(
   userId: string,
   plan: "gratis" | "pro",
   subscriptionId?: string | null,
   subscriptionOrderId?: string | null,
-  preservePendingOrder: boolean = false
+  preservePendingOrder: boolean = false,
+  options?: SetServerUserPlanOptions
 ): Promise<void> {
   const env = getServerEnv();
   const isUnitTestWithoutEmulator =
@@ -40,6 +47,30 @@ export async function setServerUserPlan(
   }
   if (!preservePendingOrder && (plan === "pro" || plan === "gratis")) {
     dataToSet.pendingProOrderId = null;
+  }
+
+  if (options?.subscriptionStatus !== undefined) {
+    dataToSet.subscriptionStatus = options.subscriptionStatus;
+  } else if (plan === "pro") {
+    dataToSet.subscriptionStatus = "active";
+  } else {
+    dataToSet.subscriptionStatus = null;
+  }
+
+  if (options?.subscriptionExpiresAt !== undefined) {
+    dataToSet.subscriptionExpiresAt = options.subscriptionExpiresAt;
+  } else if (plan === "pro") {
+    dataToSet.subscriptionExpiresAt = null;
+  } else {
+    dataToSet.subscriptionExpiresAt = null;
+  }
+
+  if (options?.cancelledAt !== undefined) {
+    dataToSet.cancelledAt = options.cancelledAt;
+  } else if (plan === "pro") {
+    dataToSet.cancelledAt = null;
+  } else {
+    dataToSet.cancelledAt = null;
   }
 
   if (!isUnitTestWithoutEmulator) {
@@ -62,6 +93,9 @@ export async function setServerUserPlan(
       ...(!preservePendingOrder && (plan === "pro" || plan === "gratis")
         ? { pendingProOrderId: null }
         : {}),
+      subscriptionStatus: (dataToSet.subscriptionStatus as "active" | "cancelled" | undefined) ?? undefined,
+      subscriptionExpiresAt: (dataToSet.subscriptionExpiresAt as number | undefined) ?? undefined,
+      cancelledAt: (dataToSet.cancelledAt as number | undefined) ?? undefined,
     });
   }
 }
