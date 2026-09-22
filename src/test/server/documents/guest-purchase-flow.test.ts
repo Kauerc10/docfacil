@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "bun:test";
+import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { POST as finalizePost } from "@/app/api/documents/finalize/route";
 import { POST as downloadPost } from "@/app/api/access/download/route";
 import {
@@ -36,6 +36,11 @@ describe("End-to-End Guest Purchase & Magic Link Flow", () => {
       users: usersRepo,
     });
     setArtifactStorageForTesting(storage);
+  });
+
+  afterEach(() => {
+    setRepositoriesForTesting(null);
+    setArtifactStorageForTesting(null);
   });
 
   const validGuestAnswers = {

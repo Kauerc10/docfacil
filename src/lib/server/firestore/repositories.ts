@@ -35,11 +35,6 @@ import {
   InMemoryGenerationCommitRepository,
   InMemoryWebhookEventsRepository,
 } from "./in-memory-repositories";
-import {
-  getDocumentStore,
-  setDocumentStoreForTesting,
-  adaptRepositoriesToStore,
-} from "./document-store";
 
 export class FirestoreDocumentsRepository implements IDocumentsRepository {
   private readonly db: Firestore;
@@ -860,27 +855,6 @@ export function getRepositories(): BackendRepositories {
     return repositoriesSingleton;
   }
 
-  const store = getDocumentStore() as any;
-  if (
-    store.documents &&
-    store.access &&
-    store.orders &&
-    store.generationRequests &&
-    store.users &&
-    store.generationCommit
-  ) {
-    repositoriesSingleton = {
-      documents: store.documents,
-      access: store.access,
-      orders: store.orders,
-      generationRequests: store.generationRequests,
-      users: store.users,
-      generationCommit: store.generationCommit,
-      webhookEvents: store.webhookEvents || new InMemoryWebhookEventsRepository(false),
-    };
-    return repositoriesSingleton;
-  }
-
   const env = getServerEnv();
   assertProductionServerConfig(env);
 
@@ -915,7 +889,6 @@ export function getRepositories(): BackendRepositories {
       generationCommit,
       webhookEvents,
     };
-    setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
   } else {
     repositoriesSingleton = {
       documents: new FirestoreDocumentsRepository(),
@@ -926,7 +899,10 @@ export function getRepositories(): BackendRepositories {
       generationCommit: new FirestoreGenerationCommitRepository(),
       webhookEvents: new FirestoreWebhookEventsRepository(),
     };
-    setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
+  }
+
+  if (typeof (globalThis as any).__syncDocumentStoreWithRepositories === "function") {
+    (globalThis as any).__syncDocumentStoreWithRepositories(repositoriesSingleton);
   }
 
   return repositoriesSingleton;
@@ -938,16 +914,19 @@ export function setTestRepositories(repos: BackendRepositories | null): void {
     if (repos.users instanceof InMemoryUsersRepository && repos.orders instanceof InMemoryOrdersRepository) {
       repos.users.setOrdersRepository(repos.orders);
     }
-    setDocumentStoreForTesting(adaptRepositoriesToStore(repos));
+    if (typeof (globalThis as any).__syncDocumentStoreWithRepositories === "function") {
+      (globalThis as any).__syncDocumentStoreWithRepositories(repos);
+    }
   } else {
-    setDocumentStoreForTesting(null);
+    if (typeof (globalThis as any).__syncDocumentStoreWithRepositories === "function") {
+      (globalThis as any).__syncDocumentStoreWithRepositories(null);
+    }
   }
 }
 
 export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | null): void {
   if (!repos) {
-    repositoriesSingleton = null;
-    setDocumentStoreForTesting(null);
+    setTestRepositories(null);
     return;
   }
   const current = getRepositories();
@@ -956,9 +935,6 @@ export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | 
   const orders = repos.orders || current.orders;
   const generationRequests = repos.generationRequests || current.generationRequests;
   const users = repos.users || current.users;
-  if (users instanceof InMemoryUsersRepository && orders instanceof InMemoryOrdersRepository) {
-    users.setOrdersRepository(orders);
-  }
   const generationCommit =
     repos.generationCommit ||
     (documents instanceof InMemoryDocumentsRepository &&
@@ -972,13 +948,9 @@ export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | 
           generationRequests
         )
       : current.generationCommit);
+  const webhookEvents = repos.webhookEvents || current.webhookEvents;
 
-  const webhookEvents =
-    repos.webhookEvents ||
-    current.webhookEvents ||
-    new InMemoryWebhookEventsRepository(false);
-
-  repositoriesSingleton = {
+  setTestRepositories({
     documents,
     access,
     orders,
@@ -986,6 +958,5 @@ export function setRepositoriesForTesting(repos: Partial<BackendRepositories> | 
     users,
     generationCommit,
     webhookEvents,
-  };
-  setDocumentStoreForTesting(adaptRepositoriesToStore(repositoriesSingleton));
+  });
 }
