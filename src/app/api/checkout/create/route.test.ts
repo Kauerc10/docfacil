@@ -207,6 +207,24 @@ describe("POST /api/checkout/create", () => {
     expect(data.error?.message).toMatch(/já possui uma assinatura do Plano Pro ativa/);
   });
 
+  it("permite novo checkout Pro quando usuário possui plano Pro com assinatura cancelada (re-assinatura)", async () => {
+    usersRepo.setUserProfile("usr_123", {
+      plano: "pro",
+      email: "usuario@exemplo.com",
+      subscriptionStatus: "cancelled",
+      subscriptionExpiresAt: Date.now() + 86400000,
+    });
+
+    const res = await POST(
+      makeRequest({ product: "pro" }, "Bearer valid_user_token")
+    );
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.kind).toBe("redirect");
+    expect(data.checkoutUrl).toBeDefined();
+  });
+
   it("reaproveita pedido Pro pendente e sua URL de checkout sem criar assinatura duplicada", async () => {
     const existingOrder = await ordersRepo.createOrder({
       provider: "mercadopago",

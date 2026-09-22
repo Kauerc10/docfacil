@@ -443,6 +443,10 @@ function PerfilContent() {
                     Nenhuma nova cobrança recorrente será realizada. Seu acesso completo permanece disponível durante todo o período mensal já pago.
                   </p>
                 </div>
+              ) : subscriptionStatus === "cancelled" ? (
+                <p className="mt-4 text-sm text-ink/50 italic">
+                  Sua assinatura Pro expirou e nenhuma nova cobrança será realizada.
+                </p>
               ) : cancelMsg ? (
                 <p className="mt-4 text-sm text-[var(--selo-green)] font-medium">
                   Sua assinatura já foi cancelada.

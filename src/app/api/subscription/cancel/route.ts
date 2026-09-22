@@ -31,6 +31,14 @@ export async function handleCancelSubscription(
       );
     }
 
+    if (profile?.subscriptionStatus === 'cancelled') {
+      throw new BackendError(
+        'INVALID_REQUEST',
+        400,
+        'Sua assinatura Pro já foi cancelada. Seu acesso permanece ativo até o término do ciclo já pago.'
+      );
+    }
+
     let subscriptionId = profile.subscriptionId;
     let order = profile.subscriptionOrderId
       ? await repos.orders.getOrder(profile.subscriptionOrderId)

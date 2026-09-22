@@ -11,6 +11,7 @@ import type { IMercadoPagoClient } from './client';
 import { MercadoPagoClient } from './client';
 import { getServerEnv } from '../../env';
 import { BackendError } from '../../errors';
+import { DEFAULT_PIX_EXPIRATION_MS } from '../constants';
 
 export class MercadoPagoBillingProvider implements BillingProvider {
   private readonly client: IMercadoPagoClient;
@@ -119,7 +120,7 @@ export class MercadoPagoBillingProvider implements BillingProvider {
       brCodeBase64: qrCodeBase64,
       expiresAt:
         payment.date_of_expiration ||
-        new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        new Date(Date.now() + DEFAULT_PIX_EXPIRATION_MS).toISOString(),
       devMode: isDev,
     };
   }

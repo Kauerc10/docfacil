@@ -15,6 +15,3 @@ export const DEFAULT_PIX_EXPIRATION_MS = 30 * 60 * 1000;
 
 /** Janela máxima de tolerância a ataques de replay em assinaturas de webhooks (10 minutos). */
 export const WEBHOOK_REPLAY_TOLERANCE_MS = 10 * 60 * 1000;
-
-/** E-mail fallback para pagador caso nenhum dado de contato seja fornecido. */
-export const DEFAULT_FALLBACK_PAYER_EMAIL = 'cliente@docfacil.com.br';

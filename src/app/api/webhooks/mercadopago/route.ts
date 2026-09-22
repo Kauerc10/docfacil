@@ -227,6 +227,12 @@ export async function handleMercadoPagoWebhook(
 
             if (isCurrentSubscription) {
               let expiry = currentProfile?.subscriptionExpiresAt;
+              if (!expiry && preapproval.next_payment_date) {
+                const parsed = Date.parse(preapproval.next_payment_date);
+                if (Number.isFinite(parsed) && parsed > now) {
+                  expiry = parsed;
+                }
+              }
               if (!expiry && order.paidAt) {
                 expiry = order.paidAt + DEFAULT_SUBSCRIPTION_CYCLE_MS;
               }

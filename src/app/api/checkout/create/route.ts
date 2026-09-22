@@ -7,6 +7,7 @@ import { requireAppCheck, resolvePrincipal, requireUser } from '@/lib/server/sec
 import { getBillingProvider } from '@/lib/server/billing/provider';
 import { getRepositories } from '@/lib/server/firestore/repositories';
 import { getServerEnv } from '@/lib/server/env';
+import { DEFAULT_PIX_EXPIRATION_MS } from '@/lib/server/billing/constants';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -97,7 +98,8 @@ export async function POST(req: Request) {
       }
 
       const userProfile = await repos.users.getUserProfile(principal.userId);
-      if (userProfile?.plano === 'pro') {
+      const isCancelledSubscription = userProfile?.subscriptionStatus === 'cancelled';
+      if (userProfile?.plano === 'pro' && !isCancelledSubscription) {
         throw new BackendError(
           'CONFLICT',
           409,
@@ -330,7 +332,7 @@ export async function POST(req: Request) {
 
     if (result.kind === 'pix') {
       const expiresAt =
-        Date.parse(result.expiresAt) || Date.now() + 30 * 60 * 1000;
+        Date.parse(result.expiresAt) || Date.now() + DEFAULT_PIX_EXPIRATION_MS;
 
       await repos.orders.updateOrder(order.id, {
         brCode: result.brCode,

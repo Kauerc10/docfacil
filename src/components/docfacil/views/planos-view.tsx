@@ -115,7 +115,11 @@ const FAQ = [
 export function PlanosView() {
   const { navigate } = useNav();
   const { user } = useAuth();
-  const isPro = user?.plano === "pro";
+  const isCancelledWithPendingAccess =
+    user?.plano === "pro" &&
+    user?.subscriptionStatus === "cancelled" &&
+    Boolean(user?.subscriptionExpiresAt && user.subscriptionExpiresAt > Date.now());
+  const isPro = user?.plano === "pro" && !isCancelledWithPendingAccess;
   const root = useRef<HTMLDivElement>(null);
 
   useGSAP(

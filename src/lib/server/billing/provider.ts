@@ -1,4 +1,5 @@
 import 'server-only';
+import { DEFAULT_PIX_EXPIRATION_MS } from './constants';
 import type { PaymentMethod } from '../domain/documents';
 
 export interface CreateOneTimePaymentInput {
@@ -94,7 +95,7 @@ export class DemoBillingProviderAdapter implements BillingProvider {
         '00020126580014br.gov.bcb.pix0136demo-pix-code-docfacil520400005303986540519.905802BR5913DocFacil Demo6009Sao Paulo62070503***6304ABCD',
       brCodeBase64:
         'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + DEFAULT_PIX_EXPIRATION_MS).toISOString(),
       devMode: true,
     };
   }

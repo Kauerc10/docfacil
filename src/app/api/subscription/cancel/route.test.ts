@@ -285,4 +285,32 @@ describe("POST /api/subscription/cancel", () => {
     const updatedOrder = await ordersRepo.getOrder(order.id!);
     expect(updatedOrder?.status).toBe("paid");
   });
+
+  it("rejeita com 400 tentativa de cancelamento duplicada para assinatura já cancelada", async () => {
+    const userId = "usr_pro_subscriber";
+    const now = 1770000000000;
+    const futureExpiry = now + 15 * 24 * 60 * 60 * 1000;
+
+    usersRepo.setUserProfile(userId, {
+      plano: "pro",
+      email: "pro@exemplo.com",
+      subscriptionId: "preapp_already_cancelled",
+      subscriptionStatus: "cancelled",
+      subscriptionExpiresAt: futureExpiry,
+    });
+
+    const res = await handleCancelSubscription(
+      makeRequest("Bearer valid_user_token"),
+      { client: mockMpClient, now: () => now }
+    );
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error?.message).toMatch(/já foi cancelada/);
+
+    // A data de expiração não é alterada ou estendida
+    const profile = await usersRepo.getUserProfile(userId);
+    expect(profile?.subscriptionExpiresAt).toBe(futureExpiry);
+    expect(cancelledPreapprovalId).toBeNull();
+  });
 });

@@ -206,9 +206,7 @@ export function evaluateCreationEntitlement(
     return { allowed: false, reason: "login_or_payment_required" };
   }
 
-  const isProActive =
-    userPlan === "pro" &&
-    (!subscriptionExpiresAt || subscriptionExpiresAt > now);
+  const isProActive = isPro({ plano: userPlan, subscriptionExpiresAt }, now);
 
   if (isProActive) {
     return { allowed: true, entitlement: "pro", watermarked: false };

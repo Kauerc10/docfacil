@@ -591,7 +591,7 @@ export class InMemoryUsersRepository implements IUsersRepository {
     orderId: string
   ): Promise<ReservePendingProSubscriptionResult> {
     const user = this.users.get(userId);
-    if (user?.plano === "pro") {
+    if (user?.plano === "pro" && user.subscriptionStatus !== "cancelled") {
       return { status: "active_pro" };
     }
 

@@ -615,7 +615,7 @@ export class FirestoreUsersRepository implements IUsersRepository {
       const userSnap = await tx.get(userRef);
       const user = userSnap.exists ? (userSnap.data() as UserProfileRecord) : null;
 
-      if (user?.plano === "pro") {
+      if (user?.plano === "pro" && user.subscriptionStatus !== "cancelled") {
         return { status: "active_pro" };
       }
 
