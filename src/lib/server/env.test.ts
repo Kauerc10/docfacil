@@ -38,6 +38,17 @@ describe("server env validation", () => {
     expect(env.R2_BUCKET_NAME).toBeUndefined();
   });
 
+  it("substitui placeholder (.env.example) de FIREBASE_PROJECT_ID por NEXT_PUBLIC_FIREBASE_PROJECT_ID real", () => {
+    const raw = {
+      NODE_ENV: "test",
+      FIREBASE_PROJECT_ID: "seu-projeto",
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: "docfacil-17958",
+    };
+
+    const env = parseServerEnv(raw);
+    expect(env.FIREBASE_PROJECT_ID).toBe("docfacil-17958");
+  });
+
   it("does not invent an R2 bucket when none was configured", () => {
     const env = parseServerEnv({
       NODE_ENV: "test",

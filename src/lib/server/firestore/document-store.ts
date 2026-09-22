@@ -8,8 +8,8 @@ import type {
   ArtifactState,
 } from "../domain/documents";
 import type { CommitGeneratedArtifactInput } from "./interfaces";
-import { getServerEnv } from "../env";
-import { assertProductionServerConfig } from "../config/assert-production-config";
+import { getRepositories } from "./repositories";
+import { InMemoryGenerationCommitRepository } from "./in-memory-repositories";
 
 export interface DocumentStore {
   // Idempotency & Generation Requests
@@ -101,33 +101,25 @@ export interface DocumentStore {
 
 let storeSingleton: DocumentStore | null = null;
 
+(globalThis as any).__syncDocumentStoreWithRepositories = (repos: any) => {
+  storeSingleton = repos ? adaptRepositoriesToStore(repos) : null;
+};
+
+export function getRawDocumentStore(): DocumentStore | null {
+  return storeSingleton;
+}
+
 export function getDocumentStore(): DocumentStore {
   if (storeSingleton) {
     return storeSingleton;
   }
 
-  const env = getServerEnv();
-  assertProductionServerConfig(env);
-
-  const useInMemory =
-    env.ALLOW_IN_MEMORY_REPOSITORIES ||
-    (env.NODE_ENV === "test" && !env.FIRESTORE_EMULATOR_HOST);
-
-  if (useInMemory) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { InMemoryDocumentStore } = require("./in-memory-document-store");
-    storeSingleton = new InMemoryDocumentStore(false);
-  } else {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { FirestoreDocumentStore } = require("./firestore-document-store");
-    storeSingleton = new FirestoreDocumentStore();
-  }
-
-  return storeSingleton!;
+  return adaptRepositoriesToStore(getRepositories());
 }
 
 export function setDocumentStoreForTesting(store: DocumentStore | null): void {
   storeSingleton = store;
+  (globalThis as any).__currentDocumentStore = store;
   if (!store && typeof (globalThis as any).__resetRepositoriesSingleton === "function") {
     (globalThis as any).__resetRepositoriesSingleton();
   }
@@ -140,8 +132,6 @@ export function adaptRepositoriesToStore(repos: any): DocumentStore {
 
   let generationCommit = repos.generationCommit;
   if (!generationCommit && repos.documents && repos.orders) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { InMemoryGenerationCommitRepository } = require("./in-memory-repositories");
     generationCommit = new InMemoryGenerationCommitRepository(
       repos.documents,
       repos.access,

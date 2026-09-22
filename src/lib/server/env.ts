@@ -39,9 +39,25 @@ export type ServerEnv = z.infer<typeof serverEnvSchema> & {
   FIREBASE_PROJECT_ID: string;
 };
 
+function isPlaceholderProjectId(id?: string): boolean {
+  if (!id) return true;
+  const normalized = id.trim().toLowerCase();
+  return normalized === "seu-projeto" || normalized === "docfacil-dev";
+}
+
 export function parseServerEnv(raw: Record<string, unknown> = process.env): ServerEnv {
   const parsed = serverEnvSchema.parse(raw);
-  const projectId = parsed.FIREBASE_PROJECT_ID || parsed.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "docfacil-dev";
+  const clientProjectId = parsed.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const serverProjectId = parsed.FIREBASE_PROJECT_ID;
+
+  let projectId: string;
+  if (!isPlaceholderProjectId(clientProjectId)) {
+    projectId = !isPlaceholderProjectId(serverProjectId)
+      ? serverProjectId!
+      : clientProjectId!;
+  } else {
+    projectId = serverProjectId || clientProjectId || "docfacil-dev";
+  }
 
   return {
     ...parsed,

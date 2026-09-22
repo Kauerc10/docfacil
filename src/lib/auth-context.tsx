@@ -147,9 +147,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      setLoading(true);
       await ensureAuthPersistence();
       await signInWithPopup(auth, new GoogleAuthProvider());
     } catch (e) {
+      setLoading(false);
       setError(translateAuthError(e));
       throw e;
     }
@@ -170,9 +172,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      setLoading(true);
       await ensureAuthPersistence();
       await signInWithEmailAndPassword(auth, email, password);
     } catch (e) {
+      setLoading(false);
       setError(translateAuthError(e));
       throw e;
     }
@@ -196,11 +200,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pendingSignupNameRef.current = normalizedName;
 
     try {
+      setLoading(true);
       await ensureAuthPersistence();
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: normalizedName });
       return { uid: cred.user.uid, email: cred.user.email || email };
     } catch (e) {
+      setLoading(false);
       pendingSignupNameRef.current = null;
       setError(translateAuthError(e));
       throw e;
