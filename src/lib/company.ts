@@ -14,12 +14,12 @@
  * preenchidos com os dados reais da empresa antes de publicar.
  */
 export const COMPANY = {
-  name: "K-HUB Soluções Digitais",
-  shortName: "K-HUB",
+  name: "RUON",
+  shortName: "RUON",
   productName: "DocFácil",
-  domain: "khub.com.br",
-  url: "https://khub.com.br",
-  email: "contato@khub.com.br",
+  domain: "ruon.dev",
+  url: "https://ruon.dev",
+  email: "kaue@ruon.dev",
 
   // --- Dados LGPD/exigências legais — PREENCHER antes de publicar ----------
 
@@ -32,9 +32,9 @@ export const COMPANY = {
    * de comunicação específico para o encarregado. Deve ser separado do
    * e-mail de contato geral.
    */
-  dpoEmail: "dpo@khub.com.br", // PREENCHER — Encarregado LGPD
+  dpoEmail: "kaue@ruon.dev", // Encarregado LGPD
   /** E-mail de suporte ao cliente. */
-  suporteEmail: "suporte@khub.com.br", // PREENCHER
+  suporteEmail: "kaue@ruon.dev", // Suporte
   /** Número real do WhatsApp (formato wa.me/55DDDNNNNNNNNN). */
   whatsappReal: "https://wa.me/5511000000000", // PREENCHER — WhatsApp real
 
