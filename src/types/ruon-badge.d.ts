@@ -1,7 +1,8 @@
 import type * as React from 'react';
 
 type RuonBadgeAttributes = {
-  ref?: string | any;
+  project?: string;
+  'data-ref'?: string;
   theme?: 'auto' | 'dark' | 'light' | 'monochrome';
   size?: 'sm' | 'md';
   label?: string;

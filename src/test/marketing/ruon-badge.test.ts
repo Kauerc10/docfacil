@@ -13,7 +13,7 @@ describe("RUON Signature Badge no Rodapé do DocFácil", () => {
 
   it("renderiza o custom element <ruon-badge> com atributos corretos para o DocFácil", () => {
     expect(footerSource).toContain('<ruon-badge');
-    expect(footerSource).toContain('ref="docfacil"');
+    expect(footerSource).toContain('project="docfacil"');
     expect(footerSource).toContain('theme="dark"');
     expect(footerSource).toContain('size="sm"');
   });

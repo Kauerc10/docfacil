@@ -141,7 +141,7 @@ export function Footer() {
               . Todos os direitos reservados.
             </p>
             <Script src="https://ruon.dev/badge.js" strategy="lazyOnload" />
-            <ruon-badge ref="docfacil" theme="dark" size="sm"></ruon-badge>
+            <ruon-badge project="docfacil" theme="dark" size="sm"></ruon-badge>
           </div>
 
         </div>
