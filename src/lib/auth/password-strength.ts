@@ -45,7 +45,7 @@ async function createEstimator() {
       ...common.dictionary,
       ...english.dictionary,
       ...portuguese.dictionary,
-      userInputs: ["DocFácil", "DocFacil", "K-HUB", "KHub"],
+      userInputs: ["DocFácil", "DocFacil", "RUON", "Ruon", "K-HUB", "KHub"],
     },
   });
 }

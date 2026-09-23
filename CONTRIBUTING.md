@@ -1,7 +1,7 @@
 # Contribuindo com o DocFacil
 
 Esse documento é a bíblia de como a gente trabalha no código. Serve pra
-qualquer pessoa que vá mexer no projeto — seja dev da K-HUB, freelancer,
+qualquer pessoa que vá mexer no projeto — seja dev da RUON, freelancer,
 ou vc daqui de 3 meses que esqueceu como funcionava.
 
 ---

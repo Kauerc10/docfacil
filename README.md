@@ -12,7 +12,7 @@ Plataforma de geração de documentos legais (contratos, declarações, procura�
 
 ## 🏢 Sobre
 
-O **DocFacil** é um produto da **K-HUB Soluções Digitais**. O projeto adota a direção de produto **"Concierge Digital + Ateliê de Documentos"**: um chat conversacional guiado como espinha dorsal da experiência de preenchimento, com preview do documento sendo montado em tempo real.
+O **DocFacil** é um produto da **RUON**. O projeto adota a direção de produto **"Concierge Digital + Ateliê de Documentos"**: um chat conversacional guiado como espinha dorsal da experiência de preenchimento, com preview do documento sendo montado em tempo real.
 
 O público-alvo inclui pessoas mais velhas e com baixa intimidade com tecnologia, então a UI é **óbvia antes de ser bonita** — mas com identidade própria para não parecer "mais um SaaS genérico".
 
@@ -231,13 +231,13 @@ perf:      performance
 
 ## 🔒 Licença & Propriedade Intelectual
 
-Copyright © 2026 **K-HUB Soluções Digitais**. Todos os direitos reservados.
+Copyright © 2026 **RUON**. Todos os direitos reservados.
 
 Este software é proprietário e confidencial. O uso, cópia, modificação ou
 distribuição não autorizada é estritamente proibido. Consulte o arquivo
 [`LICENSE`](./LICENSE) para detalhes completos.
 
-**"DocFacil"** e o logotipo do selo são marcas comerciais da K-HUB Soluções Digitais.
+**"DocFacil"** e o logotipo do selo são marcas comerciais da RUON.
 
 ---
 
@@ -245,10 +245,10 @@ distribuição não autorizada é estritamente proibido. Consulte o arquivo
 
 <div align="center">
 
-**K-HUB Soluções Digitais**
+**RUON**
 
-🌐 [khub.com.br](https://khub.com.br)
-📧 contato@khub.com.br
+🌐 [ruon.dev](https://ruon.dev)
+📧 kaue@ruon.dev
 💬 [WhatsApp](https://wa.me/5511999990000)
 
 </div>
@@ -257,6 +257,6 @@ distribuição não autorizada é estritamente proibido. Consulte o arquivo
 
 <div align="center">
 
-<sub>Feito com 💙 pela equipe K-HUB Soluções Digitais</sub>
+<sub>Feito com 💙 pela equipe RUON</sub>
 
 </div>

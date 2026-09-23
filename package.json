@@ -2,8 +2,8 @@
   "name": "docfacil",
   "version": "0.1.0",
   "private": true,
-  "description": "Documentos legais prontos como numa conversa. Sem juridiquês, sem fricção. Produto da K-HUB Soluções Digitais.",
-  "author": "K-HUB Soluções Digitais <contato@khub.com.br>",
+  "description": "Documentos legais prontos como numa conversa. Sem juridiquês, sem fricção. Produto da RUON.",
+  "author": "RUON <kaue@ruon.dev>",
   "license": "UNLICENSED",
   "homepage": "https://docfacil-indol.vercel.app",
   "repository": {
@@ -13,7 +13,7 @@
   },
   "bugs": {
     "url": "https://github.com/Kauerc10/docfacil/issues",
-    "email": "contato@khub.com.br"
+    "email": "kaue@ruon.dev"
   },
   "keywords": [
     "docfacil",
@@ -21,8 +21,7 @@
     "contratos",
     "declaracoes",
     "procuracao",
-    "khub",
-    "k-hub",
+    "ruon",
     "nextjs",
     "typescript",
     "gsap"
