@@ -1,262 +1,105 @@
 <div align="center">
 
-# DocFacil
+<img src="public/logo-docfacil.png" alt="DocFácil" width="120" />
 
-### Documentos legais prontos como numa conversa.
+# DocFácil
 
-Plataforma de geração de documentos legais (contratos, declarações, procurações) para o público leigo — sem juridiquês, sem fricção, com a credibilidade de cartório e o calor de atendimento humano.
+**Documentos prontos como numa conversa.**
+
+Catálogo de contratos, declarações e procurações em português, com preenchimento guiado, prévia e PDF. Um produto da [RUON](https://ruon.dev).
 
 </div>
 
----
+## O produto hoje
 
-## 🏢 Sobre
+O fluxo principal usa **nove modelos versionados no código**. A pessoa escolhe um documento, preenche os campos, confere a prévia e gera o PDF. Há acesso por conta Firebase, gestão dos documentos criados e pagamento avulso ou assinatura Pro pelo Mercado Pago. O servidor controla autorização, geração e armazenamento dos arquivos; os PDFs finais ficam em um bucket privado do Cloudflare R2.
 
-O **DocFacil** é um produto da **RUON**. O projeto adota a direção de produto **"Concierge Digital + Ateliê de Documentos"**: um chat conversacional guiado como espinha dorsal da experiência de preenchimento, com preview do documento sendo montado em tempo real.
+| Parte | Implementação atual |
+| --- | --- |
+| Aplicação | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
+| Identidade e dados | Firebase Authentication, Firestore, Firebase Admin e App Check |
+| Documentos | Catálogo em `src/lib/modelos.ts`, motor de PDF com pdfmake, artefatos privados no R2 |
+| Pagamentos | Mercado Pago para compra avulsa e assinatura Pro |
+| Qualidade | Bun Test, ESLint, TypeScript, Playwright e emuladores Firebase |
 
-O público-alvo inclui pessoas mais velhas e com baixa intimidade com tecnologia, então a UI é **óbvia antes de ser bonita** — mas com identidade própria para não parecer "mais um SaaS genérico".
+O schema Prisma/SQLite permanece no repositório para o legado e migrações; o backend atual de documentos usa Firestore.
 
-### ✨ Diferencial de marca
+## AI Document Creation Pilot
 
-Para fugir do clichê de IA genérica (gradientes roxo/azul, blobs flutuantes), a marca adota a metáfora do **selo/carimbo notarial** como elemento de assinatura visual:
+Estamos desenvolvendo um piloto privado de criação documental com IA na branch [`feat/ai-document-creation`](https://github.com/Kauerc10/docfacil/tree/feat/ai-document-creation), acompanhado pelo [PR Draft #41](https://github.com/Kauerc10/docfacil/pull/41). O fluxo proposto vai do pedido em texto à triagem, coleta de dados, consulta a referências, edição e aprovação do rascunho e geração de PDF. A implementação nessa branch usa LangGraph, Groq, Firestore e o motor PDF existente.
 
-- Ícone de carregamento = carimbo "batendo"
-- Tela de sucesso = carimbo estampa o documento (clímax da experiência)
-- Marca d'água sutil nos previews de documento
-- Fundo com leve textura de papel (grão sutil, nunca branco estéril)
+**O piloto ainda não faz parte da `main` nem está liberado para uso.** A avaliação do modelo, as configurações de privacidade e a validação de integração precisam ser concluídas antes da liberação. O catálogo de modelos continua sendo o fluxo disponível nesta branch.
 
----
+## Capturas da interface
 
-## 🚀 Stack & Tecnologias
+| Desktop | Mobile |
+| --- | --- |
+| ![Página inicial do DocFácil em desktop](docs/screenshots/home-desktop.png) | ![Página inicial do DocFácil em mobile](docs/screenshots/home-mobile.png) |
 
-| Camada | Tecnologia |
-|---|---|
-| **Framework** | [Next.js 16](https://nextjs.org/) (App Router) |
-| **Linguagem** | TypeScript 5 |
-| **Estilo** | Tailwind CSS 4 + [shadcn/ui](https://ui.shadcn.com/) (New York) |
-| **Animações** | [GSAP 3](https://gsap.com/) + `@gsap/react` (ScrollTrigger) |
-| **UI Icons** | Lucide React + ícones desenhados sob medida |
-| **Fontes** | Plus Jakarta Sans (display) + Inter (corpo, 18px base) |
-| **Banco de Dados** | Prisma ORM (SQLite dev) + Prisma Client |
-| **Auth** | NextAuth.js v4 (disponível) |
-| **State** | Zustand + TanStack Query |
-| **Package Manager** | [Bun](https://bun.sh/) |
+As imagens mostram a página inicial e o fluxo do catálogo, não a interface do piloto de IA.
 
----
+## Arquitetura
 
-## 📦 Instalação & Desenvolvimento
+```mermaid
+flowchart LR
+  UI[Next.js · interface] --> API[Route Handlers · autenticação e regras]
+  API --> CAT[Catálogo e motor de PDF]
+  API --> DB[(Firestore)]
+  API --> R2[(Cloudflare R2 privado)]
+```
+
+As rotas de documentos verificam a identidade no servidor. O cliente não decide cotas nem envia um template arbitrário para a finalização. Para mais detalhes, consulte a [arquitetura do backend](docs/backend-architecture.md).
+
+## Executar localmente
 
 ### Pré-requisitos
 
-- [Bun](https://bun.sh/) `>= 1.1`
-- Node.js `>= 20` (recomendado)
-- Git
-
-### Setup local
+- Bun e Node.js **22 ou superior**.
+- Projeto Firebase e credenciais para os fluxos autenticados.
+- Credenciais do R2 e do Mercado Pago para testar armazenamento e cobrança reais.
+- Java para executar os testes com emuladores Firebase.
 
 ```bash
-# 1. Clonar o repositório público
 git clone https://github.com/Kauerc10/docfacil.git
 cd docfacil
-
-# 2. Instalar dependências
 bun install
-
-# 3. Configurar variáveis de ambiente
-# macOS/Linux
 cp .env.example .env
-# PowerShell
-Copy-Item .env.example .env
-# edite .env com seus valores (DATABASE_URL, NEXTAUTH_SECRET, etc.)
-
-# 4. Configurar o banco de dados
-bun run db:push
-
-# 5. Rodar o servidor de desenvolvimento
 bun run dev
 ```
 
-A aplicação estará disponível em `http://localhost:3000`.
+No PowerShell, use `Copy-Item .env.example .env` no lugar de `cp`. Configure apenas as credenciais necessárias ao fluxo que pretende executar; veja os nomes e comentários em [`.env.example`](.env.example). O servidor local abre em `http://localhost:3000`. Nunca versione o arquivo `.env` nem credenciais reais.
 
-### Scripts disponíveis
+### Comandos úteis
 
-| Script | Descrição |
-|---|---|
-| `bun run dev` | Inicia o servidor de desenvolvimento (porta 3000) |
-| `bun run lint` | Roda o ESLint para verificar qualidade do código |
-| `bun run test` | Executa os testes unitários do motor de documentos |
-| `bun run test:coverage` | Executa os testes com relatório de cobertura |
-| `bun run build` | Build de produção |
-| `bun run start` | Inicia o servidor de produção |
-| `bun run db:push` | Sincroniza o schema Prisma com o banco |
-| `bun run db:generate` | Gera o Prisma Client |
-| `bun run db:migrate` | Cria uma nova migration |
-| `bun run db:reset` | Reseta o banco (cuidado!) |
+| Comando | Uso |
+| --- | --- |
+| `bun run dev` | Servidor de desenvolvimento |
+| `bun run lint` | ESLint |
+| `bun run typecheck` | Checagem de tipos |
+| `bun run test` | Testes Bun |
+| `bun run build:ci` | Build de produção para CI |
+| `bun run test:e2e` | Playwright com emuladores Firebase |
+| `bun run test:rules` | Regras do Firestore no emulador |
 
----
+Os scripts Prisma (`db:*`) continuam disponíveis para o schema legado; não são uma etapa obrigatória do fluxo atual de documentos.
 
-## 🗂️ Estrutura do Projeto
+## Organização do código
 
-```
-docfacil/
-├── src/
-│   ├── app/                          # App Router (Next.js 16)
-│   │   ├── layout.tsx                # Layout raiz (fontes, metadata, bg paper)
-│   │   ├── page.tsx                  # Home page
-│   │   ├── globals.css               # Design system DocFacil (tokens, utilities)
-│   │   └── api/                      # API routes
-│   │
-│   ├── components/
-│   │   ├── docfacil/                 # Componentes de marca (DocFacil)
-│   │   │   ├── selo.tsx              # Carimbo notarial (assinatura visual)
-│   │   │   ├── header.tsx            # Header fixo c/ shrink no scroll
-│   │   │   ├── hero.tsx              # Hero c/ timeline GSAP
-│   │   │   ├── catalog.tsx           # Grid de documentos (dog-ear cards)
-│   │   │   ├── how-it-works.tsx      # 3 passos + demo split-screen
-│   │   │   ├── ai-banner.tsx         # Faixa Gerador IA
-│   │   │   ├── social-proof.tsx      # Depoimentos + pills de confiança
-│   │   │   ├── success-showcase.tsx  # CLÍMAX: carimbo estampa o doc
-│   │   │   ├── footer.tsx            # Footer navy c/ WhatsApp
-│   │   │   ├── whatsapp-button.tsx   # CTA flutuante sempre visível
-│   │   │   └── gsap-safety.tsx       # Rede de segurança p/ animações
-│   │   │
-│   │   └── ui/                       # shadcn/ui (componentes base)
-│   │
-│   ├── lib/
-│   │   ├── db.ts                     # Prisma Client
-│   │   └── utils.ts                  # Utilities (cn, etc.)
-│   │
-│   └── hooks/                        # Hooks customizados
-│
-├── prisma/
-│   └── schema.prisma                 # Schema do banco de dados
-│
-├── public/                           # Assets estáticos
-├── mini-services/                    # Microserviços (websocket, etc.)
-└── docs/                             # Documentação adicional
+```text
+src/
+├── app/api/                 # Rotas HTTP de documentos, pagamentos e IA
+├── components/docfacil/     # Interface e fluxos da aplicação
+├── lib/document-engine/     # Regras dos modelos determinísticos
+├── lib/pdf/                 # Montagem e renderização de PDFs
+└── lib/server/              # Autorização, persistência, IA e integrações
+docs/                       # Arquitetura e operação
+scripts/                    # Ferramentas de manutenção e avaliação
 ```
 
----
+## Contribuição
 
-## 🎨 Design System
+Crie um branch a partir de `main`, use mensagens no padrão Conventional Commits observado no histórico (`feat(escopo): ...`, `fix(escopo): ...`) e abra um pull request. Para alterações em regras jurídicas, dados pessoais ou integrações de produção, descreva as decisões e os riscos no PR. Antes da revisão, execute as verificações pertinentes ao escopo e registre limitações de ambiente ou cenários ainda não avaliados.
 
-### Paleta de cores
+## Licença e contato
 
-| Token | HEX | Uso |
-|---|---|---|
-| `bg-paper` | `#FAF7F2` | Fundo principal (marfim quente com textura) |
-| `bg-surface` | `#FFFFFF` | Cards, inputs, superfícies |
-| `ink` | `#0E2340` | Texto principal, títulos |
-| `navy` | `#14315C` | Header, footer, faixas escuras |
-| `blue-royal` | `#2554C7` | CTAs de navegação, links |
-| `blue-soft` | `#E7EEFC` | Hovers, tags |
-| `selo-green` | `#3E8E6E` | Progresso, checkmarks |
-| `green-tint` | `#E7F3EC` | Banners de sucesso |
-| `coral` | `#FF6A4D` | **CTA final de conversão (1 por tela)** |
-
-### Regra de proporção (60-30-10 adaptado)
-
-- **Azul/ink domina ~70%** da interface
-- **Verde** aparece só em feedback pontual (~10%)
-- **Coral** no máximo um botão por tela (~5%)
-- Resto é `bg-paper`/branco
-
-### Tipografia
-
-- **Títulos:** Plus Jakarta Sans (SemiBold/Bold)
-- **Corpo/UI:** Inter (Regular/Medium), base **18px** (acessibilidade)
-- **Inputs:** 20-22px
-- Line-height 1.5+, contraste forte, poucos tamanhos na tela
-
----
-
-## ♿ Acessibilidade
-
-O DocFacil é construído com foco em acessibilidade para o público leigo:
-
-- ✅ `prefers-reduced-motion` respeitado em todas as animações GSAP
-- ✅ Contraste alto (texto `ink` sobre `bg-paper`)
-- ✅ Base tipográfica de 18px (não 16px)
-- ✅ Targets de toque mínimos de 44px
-- ✅ HTML semântico (`main`, `header`, `nav`, `section`, `footer`)
-- ✅ ARIA labels em elementos interativos
-- ✅ Foco visual claro em inputs e botões
-- ✅ Layout responsivo mobile-first
-
----
-
-## 🤝 Contribuindo
-
-Este é o repositório público do produto DocFacil. Issues e pull requests são bem-vindos; propostas que envolvam regras jurídicas, dados pessoais ou integrações de produção devem ser discutidas antes da implementação.
-
-### Fluxo de trabalho (Git Flow simplificado)
-
-```bash
-# 1. Criar branch a partir de main
-git checkout main
-git pull origin main
-git checkout -b feat/sua-feature
-
-# 2. Desenvolver + commitar (Conventional Commits)
-git commit -m "feat(modelos): adiciona catálogo completo"
-
-# 3. Push + abrir Pull Request
-git push -u origin feat/sua-feature
-```
-
-### Conventional Commits
-
-```
-feat:      nova funcionalidade
-fix:       correção de bug
-docs:      documentação
-style:     formatação (sem mudança de lógica)
-refactor:  refactor sem mudança de comportamento
-test:      testes
-chore:     build, deps, configs
-perf:      performance
-```
-
-### Antes de abrir PR
-
-- [ ] `bun run lint` sem erros
-- [ ] `bun run test` sem falhas
-- [ ] `bun run typecheck` sem erros
-- [ ] Self-review feito
-- [ ] Sem `console.log` ou código morto
-- [ ] Documentação atualizada (se necessário)
-- [ ] Testes manuais no browser (desktop + mobile)
-
----
-
-## 🔒 Licença & Propriedade Intelectual
-
-Copyright © 2026 **RUON**. Todos os direitos reservados.
-
-Este software é proprietário e confidencial. O uso, cópia, modificação ou
-distribuição não autorizada é estritamente proibido. Consulte o arquivo
-[`LICENSE`](./LICENSE) para detalhes completos.
-
-**"DocFacil"** e o logotipo do selo são marcas comerciais da RUON.
-
----
-
-## 📞 Contato
-
-<div align="center">
-
-**RUON**
-
-🌐 [ruon.dev](https://ruon.dev)
-📧 kaue@ruon.dev
-💬 [WhatsApp](https://wa.me/5511999990000)
-
-</div>
-
----
-
-<div align="center">
-
-<sub>Feito com 💙 pela equipe RUON</sub>
-
-</div>
+Copyright © 2026 RUON. Todos os direitos reservados. Consulte [LICENSE](LICENSE). Contato: [kaue@ruon.dev](mailto:kaue@ruon.dev).
