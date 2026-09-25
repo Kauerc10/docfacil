@@ -258,7 +258,15 @@ function DocumentoDetalheContent() {
                 zoom ? "scale-[1.04] origin-top" : "scale-100",
               ].join(" ")}
             >
-              {temTemplateCompleto && modelo ? (
+              {doc.source === "ai" && doc.aiSnapshot ? (
+                <article className="w-full max-w-[420px] rounded-xl bg-white p-8 shadow-sm space-y-4">
+                  <h3 className="text-lg font-bold">{doc.aiSnapshot.title}</h3>
+                  {doc.aiSnapshot.sections.map((section, index) => <section key={index} className="space-y-2">
+                    <h4 className="font-semibold">{section.title}</h4>
+                    {section.paragraphs.map((paragraph, paragraphIndex) => <p key={paragraphIndex} className="text-sm leading-relaxed">{paragraph}</p>)}
+                  </section>)}
+                </article>
+              ) : temTemplateCompleto && modelo ? (
                 <div className="w-full max-w-[420px]">
                   <DetalhePreview
                     docId={doc.id}
@@ -329,13 +337,13 @@ function DocumentoDetalheContent() {
 
             {/* Actions — delegates to useDocumentoActions */}
             <section aria-label="Ações" className="space-y-2.5">
-              <ActionButton
+              {doc.source !== "ai" && <ActionButton
                 primary
                 icon={<Pencil className="w-4 h-4" aria-hidden="true" />}
                 label="Editar respostas"
                 onClick={handleEditar}
                 disabled={actionLoading !== null}
-              />
+              />}
               <ActionButton
                 icon={
                   actionLoading === "download" ? (
@@ -385,7 +393,7 @@ function DocumentoDetalheContent() {
                 </div>
               )}
 
-              <ActionButton
+              {doc.source !== "ai" && <ActionButton
                 icon={
                   actionLoading === "duplicate" ? (
                     <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -398,7 +406,7 @@ function DocumentoDetalheContent() {
                   void handleDuplicar();
                 }}
                 disabled={actionLoading !== null}
-              />
+              />}
 
               <DeleteAction
                 docNome={doc.modeloNome}

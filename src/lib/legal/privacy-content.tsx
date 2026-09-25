@@ -138,6 +138,11 @@ export function PrivacyContent({
           dados, e-mail transacional) — com contratos e cláusulas LGPD.
         </li>
         <li>
+          <strong>Provedor de IA:</strong> no piloto de criação com IA, enviamos
+          o pedido, as respostas e os trechos necessários para gerar o rascunho
+          à Groq. O recurso é disponibilizado somente a contas autorizadas.
+        </li>
+        <li>
           <strong>Autoridades públicas</strong> — quando determinado por
           ordem judicial ou exigência legal.
         </li>
@@ -206,6 +211,12 @@ export function PrivacyContent({
         <li>
           <strong>Documentos:</strong> enquanto você não os excluir (e por
           90 dias após, em lixeira recuperável).
+        </li>
+        <li>
+          <strong>Sessões de IA:</strong> conversas, rascunhos e progresso podem
+          ser apagados por você a qualquer momento. Após 30 dias sem atividade,
+          deixam de estar acessíveis e são removidos na próxima limpeza diária.
+          O documento finalizado segue a retenção aplicável aos documentos.
         </li>
         <li>
           <strong>Registros de pagamento e fiscais:</strong> por 5 (cinco)
