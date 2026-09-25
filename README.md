@@ -26,9 +26,9 @@ O schema Prisma/SQLite permanece no repositório para o legado e migrações; o 
 
 ## AI Document Creation Pilot
 
-O piloto adiciona criação documental em português por **pedido → triagem → coleta de dados → consulta à base → rascunho → edição e validação → aprovação → PDF**. O fluxo usa LangGraph com checkpoints no Firestore, Groq (`openai/gpt-oss-120b`) e recuperação textual de cláusulas do catálogo e referências oficiais. O conteúdo aprovado é convertido pelo mesmo motor de PDF, com proveniência e snapshot persistidos.
+Nesta branch, estamos desenvolvendo um piloto de criação documental em português por **pedido → triagem → coleta de dados → consulta à base → rascunho → edição e validação → aprovação → PDF**. A implementação usa LangGraph com checkpoints no Firestore, Groq (`openai/gpt-oss-120b`) e recuperação textual de cláusulas do catálogo e referências oficiais. O conteúdo aprovado é convertido pelo mesmo motor de PDF, com proveniência e snapshot persistidos.
 
-O acesso está **desativado por padrão** e restrito a UIDs autorizados no servidor. A liberação depende da confirmação de Zero Data Retention no Groq e da avaliação de 20 casos fictícios. A validação automática auxilia a revisão do usuário; não garante validade jurídica. A conversa e os checkpoints expiram após 30 dias de inatividade, enquanto o documento finalizado segue o ciclo normal dos documentos.
+O acesso está **desativado por padrão** e restrito a UIDs autorizados no servidor. O piloto ainda não foi liberado: dependemos da confirmação de Zero Data Retention no Groq, da avaliação de 20 casos fictícios e da validação do fluxo com o emulador Firestore. A validação automática auxilia a revisão do usuário; não garante validade jurídica. A conversa e os checkpoints expiram após 30 dias de inatividade, enquanto o documento finalizado segue o ciclo normal dos documentos.
 
 Limites do piloto por conta: **3 sessões novas/dia, 2 revisões por rascunho, 3 PDFs/dia e 3.000 palavras por documento**. Veja [configuração, operação e critérios de liberação](docs/ai-pilot.md).
 
