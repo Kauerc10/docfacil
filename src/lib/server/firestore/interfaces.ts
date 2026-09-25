@@ -154,6 +154,7 @@ export interface CommitGeneratedArtifactInput {
     initialCount: number;
     limit: number;
   };
+  aiQuota?: { userId: string; day: string; limit: number };
   now: number;
 }
 

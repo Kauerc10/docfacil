@@ -29,6 +29,9 @@ export async function POST(
     if (original.owner.type !== "user" || original.owner.userId !== user.userId) {
       throw new BackendError("DOCUMENT_FORBIDDEN", 403, "Você não tem permissão para duplicar este documento.");
     }
+    if (original.source === "ai") {
+      throw new BackendError("DOCUMENT_IMMUTABLE", 409, "Documentos de IA finalizados não podem ser duplicados neste piloto.");
+    }
 
     const modelo = MODELOS.find((m) => m.slug === original.modeloSlug);
     if (!modelo) {

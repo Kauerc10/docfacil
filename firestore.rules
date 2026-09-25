@@ -72,6 +72,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Sessões de IA, checkpoints e contadores são acessados somente pelo servidor.
+    match /ai_sessions/{sessionId} {
+      allow read, write: if false;
+      match /checkpoints/{checkpointId} { allow read, write: if false; }
+    }
+    match /ai_usage/{id} { allow read, write: if false; }
+    match /ai_usage_global/{id} { allow read, write: if false; }
+
     // === Payments (legado) ===
     match /payments/{id} {
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;

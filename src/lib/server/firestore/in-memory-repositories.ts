@@ -665,6 +665,7 @@ export class InMemoryGenerationCommitRepository implements IGenerationCommitRepo
   private readonly ordersRepo: InMemoryOrdersRepository;
   private readonly requestsRepo: InMemoryGenerationRequestsRepository;
   private readonly freeQuotaCounts = new Map<string, number>();
+  private readonly aiQuotaCounts = new Map<string, number>();
   private failNextError: Error | null = null;
 
   constructor(
@@ -732,11 +733,16 @@ export class InMemoryGenerationCommitRepository implements IGenerationCommitRepo
       }
       nextFreeQuotaCount = currentCount + 1;
     }
+    const aiQuotaKey = input.aiQuota ? `${input.aiQuota.userId}:${input.aiQuota.day}` : undefined;
+    if (input.aiQuota && aiQuotaKey && (this.aiQuotaCounts.get(aiQuotaKey) ?? 0) >= input.aiQuota.limit) {
+      throw new BackendError("FREE_LIMIT_REACHED", 429, "Limite diário de PDFs de IA atingido.");
+    }
 
     // Atomic execution
     if (freeQuotaKey && nextFreeQuotaCount !== undefined) {
       this.freeQuotaCounts.set(freeQuotaKey, nextFreeQuotaCount);
     }
+    if (aiQuotaKey) this.aiQuotaCounts.set(aiQuotaKey, (this.aiQuotaCounts.get(aiQuotaKey) ?? 0) + 1);
     await this.docsRepo.saveArtifact(input.documentId, input.artifact);
     await this.docsRepo.updateDocumentRespostas(
       input.documentId,
