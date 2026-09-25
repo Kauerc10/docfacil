@@ -728,6 +728,9 @@ export class FirestoreGenerationCommitRepository implements IGenerationCommitRep
             .collection("months")
             .doc(String(input.freeQuota.startOfMonthTimestamp))
         : null;
+      const aiQuotaRef = input.aiQuota
+        ? this.db.collection("ai_usage").doc(`${input.aiQuota.userId}_${input.aiQuota.day}`)
+        : null;
       const accessRef = input.guestAccess
         ? this.db.collection("access_links").doc(input.guestAccess.tokenHash)
         : null;
@@ -735,6 +738,7 @@ export class FirestoreGenerationCommitRepository implements IGenerationCommitRep
       const documentSnapshot = await tx.get(documentRef);
       const orderSnapshot = orderRef ? await tx.get(orderRef) : null;
       const freeQuotaSnapshot = freeQuotaRef ? await tx.get(freeQuotaRef) : null;
+      const aiQuotaSnapshot = aiQuotaRef ? await tx.get(aiQuotaRef) : null;
 
       if (!documentSnapshot.exists) {
         throw new BackendError(
@@ -764,6 +768,9 @@ export class FirestoreGenerationCommitRepository implements IGenerationCommitRep
       }
 
       let nextFreeQuotaCount: number | undefined;
+      if (input.aiQuota && (aiQuotaSnapshot?.data()?.pdfs ?? 0) >= input.aiQuota.limit) {
+        throw new BackendError("FREE_LIMIT_REACHED", 429, "Limite diário de PDFs de IA atingido.");
+      }
       if (input.freeQuota) {
         const storedCount = freeQuotaSnapshot?.data()?.count;
         const currentCount =
@@ -779,6 +786,9 @@ export class FirestoreGenerationCommitRepository implements IGenerationCommitRep
       }
 
       tx.set(artifactRef, input.artifact);
+      if (input.aiQuota && aiQuotaRef) {
+        tx.set(aiQuotaRef, { pdfs: (aiQuotaSnapshot?.data()?.pdfs ?? 0) + 1, updatedAt: input.now }, { merge: true });
+      }
 
       if (input.freeQuota && freeQuotaRef && nextFreeQuotaCount !== undefined) {
         tx.set(

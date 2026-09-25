@@ -68,6 +68,9 @@ export async function POST(
         "Sem permissão para criar nova versão deste documento."
       );
     }
+    if (existingDoc.source === "ai") {
+      throw new BackendError("DOCUMENT_IMMUTABLE", 409, "Documentos criados com IA não têm edição após a finalização neste piloto.");
+    }
 
     const result = await generateDocumentArtifact({
       requestId,

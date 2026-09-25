@@ -103,6 +103,7 @@ export async function listDocuments(userId: string): Promise<Documento[]> {
   return dtos.map((dto) => ({
     id: dto.id,
     modeloSlug: dto.modeloSlug,
+    source: dto.source,
     modeloNome: dto.modeloNome,
     respostas: {},
     status: dto.status,
@@ -123,6 +124,8 @@ export async function getDocument(id: string): Promise<Documento | null> {
   return {
     id: dto.id,
     modeloSlug: dto.modeloSlug,
+    source: dto.source,
+    aiSnapshot: dto.aiSnapshot,
     modeloNome: dto.modeloNome,
     respostas: dto.respostas,
     status: dto.status,

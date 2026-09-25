@@ -157,6 +157,8 @@ export interface Documento {
   id: string;
   /** slug do modelo usado */
   modeloSlug: string;
+  source?: "catalog" | "ai";
+  aiSnapshot?: { title: string; sections: Array<{ title: string; paragraphs: string[] }> };
   modeloNome: string;
   /** respostas do usuário (key → valor) */
   respostas: Record<string, string>;

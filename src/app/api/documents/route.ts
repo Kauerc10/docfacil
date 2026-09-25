@@ -20,6 +20,7 @@ export async function GET(req: Request) {
     const documents: DocumentSummaryDto[] = records.map((doc) => ({
       id: doc.id!,
       modeloSlug: doc.modeloSlug,
+      source: doc.source ?? "catalog",
       modeloNome: doc.modeloNome,
       status: doc.artifactState === "ready" ? "concluido" : "rascunho",
       artifactState: doc.artifactState,

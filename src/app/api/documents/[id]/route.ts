@@ -42,6 +42,8 @@ export async function GET(
         document: {
           id: doc.id,
           modeloSlug: doc.modeloSlug,
+          source: doc.source ?? "catalog",
+          aiSnapshot: doc.aiSnapshot,
           modeloNome: doc.modeloNome,
           respostas: doc.respostas,
           status: doc.artifactState === "ready" ? "concluido" : "rascunho",

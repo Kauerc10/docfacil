@@ -27,9 +27,16 @@ export interface DocumentRecord {
   owner: DocumentOwner;
   modeloSlug: string;
   modeloNome: string;
+  source?: "catalog" | "ai";
+  aiSessionId?: string;
+  aiSnapshot?: {
+    title: string;
+    sections: Array<{ title: string; paragraphs: string[] }>;
+    references: Array<{ id: string; source: string; version: string }>;
+  };
   respostas: Record<string, string>;
   entitlement: {
-    type: DocumentEntitlement;
+    type: DocumentEntitlement | "ai_beta";
     orderId?: string;
     watermarked: boolean;
   };
