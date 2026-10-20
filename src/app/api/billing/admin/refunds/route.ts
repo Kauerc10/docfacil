@@ -9,7 +9,7 @@ import { createMercadoPagoBillingProvider } from "@/lib/server/billing/mercadopa
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const executeSchema = z.object({ action: z.literal("execute"), orderId: z.string().min(1), confirmedAmountCents: z.literal(1990) });
+const executeSchema = z.object({ action: z.literal("execute"), orderId: z.string().min(1), confirmedAmountCents: z.union([z.literal(1990), z.literal(2990), z.literal(3990)]) });
 
 export async function GET(req: Request): Promise<Response> {
   try {

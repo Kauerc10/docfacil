@@ -300,6 +300,7 @@ function DocumentoDetalheContent() {
               <dl className="space-y-3 text-sm">
                 <MetaRow label="Criado em" value={criadoFmt} />
                 <MetaRow label="Última edição" value={atualizadoFmt} />
+                <MetaRow label="Correções gratuitas" value="Garantidas por 7 dias" />
                 <div className="flex items-center justify-between gap-3 pt-1">
                   <dt className="text-ink/55">Status</dt>
                   <dd>

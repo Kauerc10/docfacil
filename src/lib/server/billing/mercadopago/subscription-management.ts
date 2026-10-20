@@ -28,10 +28,17 @@ export async function cancelMercadoPagoSubscription(input: {
 export async function continueMercadoPagoSubscription(input: {
   userId: string;
   repos: BillingRepositories;
-}): Promise<never> {
+}): Promise<{ status: "active"; autoRenew: true; paidThrough: number }> {
   const current = await input.repos.subscriptions.getByUserId(input.userId);
   if (!current || current.provider !== "mercadopago") {
     throw new BackendError("ORDER_NOT_FOUND", 404, "Assinatura Pro não encontrada.");
   }
-  throw new BackendError("CONFLICT", 409, "Esta assinatura precisa de uma nova autorização no Mercado Pago antes de continuar.");
+  if (current.autoRenew && current.status === "active") {
+    return { status: "active", autoRenew: true, paidThrough: current.paidThrough };
+  }
+  if (current.status === "cancelled" || current.paidThrough <= Date.now()) {
+    throw new BackendError("CONFLICT", 409, "Esta assinatura precisa de uma nova autorização no Mercado Pago antes de continuar.");
+  }
+  const resumed = await input.repos.subscriptions.resumeAutoRenew(input.userId);
+  return { status: "active", autoRenew: true, paidThrough: resumed.paidThrough };
 }

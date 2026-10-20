@@ -10,12 +10,15 @@ import { planPriceToCents } from "../../../pricing";
 import { capturePurchase } from "../purchase-delivery";
 import { createMercadoPagoBillingProvider } from "./provider";
 import { FirestoreCheckoutSessions, checkoutTokenHash } from "./checkout-store";
+import { getOrCreateWelcomeOffer, PROMO_CENTS } from "../welcome-offer";
+import { purchaseOrderCookie } from "../purchase-authorization";
 
 export const mercadoPagoCheckoutSchema = z.object({
   product: z.enum(["avulso", "pro"]),
   method: z.enum(["pix", "card"]),
   requestId: z.string().uuid(),
   accessToken: z.string().regex(/^[a-f0-9]{64}$/),
+  appliedOffer: z.literal("welcome").optional(),
   guestContact: z.object({ email: z.string().trim().email(), phone: z.string().trim().min(8).max(30).optional() }).optional(),
   successUrl: z.string().url().optional(),
   draft: z.object({
@@ -31,7 +34,7 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export const mercadoPagoOrderCookie = (id: string) => `mp_order_${id}`;
+export const mercadoPagoOrderCookie = purchaseOrderCookie;
 
 export interface MercadoPagoCheckoutDependencies {
   sessions?: Pick<FirestoreCheckoutSessions, "begin" | "finish">;
@@ -66,6 +69,22 @@ export async function createMercadoPagoCheckout(req: Request, principal: Princip
     const completion = new URL(input.successUrl ?? "/?view=checkout", origin);
     if (completion.origin !== origin) throw new BackendError("INVALID_REQUEST", 400, "URL de retorno inválida.");
     const requestHash = createHash("sha256").update(canonical({ buyer, product: "pro", method: "card" })).digest("hex");
+    const hasHadProBefore = Boolean(existing && (existing.status === "active" || existing.lastPaidAt > 0));
+    let proAmountCents = planPriceToCents("pro");
+    if (input.appliedOffer === "welcome") {
+      try {
+        const offer = await getOrCreateWelcomeOffer({
+          userId: principal.userId,
+          hasHadProBefore,
+          now: Date.now(),
+        });
+        if (offer.status === "active" && Date.now() < offer.expiresAt) {
+          proAmountCents = PROMO_CENTS;
+        }
+      } catch {
+        // Fallback para preço regular
+      }
+    }
     const orderId = createHash("sha256").update(`${canonical(buyer)}:pro:${input.requestId}`).digest("hex");
     const sessions = deps.sessions ?? new FirestoreCheckoutSessions();
     const provider = deps.provider ?? createMercadoPagoBillingProvider();
@@ -80,7 +99,7 @@ export async function createMercadoPagoCheckout(req: Request, principal: Princip
         buyer,
         status: "pending",
         method: "card",
-        amountCents: planPriceToCents("pro"),
+        amountCents: proAmountCents,
         createdAt: Date.now(),
       },
     });
@@ -95,7 +114,7 @@ export async function createMercadoPagoCheckout(req: Request, principal: Princip
         if (!provider.createSubscription) throw new BackendError("SERVER_MISCONFIGURED", 500, "Assinatura não configurada.");
         const result = await provider.createSubscription({
           orderId,
-          amountCents: planPriceToCents("pro"),
+          amountCents: proAmountCents,
           completionUrl: completion.toString(),
           buyerEmail: email,
         });
@@ -109,7 +128,7 @@ export async function createMercadoPagoCheckout(req: Request, principal: Princip
           kind: "redirect",
           orderId,
           product: "pro",
-          amountCents: planPriceToCents("pro"),
+          amountCents: proAmountCents,
           checkoutUrl: result.checkoutUrl,
         };
         await sessions.finish(orderId, session.owner, responseBody);
@@ -138,7 +157,7 @@ export async function createMercadoPagoCheckout(req: Request, principal: Princip
   const provider = deps.provider ?? createMercadoPagoBillingProvider(); // validar configuração antes de persistir
   const { session, acquired } = await sessions.begin({
     orderId, requestHash, tokenHash: checkoutTokenHash(input.accessToken), now: Date.now(),
-    order: { provider: "mercadopago", product: "avulso", buyer, status: "pending", method: input.method, amountCents: planPriceToCents("avulso"), createdAt: Date.now() },
+    order: { provider: "mercadopago", product: "avulso", buyer, status: "pending", method: input.method, amountCents: planPriceToCents("avulso"), fulfillmentMode: "verified_delivery", createdAt: Date.now() },
   });
   if (!acquired && session.state !== "ready") {
     throw new BackendError("INVALID_REQUEST", 409, "Esta tentativa está sendo verificada. Não pague novamente.");

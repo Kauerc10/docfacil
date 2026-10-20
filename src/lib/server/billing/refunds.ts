@@ -23,7 +23,8 @@ function operationRef(db: Firestore, id: string) { return db.collection("billing
 export async function requestAvulsoRefund(input: { req: Request; order: OrderRecord; principal: Principal; reason: string; db?: Firestore }): Promise<RefundRequestRecord> {
   const db = input.db ?? getAdminFirestore();
   if (!await authorizePurchaseRequest(input.req, input.order, input.principal)) throw new BackendError("ORDER_FORBIDDEN", 403, "Você não tem permissão para esta compra.");
-  if (input.order.product !== "avulso" || input.order.provider !== "mercadopago" || input.order.amountCents !== AVULSO_CENTS) throw new BackendError("INVALID_REQUEST", 409, "Reembolso disponível apenas para compras avulsas do Mercado Pago.");
+  const allowedAmounts = [AVULSO_CENTS, 3990, 2990];
+  if (input.order.provider !== "mercadopago" || !allowedAmounts.includes(input.order.amountCents)) throw new BackendError("INVALID_REQUEST", 409, "Reembolso disponível apenas para compras do Mercado Pago.");
   if (!input.order.id) throw new BackendError("INVALID_REQUEST", 400, "Pedido inválido.");
   const reason = input.reason.trim();
   if (reason.length < 3 || reason.length > 500) throw new BackendError("INVALID_REQUEST", 400, "Motivo de reembolso inválido.");
@@ -57,18 +58,19 @@ export async function requireBillingAdmin(req: Request): Promise<{ uid: string }
   }
 }
 
-function fullyRefunded(payment: MercadoPagoPayment): boolean {
+function fullyRefunded(payment: MercadoPagoPayment, expectedCents: number): boolean {
   if (String(payment.status ?? "").toLowerCase() === "refunded") return true;
   const refunds = Array.isArray(payment.refunds) ? payment.refunds as Array<Record<string, unknown>> : [];
   const amount = refunds.filter((refund) => String(refund.status ?? "").toLowerCase() === "approved").reduce((sum, refund) => sum + Math.round(Number(refund.amount ?? 0) * 100), 0);
-  return amount >= AVULSO_CENTS;
+  return amount >= expectedCents;
 }
 
-export async function executeAvulsoRefund(input: { order: OrderRecord; request: RefundRequestRecord; reviewerId: string; confirmedAmountCents: 1990; provider: RefundProvider; db?: Firestore; now?: number }): Promise<RefundRequestRecord> {
+export async function executeAvulsoRefund(input: { order: OrderRecord; request: RefundRequestRecord; reviewerId: string; confirmedAmountCents: number; provider: RefundProvider; db?: Firestore; now?: number }): Promise<RefundRequestRecord> {
   const db = input.db ?? getAdminFirestore();
   const now = input.now ?? Date.now();
-  if (input.order.id !== input.request.orderId || input.order.provider !== "mercadopago" || input.order.product !== "avulso" || !["paid", "reserved", "consumed"].includes(input.order.status) || input.order.providerPaymentId === undefined || input.order.amountCents !== AVULSO_CENTS) throw new BackendError("INVALID_REQUEST", 409, "Cobrança integral não disponível para este pedido.");
-  if (input.confirmedAmountCents !== AVULSO_CENTS || !input.reviewerId) throw new BackendError("INVALID_REQUEST", 400, "Valor de reembolso inválido.");
+  const expectedCents = input.order.amountCents;
+  if (input.order.id !== input.request.orderId || input.order.provider !== "mercadopago" || !["paid", "reserved", "consumed"].includes(input.order.status) || input.order.providerPaymentId === undefined) throw new BackendError("INVALID_REQUEST", 409, "Cobrança integral não disponível para este pedido.");
+  if (input.confirmedAmountCents !== expectedCents || !input.reviewerId) throw new BackendError("INVALID_REQUEST", 400, "Valor de reembolso inválido.");
   const operationId = `manual-refund:${input.order.id}`;
   const opRef = operationRef(db, operationId);
   const owner = crypto.randomUUID();
@@ -81,7 +83,7 @@ export async function executeAvulsoRefund(input: { order: OrderRecord; request: 
     if (!order.exists || order.get("provider") !== "mercadopago" || order.get("providerPaymentId") !== input.order.providerPaymentId) throw new BackendError("CONFLICT", 409, "Pedido e cobrança não conferem.");
     if (request.get("status") === "confirmed") return false;
     if (request.get("status") === "processing" && Number(request.get("leaseUntil") ?? 0) > now) return false;
-    const updates = { status: "processing", leaseOwner: owner, leaseUntil, reviewedBy: input.reviewerId, confirmedAmountCents: AVULSO_CENTS, updatedAt: now };
+    const updates = { status: "processing", leaseOwner: owner, leaseUntil, reviewedBy: input.reviewerId, confirmedAmountCents: expectedCents, updatedAt: now };
     tx.set(requestRef(db, input.request.id), updates, { merge: true });
     if (operation.exists) tx.set(opRef, { ...updates, id: operationId, type: "manual_refund", orderId: input.order.id, paymentId: input.order.providerPaymentId, idempotencyKey: `manual-refund:${input.order.id}` }, { merge: true });
     else tx.create(opRef, { ...updates, id: operationId, type: "manual_refund", orderId: input.order.id, paymentId: input.order.providerPaymentId, idempotencyKey: `manual-refund:${input.order.id}`, createdAt: now });
@@ -90,19 +92,36 @@ export async function executeAvulsoRefund(input: { order: OrderRecord; request: 
   if (!claimed) return (await getRefundRequest(input.order.id!, db))!;
   try {
     let payment = await input.provider.getPayment(input.order.providerPaymentId);
-    if (String(payment.id) !== String(input.order.providerPaymentId) || payment.currency_id !== "BRL" || Math.round(Number(payment.transaction_amount ?? 0) * 100) !== AVULSO_CENTS) throw new BackendError("CONFLICT", 409, "Cobrança consultada não corresponde ao pedido.");
-    if (!fullyRefunded(payment)) {
+    if (String(payment.id) !== String(input.order.providerPaymentId) || payment.currency_id !== "BRL" || Math.round(Number(payment.transaction_amount ?? 0) * 100) !== expectedCents) throw new BackendError("CONFLICT", 409, "Cobrança consultada não corresponde ao pedido.");
+    if (!fullyRefunded(payment, expectedCents)) {
       await input.provider.refundPayment(input.order.providerPaymentId, `manual-refund:${input.order.id}`);
       payment = await input.provider.getPayment(input.order.providerPaymentId);
     }
-    const refundedCents = Array.isArray(payment.refunds) ? (payment.refunds as Array<Record<string, unknown>>).filter((refund) => String(refund.status ?? "").toLowerCase() === "approved").reduce((sum, refund) => sum + Math.round(Number(refund.amount ?? 0) * 100), 0) : (String(payment.status ?? "").toLowerCase() === "refunded" ? AVULSO_CENTS : 0);
-    const status: RefundRequestRecord["status"] = fullyRefunded(payment) ? "confirmed" : refundedCents > 0 ? "partial" : "processing";
+    const refundedCents = Array.isArray(payment.refunds) ? (payment.refunds as Array<Record<string, unknown>>).filter((refund) => String(refund.status ?? "").toLowerCase() === "approved").reduce((sum, refund) => sum + Math.round(Number(refund.amount ?? 0) * 100), 0) : (String(payment.status ?? "").toLowerCase() === "refunded" ? expectedCents : 0);
+    const status: RefundRequestRecord["status"] = fullyRefunded(payment, expectedCents) ? "confirmed" : refundedCents > 0 ? "partial" : "processing";
     await db.runTransaction(async (tx) => {
       const requestSnap = await tx.get(requestRef(db, input.request.id));
       if (!requestSnap.exists || requestSnap.get("leaseOwner") !== owner) return;
       tx.set(requestRef(db, input.request.id), { status, confirmedAmountCents: refundedCents, leaseOwner: null, leaseUntil: null, updatedAt: now }, { merge: true });
       tx.set(opRef, { status, confirmedAmountCents: refundedCents, leaseOwner: null, leaseUntil: null, updatedAt: now }, { merge: true });
-      if (status === "confirmed") tx.update(db.collection("orders").doc(input.order.id!), { status: "refunded", updatedAt: now });
+      if (status === "confirmed") {
+        tx.update(db.collection("orders").doc(input.order.id!), { status: "refunded", updatedAt: now });
+        if (input.order.product === "pro" && input.order.buyer.type === "user") {
+          const subRef = db.collection("billing_subscriptions").doc(input.order.buyer.userId);
+          const subSnap = await tx.get(subRef);
+          if (subSnap.exists) {
+            const currentSub = subSnap.data() as { paidThrough?: number; status?: string };
+            const currentPaidThrough = Number(currentSub.paidThrough ?? 0);
+            const newPaidThrough = Math.max(0, currentPaidThrough - 30 * 86400000);
+            tx.update(subRef, {
+              paidThrough: newPaidThrough,
+              status: newPaidThrough <= now ? "cancelled" : (currentSub.status ?? "active"),
+              autoRenew: newPaidThrough <= now ? false : undefined,
+              updatedAt: now,
+            });
+          }
+        }
+      }
     });
     return (await getRefundRequest(input.order.id!, db))!;
   } catch {

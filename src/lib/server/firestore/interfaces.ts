@@ -106,6 +106,7 @@ export interface IBillingSubscriptionsRepository {
   }): Promise<{ applied: boolean; subscription: BillingSubscriptionRecord }>;
   requestCancellation(userId: string, requestedAt: number): Promise<BillingSubscriptionRecord>;
   confirmCancellation(userId: string, confirmedAt: number): Promise<BillingSubscriptionRecord>;
+  resumeAutoRenew(userId: string): Promise<BillingSubscriptionRecord>;
 }
 
 export interface IBillingWebhookEventsRepository {

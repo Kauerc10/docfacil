@@ -1,6 +1,9 @@
 import "server-only";
 import type { Firestore } from "firebase-admin/firestore";
 import { getAdminFirestore } from "../firebase-admin";
+import { getServerEnv } from "../env";
+
+const inMemoryOffers = new Map<string, WelcomeOfferWindow>();
 
 export const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 export const THIRTY_MINUTES_MS = 30 * 60 * 1000;
@@ -31,8 +34,50 @@ export async function getOrCreateWelcomeOffer(input: {
   now?: number;
   db?: Firestore;
 }): Promise<WelcomeOfferWindow> {
-  const db = input.db ?? getAdminFirestore();
   const now = input.now ?? Date.now();
+  let useInMemory = false;
+  try {
+    const env = getServerEnv();
+    if (env.ALLOW_IN_MEMORY_REPOSITORIES && !input.db && !process.env.FIRESTORE_EMULATOR_HOST) {
+      useInMemory = true;
+    }
+  } catch {}
+
+  if (useInMemory) {
+    const current = inMemoryOffers.get(input.userId);
+    if (current) {
+      if (current.status === "active" && now > current.expiresAt) {
+        const updated: WelcomeOfferWindow = { ...current, status: "expired", updatedAt: now };
+        inMemoryOffers.set(input.userId, updated);
+        return updated;
+      }
+      return current;
+    }
+    if (input.hasHadProBefore) {
+      const record: WelcomeOfferWindow = {
+        userId: input.userId,
+        startedAt: now,
+        expiresAt: now,
+        status: "expired",
+        createdAt: now,
+        updatedAt: now,
+      };
+      inMemoryOffers.set(input.userId, record);
+      return record;
+    }
+    const record: WelcomeOfferWindow = {
+      userId: input.userId,
+      startedAt: now,
+      expiresAt: now + TWO_HOURS_MS,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    };
+    inMemoryOffers.set(input.userId, record);
+    return record;
+  }
+
+  const db = input.db ?? getAdminFirestore();
   const ref = offerRef(db, input.userId);
 
   return db.runTransaction(async (tx) => {

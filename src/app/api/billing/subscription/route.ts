@@ -34,7 +34,8 @@ export async function POST(req: Request): Promise<Response> {
       return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
     }
     if (action === "continue") {
-      await continueMercadoPagoSubscription({ userId: user.userId, repos });
+      const result = await continueMercadoPagoSubscription({ userId: user.userId, repos });
+      return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
     }
     throw new BackendError("INVALID_REQUEST", 400, "Ação de assinatura inválida.");
   } catch (error: unknown) {

@@ -30,8 +30,9 @@ function requiredEmail(input: { buyerEmail?: string }): string {
   return email;
 }
 
-function requiredAmount(amountCents: number, expected: number): number {
-  if (!Number.isSafeInteger(amountCents) || amountCents !== expected) {
+function requiredAmount(amountCents: number, expected: number | number[]): number {
+  const allowed = Array.isArray(expected) ? expected : [expected];
+  if (!Number.isSafeInteger(amountCents) || !allowed.includes(amountCents)) {
     throw new BackendError("INVALID_REQUEST", 400, "Valor de pagamento inválido.");
   }
   return amountCents / 100;
@@ -131,7 +132,7 @@ export class MercadoPagoBillingProvider implements BillingProvider {
     input: CreateSubscriptionInput & Partial<Pick<MercadoPagoSubscriptionInput, "buyerEmail">>
   ): Promise<SubscriptionPaymentResult> {
     const email = requiredEmail(input);
-    const amount = requiredAmount(input.amountCents, PRO_CENTS);
+    const amount = requiredAmount(input.amountCents, [PRO_CENTS, 2990]);
     const orderId = requiredId(input.orderId, "Pedido");
     const subscription = await this.client.request<MercadoPagoSubscription>(
       "/preapproval",

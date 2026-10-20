@@ -593,8 +593,8 @@ export function CheckoutView() {
           />
           <TrustBadge
             icon={RotateCcw}
-            title="7 dias de garantia"
-            desc="Reembolso integral (CDC art. 49)"
+            title={isAvulso ? "7 dias de correções" : "7 dias de garantia"}
+            desc={isAvulso ? "Edição gratuita do mesmo documento por 7 dias" : "Reembolso integral (CDC art. 49)"}
           />
           <TrustBadge
             icon={Ban}

@@ -184,6 +184,25 @@ export class FirestoreBillingSubscriptionsRepository
     });
   }
 
+  public async resumeAutoRenew(userId: string): Promise<BillingSubscriptionRecord> {
+    const ref = this.db.collection("billing_subscriptions").doc(userId);
+    return this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new BackendError("ORDER_NOT_FOUND", 404, "Assinatura Pro não encontrada.");
+      const current = snap.data() as BillingSubscriptionRecord;
+      const next: BillingSubscriptionRecord = {
+        ...current,
+        status: "active",
+        autoRenew: true,
+        cancellationRequestedAt: undefined,
+        cancellationRequestStatus: undefined,
+        updatedAt: Date.now(),
+      };
+      tx.set(ref, next, { merge: true });
+      return next;
+    });
+  }
+
   public async confirmCancellation(userId: string, confirmedAt: number): Promise<BillingSubscriptionRecord> {
     const ref = this.db.collection("billing_subscriptions").doc(userId);
     return this.db.runTransaction(async (tx) => {

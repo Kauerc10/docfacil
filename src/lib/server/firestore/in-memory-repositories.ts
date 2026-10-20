@@ -788,6 +788,21 @@ export class InMemoryBillingSubscriptionsRepository
     return JSON.parse(JSON.stringify(next));
   }
 
+  public async resumeAutoRenew(userId: string): Promise<BillingSubscriptionRecord> {
+    const current = this.subs.get(userId);
+    if (!current) throw new BackendError("ORDER_NOT_FOUND", 404, "Assinatura Pro não encontrada.");
+    const next: BillingSubscriptionRecord = {
+      ...current,
+      status: "active",
+      autoRenew: true,
+      cancellationRequestedAt: undefined,
+      cancellationRequestStatus: undefined,
+      updatedAt: Date.now(),
+    };
+    this.subs.set(userId, JSON.parse(JSON.stringify(next)));
+    return JSON.parse(JSON.stringify(next));
+  }
+
   public async confirmCancellation(userId: string, confirmedAt: number): Promise<BillingSubscriptionRecord> {
     const current = this.subs.get(userId);
     if (!current) throw new BackendError("ORDER_NOT_FOUND", 404, "Assinatura Pro não encontrada.");

@@ -1,5 +1,6 @@
 import "server-only";
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
+import { getServerEnv } from "../env";
 import type { Firestore } from "firebase-admin/firestore";
 import { getAdminFirestore, getAdminAuth } from "../firebase-admin";
 import { BackendError } from "../errors";
@@ -27,8 +28,17 @@ function maskIdentifier(id: string): string {
   return digits.slice(0, 3) + ".***.***-" + digits.slice(-2);
 }
 
-export function hashIdentifier(id: string): string {
-  return createHash("sha256").update(id.trim().replace(/\D/g, "")).digest("hex");
+function getIdentitySecret(): string {
+  try {
+    const env = getServerEnv();
+    return env.PURCHASE_ACCESS_SECRET || env.FIREBASE_PRIVATE_KEY || "docfacil-identity-hmac-salt-dev-2026";
+  } catch {
+    return "docfacil-identity-hmac-salt-dev-2026";
+  }
+}
+
+export function hashIdentifier(id: string, secret = getIdentitySecret()): string {
+  return createHmac("sha256", secret).update(id.trim().replace(/\D/g, "")).digest("hex");
 }
 
 function correctionRef(db: Firestore, id: string) {

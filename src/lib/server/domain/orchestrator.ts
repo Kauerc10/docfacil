@@ -163,7 +163,8 @@ export async function generateDocumentArtifact(
 
   if (orderId) {
     const purchase = await orders.getOrder(orderId);
-    if (purchase?.provider === "mercadopago" && deps?.purchaseDeliveryOrderId !== orderId) {
+    const requiresVerifiedDelivery = purchase?.fulfillmentMode === "verified_delivery" || purchase?.provider === "mercadopago";
+    if (requiresVerifiedDelivery && deps?.purchaseDeliveryOrderId !== orderId) {
       throw new BackendError("ORDER_FORBIDDEN", 403, "Esta compra deve ser concluída pela entrega do documento salvo.");
     }
   }

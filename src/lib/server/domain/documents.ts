@@ -124,6 +124,7 @@ export interface OrderRecord {
   createdAt: number;
   paidAt?: number;
   consumedAt?: number;
+  fulfillmentMode?: "verified_delivery" | "instant";
 }
 
 export const documentDraftInputSchema = z.object({

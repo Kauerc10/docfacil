@@ -86,7 +86,9 @@ export async function reconcileMercadoPagoPayment(
   const order = await deps.repos.orders.getOrder(externalReference);
   if (!order) throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido da cobrança não encontrado.");
   if (order.provider !== "mercadopago") invalid("Pedido não pertence ao Mercado Pago.");
-  const expected = order.product === "pro" ? PRO_CENTS : AVULSO_CENTS;
+  const expected = order.product === "pro"
+    ? ([PRO_CENTS, 2990].includes(order.amountCents) ? order.amountCents : PRO_CENTS)
+    : AVULSO_CENTS;
   validatePayment(payment, deps, expected);
   if (order.amountCents !== expected) invalid("Pedido possui valor incompatível.");
   if (!payment.date_approved || !Number.isFinite(Date.parse(payment.date_approved))) invalid("Data de aprovação da cobrança ausente.");
