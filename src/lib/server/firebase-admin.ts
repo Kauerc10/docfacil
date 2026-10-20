@@ -14,7 +14,7 @@ export function getFirebaseAdminApp(): App {
     return adminApp;
   }
 
-  if (getApps().length > 0) {
+  if (getApps().some(app => app.name === "[DEFAULT]")) {
     adminApp = getApp();
     return adminApp;
   }

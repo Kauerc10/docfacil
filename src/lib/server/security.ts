@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger";
 
 export type Principal =
   | { type: "guest" }
-  | { type: "user"; userId: string; email?: string };
+  | { type: "user"; userId: string; email?: string; emailVerified?: boolean };
 
 function readTokenProjectHints(token: string): {
   audience?: string;
@@ -70,6 +70,7 @@ export async function resolvePrincipal(
       type: "user",
       userId: decoded.uid,
       email: decoded.email,
+      ...(decoded.email_verified === true ? { emailVerified: true } : {}),
     };
   } catch (error) {
     const env = getServerEnv();

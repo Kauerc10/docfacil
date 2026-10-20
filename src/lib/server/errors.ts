@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 export type BackendErrorCode =
   | "INVALID_REQUEST"
+  | "CONFLICT"
   | "INVALID_AUTH_TOKEN"
   | "APP_CHECK_REQUIRED"
   | "APP_CHECK_INVALID"
