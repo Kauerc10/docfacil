@@ -31,6 +31,7 @@ import {
 import { getPerfil, listPagamentos } from "@/lib/services/users-service";
 import { PLAN_BILLING_DESC } from "@/lib/pricing";
 import type { Pagamento, PerfilUsuario } from "@/lib/types";
+import { apiFetch } from "@/lib/auth/api-fetch";
 
 const PLANO_LABEL: Record<PerfilUsuario["plano"], string> = {
   gratis: "Grátis",
@@ -108,6 +109,7 @@ function PerfilContent() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [cancelMsg, setCancelMsg] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,12 +157,21 @@ function PerfilContent() {
     }
   }
 
-  function handleCancelSubscription() {
-    const proximaData = new Date();
-    proximaData.setMonth(proximaData.getMonth() + 1);
-    const fmt = proximaData.toLocaleDateString("pt-BR");
-    setCancelMsg(`Assinatura cancelada. Você manterá acesso até ${fmt}.`);
-    toast.success("Assinatura cancelada. Sem multas, sem burocracia.");
+  async function handleCancelSubscription() {
+    if (cancelling) return;
+    setCancelling(true);
+    try {
+      const response = await apiFetch("/api/billing/subscription", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "cancel" }) });
+      const body = await response.json();
+      if (!response.ok || body.status !== "cancelled" || !Number.isFinite(body.paidThrough)) {
+        throw new Error(body.error?.message ?? "Não conseguimos confirmar o cancelamento. Sua solicitação pode ser consultada novamente.");
+      }
+      const fmt = new Date(body.paidThrough).toLocaleDateString("pt-BR");
+      setCancelMsg(`Renovação cancelada. Seu período pago permanece disponível até ${fmt}.`);
+      toast.success("Cancelamento confirmado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível confirmar o cancelamento.");
+    } finally { setCancelling(false); }
   }
 
   const plano = perfil?.plano ?? user?.plano ?? "gratis";
@@ -410,6 +421,7 @@ function PerfilContent() {
                     <AlertDialogFooter>
                       <AlertDialogCancel>Manter assinatura</AlertDialogCancel>
                       <AlertDialogAction
+                          disabled={cancelling}
                         onClick={handleCancelSubscription}
                         className="bg-[var(--coral)] text-white hover:bg-[var(--coral-hover)]"
                       >
