@@ -5,6 +5,8 @@ import { BackendError } from "@/lib/server/errors";
 import { requireAppCheck, resolvePrincipal } from "@/lib/server/security";
 import { createOrderBuyerPrincipalKey } from "@/lib/server/billing/order-identity";
 import { getBillingRepositories } from "@/lib/server/firestore/billing-repositories";
+import { authorizePurchaseRequest } from "@/lib/server/billing/purchase-authorization";
+import { getPurchaseDelivery } from "@/lib/server/billing/purchase-delivery";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,6 +59,19 @@ export async function POST(req: Request) {
     }
 
     let authorized = false;
+
+    if (order.provider === "mercadopago") {
+      authorized = await authorizePurchaseRequest(req, order, principal);
+      if (!authorized) throw new BackendError("ORDER_FORBIDDEN", 403, "Você não tem permissão para consultar este pedido.");
+      const delivery = await getPurchaseDelivery(orderId);
+      return NextResponse.json({
+        orderId: order.id, product: order.product, status: order.status,
+        method: order.method, amountCents: order.amountCents,
+        ...(order.status === "pending" && order.pix ? { pix: order.pix } : {}),
+        deliveryStatus: delivery?.status ?? "pending",
+        ...(delivery?.result ? { documentId: delivery.result.documentId, purchaseAccessPath: `/purchases/access?orderId=${encodeURIComponent(orderId)}` } : {}),
+      }, { headers: { "Cache-Control": "no-store" } });
+    }
 
     if (principal.type === "user") {
       authorized =

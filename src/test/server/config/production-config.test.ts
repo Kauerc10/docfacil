@@ -11,6 +11,9 @@ function source(path: string): string {
 describe("Production Server Configuration Assertions (Fail-Closed)", () => {
   const validProductionEnv: ServerEnv = {
     NODE_ENV: "production",
+    CHECKOUT_PROVIDER: "abacatepay",
+    MERCADOPAGO_ENVIRONMENT: "test",
+    MERCADOPAGO_PROMOTION_VERIFIED: false,
     VERCEL_ENV: "production",
     FIREBASE_PROJECT_ID: "docfacil-prod",
     FIREBASE_CLIENT_EMAIL: "admin@docfacil-prod.iam.gserviceaccount.com",
@@ -33,6 +36,48 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
 
   it("passes when all production requirements are satisfied", () => {
     expect(() => assertProductionServerConfig(validProductionEnv)).not.toThrow();
+  });
+
+  const mercadoPagoEnv = (): ServerEnv => ({
+    ...validProductionEnv,
+    CHECKOUT_PROVIDER: "mercadopago",
+    NEXT_PUBLIC_CHECKOUT_PROVIDER: "mercadopago",
+    MERCADOPAGO_ENVIRONMENT: "production",
+    MERCADOPAGO_ACCESS_TOKEN: "fake-production-token",
+    MERCADOPAGO_WEBHOOK_SECRET: "fake-webhook-secret-only-for-test",
+    MERCADOPAGO_COLLECTOR_ID: "12345",
+    PURCHASE_ACCESS_SECRET: "fake-purchase-secret-at-least-32-chars",
+    PURCHASE_MAIL_API_KEY: "fake-mail-api-key",
+    PURCHASE_MAIL_FROM: "Compras <compras@example.com>",
+    BILLING_RECONCILE_SECRET: "fake-cron-secret-at-least-32-characters",
+    ABACATEPAY_API_KEY: undefined,
+    ABACATEPAY_WEBHOOK_SECRET: undefined,
+    ABACATEPAY_AVULSO_PRODUCT_ID: undefined,
+    ABACATEPAY_PRO_PRODUCT_ID: undefined,
+  });
+
+  it("Mercado Pago does not require the retired gateway credentials", () => {
+    expect(() => assertProductionServerConfig(mercadoPagoEnv())).not.toThrow();
+  });
+
+  it.each(["MERCADOPAGO_ACCESS_TOKEN", "MERCADOPAGO_WEBHOOK_SECRET", "MERCADOPAGO_COLLECTOR_ID"] as const)(
+    "Mercado Pago fails closed without %s", (key) => {
+      const env = mercadoPagoEnv();
+      delete env[key];
+      expect(() => assertProductionServerConfig(env)).toThrow(key);
+    }
+  );
+
+  it("Mercado Pago rejects test environment in final production", () => {
+    expect(() => assertProductionServerConfig({ ...mercadoPagoEnv(), MERCADOPAGO_ENVIRONMENT: "test" }))
+      .toThrow("test credentials");
+  });
+
+  it("Mercado Pago rejects a different client gateway or insecure return origin", () => {
+    expect(() => assertProductionServerConfig({ ...mercadoPagoEnv(), NEXT_PUBLIC_CHECKOUT_PROVIDER: "demo" }))
+      .toThrow("must match");
+    expect(() => assertProductionServerConfig({ ...mercadoPagoEnv(), NEXT_PUBLIC_APP_URL: "http://example.com" }))
+      .toThrow("HTTPS");
   });
 
   it("fails closed when Firebase credentials are missing in production", () => {
@@ -114,6 +159,9 @@ describe("Production Server Configuration Assertions (Fail-Closed)", () => {
 
   it("allows partial credentials in development environment", () => {
     const devEnv: ServerEnv = {
+      CHECKOUT_PROVIDER: "abacatepay",
+      MERCADOPAGO_ENVIRONMENT: "test",
+      MERCADOPAGO_PROMOTION_VERIFIED: false,
       NODE_ENV: "development",
       VERCEL_ENV: undefined,
       FIREBASE_PROJECT_ID: "dev-proj",

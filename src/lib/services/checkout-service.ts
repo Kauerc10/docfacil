@@ -10,7 +10,7 @@ import {
   preparePixPaymentNavigation,
 } from "@/lib/services/pix-payment-session";
 
-export type CheckoutProvider = "abacatepay";
+export type CheckoutProvider = "abacatepay" | "mercadopago";
 export type CheckoutPlan = PaidPlan;
 export type CheckoutMethod = "pix" | "card";
 
@@ -23,6 +23,7 @@ export interface CheckoutParams {
   successUrl?: string;
   method?: CheckoutMethod;
   authenticated?: boolean;
+  draft?: { modeloSlug: string; respostas: Record<string, string>; clausulasSelecionadas?: string[] };
 }
 
 export interface CheckoutPixPayload {
@@ -79,6 +80,9 @@ export interface CheckoutStatusResult {
   amountCents: number;
   pix?: CheckoutPixPayload;
   documentId?: string;
+  guestAccessPath?: string;
+  purchaseAccessPath?: string;
+  deliveryStatus?: "pending" | "processing" | "completed" | "failed";
 }
 
 export interface CheckoutCreatePayloadInput {
@@ -92,11 +96,10 @@ export interface CheckoutCreatePayloadInput {
 export { PLAN_PRICES, PLAN_LABELS } from "@/lib/pricing";
 
 export const ACTIVE_PROVIDER: CheckoutProvider | "demo" =
-  process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER === "abacatepay"
-    ? "abacatepay"
-    : "demo";
+  process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER === "mercadopago" ? "mercadopago" :
+  process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER === "abacatepay" ? "abacatepay" : "demo";
 
-const IS_PRODUCTION_CONFIGURED = ACTIVE_PROVIDER === "abacatepay";
+const IS_PRODUCTION_CONFIGURED = ACTIVE_PROVIDER !== "demo";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -214,6 +217,9 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
   const amount = PLAN_PRICES[params.plan];
 
   if (provider === "demo" || !IS_PRODUCTION_CONFIGURED) {
+    if (process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_CHECKOUT_PROVIDER !== "demo") {
+      throw new Error("Pagamento indisponível: configuração do checkout ausente.");
+    }
     if (!params.userEmail) {
       throw new Error("Informe seu e-mail para prosseguir com o pagamento.");
     }
@@ -251,13 +257,27 @@ export async function createCheckout(params: CheckoutParams): Promise<CheckoutRe
 
   const authenticated =
     params.authenticated ?? Boolean(params.userId && params.userId !== "guest");
-  const payload = buildCheckoutCreatePayload({
+  const payload: Record<string, unknown> = buildCheckoutCreatePayload({
     plan: params.plan,
     authenticated,
     userEmail: params.userEmail,
     method: params.method,
     successUrl: params.successUrl,
   });
+
+  if (provider === "mercadopago") {
+    if (params.plan === "avulso" && !params.draft) throw new Error("Salve o documento antes de pagar.");
+    const source = JSON.stringify({ plan: params.plan, method: params.method, draft: params.draft, email: params.userEmail });
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source));
+    const key = `docfacil:mp-attempt:${Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("")}`;
+    let attempt: { requestId: string; accessToken: string } | null = null;
+    try { attempt = JSON.parse(window.localStorage.getItem(key) ?? "null"); } catch { /* storage opcional */ }
+    if (!attempt || !/^[a-f0-9]{64}$/.test(attempt.accessToken) || !/^[a-f0-9-]{36}$/i.test(attempt.requestId)) {
+      attempt = { requestId: crypto.randomUUID(), accessToken: Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, "0")).join("") };
+      try { window.localStorage.setItem(key, JSON.stringify(attempt)); } catch { /* cookie ainda protege a compra */ }
+    }
+    Object.assign(payload, attempt, { draft: params.draft });
+  }
 
   const res = await apiFetch("/api/checkout/create", {
     method: "POST",

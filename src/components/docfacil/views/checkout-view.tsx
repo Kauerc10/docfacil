@@ -42,6 +42,7 @@ import {
   clearFinalizationRequestId,
 } from "@/lib/documents/client";
 import { buildAccountDraftFinalizationAnswers } from "@/lib/documents/account-draft";
+import { apiFetch } from "@/lib/auth/api-fetch";
 
 const PAYMENT_POLL_INTERVAL_MS = 1500;
 const PAYMENT_POLL_MAX_ATTEMPTS = 120;
@@ -60,6 +61,7 @@ export function CheckoutView() {
   const [guestEmail, setGuestEmail] = useState("");
   const [method, setMethod] = useState<CheckoutMethod>("pix");
   const [verifyingPayment, setVerifyingPayment] = useState(false);
+  const [deliveryFailure, setDeliveryFailure] = useState<string | null>(null);
   const [pixCheckout, setPixCheckout] = useState<
     Extract<CheckoutResult, { kind: "pix" }> | null
   >(null);
@@ -76,6 +78,19 @@ export function CheckoutView() {
       try {
         const slug = params.slug;
         const draftId = params.draftId;
+
+        if (status.deliveryStatus) {
+          if (status.deliveryStatus === "completed" && status.purchaseAccessPath) {
+            window.location.assign(status.purchaseAccessPath);
+            return;
+          }
+          if (status.deliveryStatus === "completed" && status.documentId && slug) {
+            navigate("sucesso", { slug, id: status.documentId });
+            return;
+          }
+          handledPaidOrderId.current = null;
+          return;
+        }
 
         if (status.status === "consumed") {
           if (!status.documentId || !slug) {
@@ -180,8 +195,16 @@ export function CheckoutView() {
 
         if (status.status === "paid" || status.status === "consumed") {
           await continueAfterPaidOrder(status);
-          if (!cancelled) setVerifyingPayment(false);
-          return;
+          if (!status.deliveryStatus || status.deliveryStatus === "completed") {
+            if (!cancelled) setVerifyingPayment(false);
+            return;
+          }
+          if (status.deliveryStatus === "failed") {
+            setDeliveryFailure(status.orderId);
+            setVerifyingPayment(false);
+            toast.error("Pagamento confirmado. A geração precisa de nova tentativa; sua compra continua salva.");
+            return;
+          }
         }
 
         if (status.status === "failed" || status.status === "refunded") {
@@ -257,6 +280,21 @@ export function CheckoutView() {
         successUrl = success.toString();
       }
 
+      let paidDraft: { modeloSlug: string; respostas: Record<string, string>; clausulasSelecionadas: string[] } | undefined;
+      if (ACTIVE_PROVIDER === "mercadopago" && plan === "avulso") {
+        if (user && draftId) {
+          const draft = await getAccountDraft(draftId);
+          if (!draft) throw new Error("Rascunho não encontrado.");
+          if (draft.sourceDocumentId) throw new Error("A compra de correções está em preparação. Seu documento continua salvo.");
+          paidDraft = { modeloSlug: draft.modeloSlug, respostas: buildAccountDraftFinalizationAnswers(draft), clausulasSelecionadas: draft.clausulasSelecionadas };
+        } else if (slug) {
+          const draft = loadGuestDraft(slug);
+          if (!draft) throw new Error("Rascunho não encontrado.");
+          const respostas = { ...draft.answers };
+          for (const extras of Object.values(draft.extrasPorClausula ?? {})) Object.assign(respostas, extras);
+          paidDraft = { modeloSlug: slug, respostas, clausulasSelecionadas: draft.clausulasSelecionadas };
+        }
+      }
       const result = await createCheckout({
         plan,
         userId,
@@ -265,6 +303,7 @@ export function CheckoutView() {
         method: plan === "pro" ? "card" : method,
         documentId: params.docId,
         successUrl,
+        draft: paidDraft,
       });
 
       if (result.provider === "demo" && plan === "pro") {
@@ -430,6 +469,25 @@ export function CheckoutView() {
               : "Assinatura mensal. Cancele quando quiser."}
           </p>
         </div>
+
+        {deliveryFailure && (
+          <div role="status" className="mb-6 rounded-xl border border-[var(--border)] bg-surface p-5">
+            <p className="font-semibold">Seu pagamento está confirmado.</p>
+            <p className="mt-2 text-sm text-ink/70">Não foi possível concluir o documento. Você pode tentar novamente sem pagar outra vez.</p>
+            <button type="button" disabled={submitting} className="mt-4 underline disabled:opacity-50" onClick={async () => {
+              setSubmitting(true);
+              try {
+                const response = await apiFetch("/api/checkout/retry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId: deliveryFailure }) });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error?.message ?? "Não conseguimos concluir agora. Sua compra continua salva.");
+                if (result.purchaseAccessPath) window.location.assign(result.purchaseAccessPath);
+                else if (result.documentId && params.slug) navigate("sucesso", { slug: params.slug, id: result.documentId });
+                else toast.info("Sua nova tentativa está em andamento. Você pode voltar a esta compra depois.");
+              } catch (error) { toast.error(error instanceof Error ? error.message : "Sua compra continua salva."); }
+              finally { setSubmitting(false); }
+            }}>{submitting ? "Tentando novamente…" : "Tentar novamente sem cobrança"}</button>
+          </div>
+        )}
 
         <div className="bg-surface border border-[var(--border)] rounded-2xl shadow-[0_12px_40px_-12px_rgba(14,35,64,0.16)] overflow-hidden">
           <div className="px-6 sm:px-7 py-5 border-b border-[var(--border)] bg-[var(--blue-soft)]/30">

@@ -104,7 +104,7 @@ export interface OrderPixPayload {
 
 export interface OrderRecord {
   id?: string;
-  provider: "demo" | "abacatepay";
+  provider: "demo" | "abacatepay" | "mercadopago";
   product: "avulso" | "pro";
   amountCents: number;
   buyer:

@@ -27,6 +27,8 @@ export interface GenerateDocumentDependencies {
   repositories?: Partial<BackendRepositories>;
   billingSubscriptions?: IBillingSubscriptionsRepository;
   storage?: ArtifactStorage;
+  /** Apenas a entrega server-side do snapshot pago pode consumir compra MP. */
+  purchaseDeliveryOrderId?: string;
 }
 
 export interface GenerateDocumentInput {
@@ -158,6 +160,13 @@ export async function generateDocumentArtifact(
     generationCommit,
   };
   const storage = deps?.storage || getArtifactStorage();
+
+  if (orderId) {
+    const purchase = await orders.getOrder(orderId);
+    if (purchase?.provider === "mercadopago" && deps?.purchaseDeliveryOrderId !== orderId) {
+      throw new BackendError("ORDER_FORBIDDEN", 403, "Esta compra deve ser concluída pela entrega do documento salvo.");
+    }
+  }
 
   const principalKey =
     principal.type === "guest"

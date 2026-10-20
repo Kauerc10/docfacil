@@ -33,6 +33,18 @@ const serverEnvSchema = z.object({
   ABACATEPAY_WEBHOOK_SECRET: z.string().min(16).optional(),
   ABACATEPAY_AVULSO_PRODUCT_ID: z.string().min(1).optional(),
   ABACATEPAY_PRO_PRODUCT_ID: z.string().min(1).optional(),
+  CHECKOUT_PROVIDER: z.enum(["abacatepay", "mercadopago"]).default("abacatepay"),
+  NEXT_PUBLIC_CHECKOUT_PROVIDER: z.enum(["demo", "abacatepay", "mercadopago"]).optional(),
+  MERCADOPAGO_ACCESS_TOKEN: z.string().min(1).optional(),
+  MERCADOPAGO_WEBHOOK_SECRET: z.string().min(16).optional(),
+  MERCADOPAGO_COLLECTOR_ID: z.string().regex(/^\d+$/).optional(),
+  MERCADOPAGO_ENVIRONMENT: z.enum(["test", "production"]).default("test"),
+  // A oferta permanece fechada até haver prova externa do preço e da expiração.
+  MERCADOPAGO_PROMOTION_VERIFIED: booleanString.default(false),
+  BILLING_RECONCILE_SECRET: z.string().min(32).optional(),
+  PURCHASE_ACCESS_SECRET: z.string().min(32).optional(),
+  PURCHASE_MAIL_API_KEY: z.string().min(1).optional(),
+  PURCHASE_MAIL_FROM: z.string().min(1).optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().optional().default("http://localhost:3000"),
 });
 

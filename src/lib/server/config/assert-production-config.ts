@@ -15,10 +15,22 @@ export function assertProductionServerConfig(env: ServerEnv): void {
     ["R2_ACCESS_KEY_ID", env.R2_ACCESS_KEY_ID],
     ["R2_SECRET_ACCESS_KEY", env.R2_SECRET_ACCESS_KEY],
     ["R2_BUCKET_NAME", env.R2_BUCKET_NAME],
-    ["ABACATEPAY_API_KEY", env.ABACATEPAY_API_KEY],
-    ["ABACATEPAY_WEBHOOK_SECRET", env.ABACATEPAY_WEBHOOK_SECRET],
-    ["ABACATEPAY_AVULSO_PRODUCT_ID", env.ABACATEPAY_AVULSO_PRODUCT_ID],
-    ["ABACATEPAY_PRO_PRODUCT_ID", env.ABACATEPAY_PRO_PRODUCT_ID],
+    ...(env.CHECKOUT_PROVIDER === "mercadopago"
+      ? [
+          ["MERCADOPAGO_ACCESS_TOKEN", env.MERCADOPAGO_ACCESS_TOKEN],
+          ["MERCADOPAGO_WEBHOOK_SECRET", env.MERCADOPAGO_WEBHOOK_SECRET],
+          ["MERCADOPAGO_COLLECTOR_ID", env.MERCADOPAGO_COLLECTOR_ID],
+          ["PURCHASE_ACCESS_SECRET", env.PURCHASE_ACCESS_SECRET],
+          ["PURCHASE_MAIL_API_KEY", env.PURCHASE_MAIL_API_KEY],
+          ["PURCHASE_MAIL_FROM", env.PURCHASE_MAIL_FROM],
+          ["BILLING_RECONCILE_SECRET", env.BILLING_RECONCILE_SECRET],
+        ]
+      : [
+          ["ABACATEPAY_API_KEY", env.ABACATEPAY_API_KEY],
+          ["ABACATEPAY_WEBHOOK_SECRET", env.ABACATEPAY_WEBHOOK_SECRET],
+          ["ABACATEPAY_AVULSO_PRODUCT_ID", env.ABACATEPAY_AVULSO_PRODUCT_ID],
+          ["ABACATEPAY_PRO_PRODUCT_ID", env.ABACATEPAY_PRO_PRODUCT_ID],
+        ]),
   ].filter(([, value]) => !value);
 
   if (missing.length) {
@@ -26,6 +38,18 @@ export function assertProductionServerConfig(env: ServerEnv): void {
     throw new Error(
       `DocFacil production backend configuration incomplete. Missing required environment variables: ${missingKeys}`
     );
+  }
+
+  if (env.CHECKOUT_PROVIDER === "mercadopago") {
+    if (env.MERCADOPAGO_ENVIRONMENT !== "production") {
+      throw new Error("Mercado Pago test credentials cannot be used in production.");
+    }
+    if (env.NEXT_PUBLIC_CHECKOUT_PROVIDER !== "mercadopago") {
+      throw new Error("Client and server checkout providers must match in production.");
+    }
+    if (!env.NEXT_PUBLIC_APP_URL.startsWith("https://")) {
+      throw new Error("Mercado Pago requires an HTTPS application URL in production.");
+    }
   }
 
   if (

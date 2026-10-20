@@ -7,6 +7,8 @@ import { requireAppCheck, resolvePrincipal } from "@/lib/server/security";
 import { validateCheckoutSelection } from "@/lib/server/billing/checkout-policy";
 import { getAbacatePayBillingProvider } from "@/lib/server/billing/abacate/provider";
 import { getBillingRepositories } from "@/lib/server/firestore/billing-repositories";
+import { getServerEnv } from "@/lib/server/env";
+import { createMercadoPagoCheckout } from "@/lib/server/billing/mercadopago/checkout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,6 +71,9 @@ export async function POST(req: Request) {
     await requireAppCheck(req);
     const principal = await resolvePrincipal(req);
     const body = await req.json().catch(() => ({}));
+    if (getServerEnv().CHECKOUT_PROVIDER === "mercadopago") {
+      return await createMercadoPagoCheckout(req, principal, body);
+    }
     const parsed = createCheckoutSchema.safeParse(body);
 
     if (!parsed.success) {
