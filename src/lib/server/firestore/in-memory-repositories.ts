@@ -20,6 +20,7 @@ import type {
   ArtifactState,
 } from "../domain/documents";
 import type { BillingSubscriptionRecord } from "../billing/subscription";
+import { renewProSubscription } from "../billing/subscription-lifecycle";
 import { BackendError } from "../errors";
 import { createOrderBuyerPrincipalKey } from "../billing/order-identity";
 
@@ -39,7 +40,8 @@ declare global {
     generationRequests: Map<string, GenerationRequestRecord>;
     users: Map<string, { plano?: string; email?: string; nome?: string }>;
     subscriptions: Map<string, BillingSubscriptionRecord>;
-    webhookEvents: Set<string>;
+    webhookEvents: Map<string, { status: "processing" | "completed"; claimedAt?: number; ownerId?: string }>;
+    subscriptionEffects: Set<string>;
   } | undefined;
 }
 
@@ -53,7 +55,8 @@ function getStore() {
       generationRequests: new Map(),
       users: new Map(),
       subscriptions: new Map(),
-      webhookEvents: new Set(),
+      webhookEvents: new Map(),
+      subscriptionEffects: new Set(),
     };
   }
   return globalThis.__inMemoryStore;
@@ -325,6 +328,9 @@ export class InMemoryOrdersRepository implements IOrdersRepository {
   public async markOrderPaid(orderId: string): Promise<OrderRecord> {
     const order = this.orders.get(orderId);
     if (!order) throw new Error("Order not found");
+    if (order.status === "paid" || order.status === "reserved" || order.status === "consumed" || order.status === "refunded") {
+      return JSON.parse(JSON.stringify(order));
+    }
     order.status = "paid";
     order.paidAt = Date.now();
     return JSON.parse(JSON.stringify(order));
@@ -398,11 +404,16 @@ export class InMemoryOrdersRepository implements IOrdersRepository {
     documentId: string;
   }): Promise<void> {
     const order = this.orders.get(params.orderId);
-    if (order && (order.status === "reserved" || order.status === "paid")) {
-      order.status = "consumed";
-      order.documentId = params.documentId;
-      order.consumedAt = Date.now();
+    if (!order) throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido não encontrado.");
+    if (order.status === "consumed" && order.documentId === params.documentId) return;
+    if (order.status !== "reserved" || order.reservedByRequestId !== params.requestId) {
+      throw new BackendError("ORDER_ALREADY_RESERVED", 409, "A reserva deste pagamento não pertence a esta geração.");
     }
+    order.status = "consumed";
+    order.documentId = params.documentId;
+    order.consumedAt = Date.now();
+    delete order.reservedByRequestId;
+    delete order.reservedAt;
   }
 
   public async releaseReservedOrder(params: {
@@ -688,13 +699,19 @@ export class InMemoryBillingSubscriptionsRepository
   implements IBillingSubscriptionsRepository
 {
   private readonly _subs: Map<string, BillingSubscriptionRecord> | null;
+  private readonly _effects: Set<string> | null;
 
   constructor(isolated = true) {
     this._subs = isolated ? new Map() : null;
+    this._effects = isolated ? new Set() : null;
   }
 
   private get subs() {
     return this._subs ?? getStore().subscriptions;
+  }
+
+  private get effects() {
+    return this._effects ?? getStore().subscriptionEffects;
   }
 
   public async getByUserId(userId: string): Promise<BillingSubscriptionRecord | null> {
@@ -716,15 +733,77 @@ export class InMemoryBillingSubscriptionsRepository
   public async upsert(record: BillingSubscriptionRecord): Promise<void> {
     this.subs.set(record.userId, JSON.parse(JSON.stringify(record)));
   }
+
+  public async renewWithPayment(input: {
+    userId: string;
+    providerSubscriptionId: string;
+    paymentId: string;
+    paidAt: number;
+    cycleId?: string;
+  }): Promise<{ applied: boolean; subscription: BillingSubscriptionRecord }> {
+    const current = this.subs.get(input.userId);
+    if (!current || current.providerSubscriptionId !== input.providerSubscriptionId) {
+      throw new BackendError("ORDER_NOT_FOUND", 404, "Assinatura local não encontrada.");
+    }
+    const effectKey = `${input.providerSubscriptionId}:${input.cycleId ?? input.paymentId}`;
+    if (this.effects.has(effectKey) || current.lastPaymentId === input.paymentId) {
+      return { applied: false, subscription: JSON.parse(JSON.stringify(current)) };
+    }
+    const renewed = renewProSubscription(current, {
+      paymentId: input.paymentId,
+      paidAt: input.paidAt,
+    });
+    if (current.status === "cancelled" || !current.autoRenew) {
+      renewed.status = "cancelled";
+      renewed.autoRenew = false;
+    }
+    this.effects.add(effectKey);
+    this.subs.set(input.userId, JSON.parse(JSON.stringify(renewed)));
+    return { applied: true, subscription: JSON.parse(JSON.stringify(renewed)) };
+  }
+
+  public async activateWithPayment(input: {
+    record: BillingSubscriptionRecord;
+    paymentId: string;
+  }): Promise<{ applied: boolean; subscription: BillingSubscriptionRecord }> {
+    const existing = this.subs.get(input.record.userId);
+    if (existing) {
+      if (existing.providerSubscriptionId !== input.record.providerSubscriptionId) {
+        throw new BackendError("CONFLICT", 409, "Já existe uma assinatura Pro vinculada a esta conta.");
+      }
+      return { applied: false, subscription: JSON.parse(JSON.stringify(existing)) };
+    }
+    const effectKey = `${input.record.providerSubscriptionId}:${input.paymentId}`;
+    if (this.effects.has(effectKey)) return { applied: false, subscription: JSON.parse(JSON.stringify(input.record)) };
+    this.effects.add(effectKey);
+    this.subs.set(input.record.userId, JSON.parse(JSON.stringify(input.record)));
+    return { applied: true, subscription: JSON.parse(JSON.stringify(input.record)) };
+  }
+
+  public async requestCancellation(userId: string, requestedAt: number): Promise<BillingSubscriptionRecord> {
+    const current = this.subs.get(userId);
+    if (!current) throw new BackendError("ORDER_NOT_FOUND", 404, "Assinatura Pro não encontrada.");
+    const next = { ...current, cancellationRequestedAt: current.cancellationRequestedAt ?? requestedAt, cancellationRequestStatus: "requested" as const, updatedAt: requestedAt };
+    this.subs.set(userId, JSON.parse(JSON.stringify(next)));
+    return JSON.parse(JSON.stringify(next));
+  }
+
+  public async confirmCancellation(userId: string, confirmedAt: number): Promise<BillingSubscriptionRecord> {
+    const current = this.subs.get(userId);
+    if (!current) throw new BackendError("ORDER_NOT_FOUND", 404, "Assinatura Pro não encontrada.");
+    const next = { ...current, status: "cancelled" as const, autoRenew: false, updatedAt: confirmedAt, cancellationRequestedAt: current.cancellationRequestedAt ?? confirmedAt, cancellationRequestStatus: "confirmed" as const };
+    this.subs.set(userId, JSON.parse(JSON.stringify(next)));
+    return JSON.parse(JSON.stringify(next));
+  }
 }
 
 export class InMemoryBillingWebhookEventsRepository
   implements IBillingWebhookEventsRepository
 {
-  private readonly _events: Set<string> | null;
+  private readonly _events: Map<string, { status: "processing" | "completed"; claimedAt?: number; ownerId?: string }> | null;
 
   constructor(isolated = true) {
-    this._events = isolated ? new Set() : null;
+    this._events = isolated ? new Map() : null;
   }
 
   private get events() {
@@ -735,21 +814,34 @@ export class InMemoryBillingWebhookEventsRepository
     return this.events.has(eventId);
   }
 
-  public async claim(eventId: string, _now: number): Promise<boolean> {
-    if (this.events.has(eventId)) return false;
-    this.events.add(eventId);
+  public async claim(eventId: string, now: number, ownerId = eventId): Promise<boolean> {
+    const existing = this.events.get(eventId);
+    if (existing) {
+      if (existing.status === "processing" && typeof existing.claimedAt === "number" && now - existing.claimedAt >= 5 * 60_000) {
+        this.events.set(eventId, { status: "processing", claimedAt: now, ownerId });
+        return true;
+      }
+      return false;
+    }
+    this.events.set(eventId, { status: "processing", claimedAt: now, ownerId });
     return true;
   }
 
-  public async complete(eventId: string, _now: number): Promise<void> {
-    this.events.add(eventId);
+  public async complete(eventId: string, now: number, ownerId = eventId): Promise<void> {
+    const existing = this.events.get(eventId);
+    if (existing?.status === "processing" && existing.ownerId === ownerId) {
+      this.events.set(eventId, { ...existing, status: "completed", claimedAt: now });
+    }
   }
 
-  public async release(eventId: string): Promise<void> {
-    this.events.delete(eventId);
+  public async release(eventId: string, ownerId = eventId): Promise<void> {
+    const existing = this.events.get(eventId);
+    if (existing?.status === "processing" && existing.ownerId === ownerId) {
+      this.events.delete(eventId);
+    }
   }
 
   public record(eventId: string): void {
-    this.events.add(eventId);
+    this.events.set(eventId, { status: "completed" });
   }
 }

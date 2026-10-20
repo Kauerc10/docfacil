@@ -6,6 +6,7 @@ import { getServerEnv } from "../env";
 import { assertProductionServerConfig } from "../config/assert-production-config";
 import type { OrderRecord } from "../domain/documents";
 import type { BillingSubscriptionRecord } from "../billing/subscription";
+import { cancelProSubscription, renewProSubscription } from "../billing/subscription-lifecycle";
 import type {
   IBillingOrdersRepository,
   IBillingSubscriptionsRepository,
@@ -112,6 +113,88 @@ export class FirestoreBillingSubscriptionsRepository
       .doc(record.userId)
       .set(record, { merge: true });
   }
+
+  public async renewWithPayment(input: {
+    userId: string;
+    providerSubscriptionId: string;
+    paymentId: string;
+    paidAt: number;
+    cycleId?: string;
+  }): Promise<{ applied: boolean; subscription: BillingSubscriptionRecord }> {
+    const subscriptionRef = this.db.collection("billing_subscriptions").doc(input.userId);
+    const effectRef = subscriptionRef.collection("payment_effects").doc(input.cycleId ?? input.paymentId);
+    return this.db.runTransaction(async (tx) => {
+      const subscriptionSnap = await tx.get(subscriptionRef);
+      const effectSnap = await tx.get(effectRef);
+      if (!subscriptionSnap.exists) {
+        throw new BackendError("ORDER_NOT_FOUND", 404, "Assinatura local não encontrada.");
+      }
+      const current = subscriptionSnap.data() as BillingSubscriptionRecord;
+      if (current.providerSubscriptionId !== input.providerSubscriptionId) {
+        throw new BackendError("ORDER_NOT_FOUND", 404, "Assinatura local não encontrada.");
+      }
+      if (effectSnap.exists || current.lastPaymentId === input.paymentId) {
+        return { applied: false, subscription: current };
+      }
+      const renewed = renewProSubscription(current, {
+        paymentId: input.paymentId,
+        paidAt: input.paidAt,
+      });
+      if (current.status === "cancelled" || !current.autoRenew) {
+        renewed.status = "cancelled";
+        renewed.autoRenew = false;
+      }
+      tx.create(effectRef, { paymentId: input.paymentId, paidAt: input.paidAt, createdAt: input.paidAt });
+      tx.set(subscriptionRef, renewed, { merge: true });
+      return { applied: true, subscription: renewed };
+    });
+  }
+
+  public async activateWithPayment(input: {
+    record: BillingSubscriptionRecord;
+    paymentId: string;
+  }): Promise<{ applied: boolean; subscription: BillingSubscriptionRecord }> {
+    const ref = this.db.collection("billing_subscriptions").doc(input.record.userId);
+    const effectRef = ref.collection("payment_effects").doc(input.paymentId);
+    return this.db.runTransaction(async (tx) => {
+      const [existingSnap, effectSnap] = [await tx.get(ref), await tx.get(effectRef)];
+      if (existingSnap.exists) {
+        const existing = existingSnap.data() as BillingSubscriptionRecord;
+        if (existing.providerSubscriptionId !== input.record.providerSubscriptionId) {
+          throw new BackendError("CONFLICT", 409, "Já existe uma assinatura Pro vinculada a esta conta.");
+        }
+        return { applied: false, subscription: existing };
+      }
+      if (effectSnap.exists) return { applied: false, subscription: input.record };
+      tx.create(effectRef, { paymentId: input.paymentId, createdAt: input.record.createdAt });
+      tx.create(ref, input.record);
+      return { applied: true, subscription: input.record };
+    });
+  }
+
+  public async requestCancellation(userId: string, requestedAt: number): Promise<BillingSubscriptionRecord> {
+    const ref = this.db.collection("billing_subscriptions").doc(userId);
+    return this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new BackendError("ORDER_NOT_FOUND", 404, "Assinatura Pro não encontrada.");
+      const current = snap.data() as BillingSubscriptionRecord;
+      const next = { ...current, cancellationRequestedAt: current.cancellationRequestedAt ?? requestedAt, cancellationRequestStatus: "requested" as const, updatedAt: requestedAt };
+      tx.set(ref, next, { merge: true });
+      return next;
+    });
+  }
+
+  public async confirmCancellation(userId: string, confirmedAt: number): Promise<BillingSubscriptionRecord> {
+    const ref = this.db.collection("billing_subscriptions").doc(userId);
+    return this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new BackendError("ORDER_NOT_FOUND", 404, "Assinatura Pro não encontrada.");
+      const current = snap.data() as BillingSubscriptionRecord;
+      const next = { ...cancelProSubscription(current, confirmedAt), cancellationRequestStatus: "confirmed" as const, cancellationRequestedAt: current.cancellationRequestedAt ?? confirmedAt };
+      tx.set(ref, next, { merge: true });
+      return next;
+    });
+  }
 }
 
 export class FirestoreBillingWebhookEventsRepository
@@ -132,35 +215,42 @@ export class FirestoreBillingWebhookEventsRepository
     return snap.exists;
   }
 
-  public async claim(eventId: string, now: number): Promise<boolean> {
+  public async claim(eventId: string, now: number, ownerId = eventId): Promise<boolean> {
     const ref = this.eventRef(eventId);
     return await this.db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
-      if (snap.exists) return false;
+      if (snap.exists) {
+        const data = snap.data() as { status?: string; claimedAt?: number };
+        if (data.status === "processing" && typeof data.claimedAt === "number" && now - data.claimedAt >= 5 * 60_000) {
+          tx.update(ref, { status: "processing", claimedAt: now, ownerId });
+          return true;
+        }
+        return false;
+      }
 
       tx.create(ref, {
         status: "processing",
         claimedAt: now,
+        ownerId,
       });
       return true;
     });
   }
 
-  public async complete(eventId: string, now: number): Promise<void> {
-    await this.eventRef(eventId).set(
-      {
-        status: "completed",
-        completedAt: now,
-      },
-      { merge: true }
-    );
-  }
-
-  public async release(eventId: string): Promise<void> {
+  public async complete(eventId: string, now: number, ownerId = eventId): Promise<void> {
     const ref = this.eventRef(eventId);
     await this.db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
-      if (!snap.exists || snap.data()?.status !== "processing") return;
+      if (!snap.exists || snap.data()?.ownerId !== ownerId || snap.data()?.status !== "processing") return;
+      tx.update(ref, { status: "completed", completedAt: now });
+    });
+  }
+
+  public async release(eventId: string, ownerId = eventId): Promise<void> {
+    const ref = this.eventRef(eventId);
+    await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists || snap.data()?.status !== "processing" || snap.data()?.ownerId !== ownerId) return;
       tx.delete(ref);
     });
   }

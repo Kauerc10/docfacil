@@ -314,13 +314,17 @@ export class FirestoreOrdersRepository implements IOrdersRepository {
 
   public async markOrderPaid(orderId: string): Promise<OrderRecord> {
     const docRef = this.db.collection("orders").doc(orderId);
-    const paidAt = Date.now();
-    await docRef.update({
-      status: "paid",
-      paidAt,
+    return this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      if (!snap.exists) throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido não encontrado.");
+      const current = { ...snap.data(), id: snap.id } as OrderRecord;
+        if (current.status === "paid" || current.status === "reserved" || current.status === "consumed" || current.status === "refunded") {
+        return current;
+      }
+      const paidAt = Date.now();
+      tx.update(docRef, { status: "paid", paidAt });
+      return { ...current, status: "paid", paidAt };
     });
-    const snap = await docRef.get();
-    return { ...snap.data(), id: snap.id } as OrderRecord;
   }
 
   public async consumeOrder(orderId: string, documentId: string): Promise<void> {
@@ -403,10 +407,21 @@ export class FirestoreOrdersRepository implements IOrdersRepository {
     documentId: string;
   }): Promise<void> {
     const docRef = this.db.collection("orders").doc(params.orderId);
-    await docRef.update({
-      status: "consumed",
-      documentId: params.documentId,
-      consumedAt: Date.now(),
+    await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      if (!snap.exists) throw new BackendError("ORDER_NOT_FOUND", 404, "Pedido não encontrado.");
+      const order = snap.data() as OrderRecord;
+      if (order.status === "consumed" && order.documentId === params.documentId) return;
+      if (order.status !== "reserved" || order.reservedByRequestId !== params.requestId) {
+        throw new BackendError("ORDER_ALREADY_RESERVED", 409, "A reserva deste pagamento não pertence a esta geração.");
+      }
+      tx.update(docRef, {
+        status: "consumed",
+        documentId: params.documentId,
+        consumedAt: Date.now(),
+        reservedByRequestId: FieldValue.delete(),
+        reservedAt: FieldValue.delete(),
+      });
     });
   }
 

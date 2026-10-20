@@ -92,13 +92,27 @@ export interface IBillingSubscriptionsRepository {
   getByUserId(userId: string): Promise<BillingSubscriptionRecord | null>;
   getByProviderSubscriptionId(id: string): Promise<BillingSubscriptionRecord | null>;
   upsert(record: BillingSubscriptionRecord): Promise<void>;
+  /** Applies one provider payment exactly once and advances its paid period atomically. */
+  renewWithPayment(input: {
+    userId: string;
+    providerSubscriptionId: string;
+    paymentId: string;
+    paidAt: number;
+    cycleId?: string;
+  }): Promise<{ applied: boolean; subscription: BillingSubscriptionRecord }>;
+  activateWithPayment(input: {
+    record: BillingSubscriptionRecord;
+    paymentId: string;
+  }): Promise<{ applied: boolean; subscription: BillingSubscriptionRecord }>;
+  requestCancellation(userId: string, requestedAt: number): Promise<BillingSubscriptionRecord>;
+  confirmCancellation(userId: string, confirmedAt: number): Promise<BillingSubscriptionRecord>;
 }
 
 export interface IBillingWebhookEventsRepository {
   exists(eventId: string): Promise<boolean>;
-  claim(eventId: string, now: number): Promise<boolean>;
-  complete(eventId: string, now: number): Promise<void>;
-  release(eventId: string): Promise<void>;
+  claim(eventId: string, now: number, ownerId?: string): Promise<boolean>;
+  complete(eventId: string, now: number, ownerId?: string): Promise<void>;
+  release(eventId: string, ownerId?: string): Promise<void>;
 }
 
 export interface IGenerationRequestsRepository {
