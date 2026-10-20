@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { BackendError } from "@/lib/server/errors";
 import { getServerEnv } from "@/lib/server/env";
@@ -16,7 +17,6 @@ import {
   activateProSubscription,
   cancelProSubscription,
   failProRenewal,
-  renewProSubscription,
 } from "@/lib/server/billing/subscription-lifecycle";
 
 export const runtime = "nodejs";
@@ -350,7 +350,12 @@ async function processSubscriptionCompleted(
     paidAt,
   });
 
-  await repos.subscriptions.upsert(record);
+  const existingSubscription = await repos.subscriptions.getByProviderSubscriptionId(providerSubscriptionId);
+  // A replay of the initial activation must never move paidThrough backwards or
+  // reset a subscription that already has a later financial effect.
+  if (!existingSubscription) {
+    await repos.subscriptions.upsert(record);
+  }
   await repos.orders.updateProviderRefs(order.id!, {
     providerPaymentId,
     providerCheckoutId,
@@ -413,11 +418,12 @@ async function processSubscriptionRenewed(
   }
   requireCardMethods(payment);
 
-  const renewed = renewProSubscription(current, {
+  await repos.subscriptions.renewWithPayment({
+    userId: current.userId,
+    providerSubscriptionId: current.providerSubscriptionId,
     paymentId: requiredString(payment, "id"),
     paidAt: parseEventTimestamp(payment, "createdAt", now),
   });
-  await repos.subscriptions.upsert(renewed);
 }
 
 async function processSubscriptionPaymentFailed(
@@ -498,6 +504,7 @@ export async function handleAbacatePayWebhook(
   deps: WebhookHandlerDeps
 ): Promise<Response> {
   let claimedEventId: string | null = null;
+  let claimOwnerId: string | null = null;
 
   try {
     const receivedSecret = new URL(req.url).searchParams.get("webhookSecret");
@@ -533,7 +540,8 @@ export async function handleAbacatePayWebhook(
     }
 
     const now = deps.now();
-    const claimed = await deps.repos.webhookEvents.claim(event.id, now);
+    claimOwnerId = randomUUID();
+    const claimed = await deps.repos.webhookEvents.claim(event.id, now, claimOwnerId);
     if (!claimed) {
       return NextResponse.json(
         { ok: true, duplicate: true },
@@ -543,8 +551,9 @@ export async function handleAbacatePayWebhook(
     claimedEventId = event.id;
 
     await processEvent(event, deps.repos, now);
-    await deps.repos.webhookEvents.complete(event.id, deps.now());
+    await deps.repos.webhookEvents.complete(event.id, deps.now(), claimOwnerId);
     claimedEventId = null;
+    claimOwnerId = null;
 
     return NextResponse.json(
       { ok: true },
@@ -552,7 +561,7 @@ export async function handleAbacatePayWebhook(
     );
   } catch (error: unknown) {
     if (claimedEventId) {
-      await deps.repos.webhookEvents.release(claimedEventId).catch(() => undefined);
+      await deps.repos.webhookEvents.release(claimedEventId, claimOwnerId ?? undefined).catch(() => undefined);
     }
     return BackendError.fromUnknown(error).toResponse();
   }
