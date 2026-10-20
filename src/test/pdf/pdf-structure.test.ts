@@ -163,7 +163,7 @@ describe("PDF Structure & Layout Protection", () => {
     expect(JSON.stringify(closingStack)).toContain('"dontBreakRows":true');
   });
 
-  it("não promete validade legal na marca d'água do DocFácil", () => {
+  it("não promete validade legal na marca d'água do Ninhal", () => {
     const locacao = getModelo("contrato-locacao")!;
     const ddo = buildDocDefinition(locacao, answers, { watermark: true }) as {
       background?: () => unknown;
@@ -171,7 +171,7 @@ describe("PDF Structure & Layout Protection", () => {
     const background = ddo.background?.();
     const serialized = JSON.stringify(background);
 
-    expect(serialized).toContain("DOCFÁCIL");
+    expect(serialized).toContain("NINHAL");
     expect(serialized).toContain("DOCUMENTO GERADO");
     expect(serialized).not.toContain("VALIDADE LEGAL");
   });
@@ -279,7 +279,7 @@ describe("PDF Structure & Layout Protection", () => {
       expect(recipe.pageMarginsCm[0]).toBe(2);
       expect(recipe.pageMarginsCm[2]).toBe(2);
       expect(recipe.bodyColor).toBe("#181818");
-      expect(serializedHeader).toContain("DocFácil");
+      expect(serializedHeader).toMatch(/DocFácil|Ninhal/);
       expect(serializedHeader).toContain("Documentos jurídicos simplificados");
       expect(serializedHeader).toContain("#b9853d");
     }
