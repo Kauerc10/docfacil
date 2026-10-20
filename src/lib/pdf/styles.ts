@@ -174,7 +174,7 @@ export function buildDocDefinition(
             },
             {
               stack: [
-                { text: "DOCFÁCIL", fontSize: 28, bold: true, color: "#2554c7", alignment: "center", characterSpacing: 3, opacity: 0.08 },
+                { text: "NINHAL", fontSize: 28, bold: true, color: "#2554c7", alignment: "center", characterSpacing: 3, opacity: 0.08 },
                 { text: "•", fontSize: 14, color: "#2554c7", alignment: "center", opacity: 0.08, margin: [0, 4, 0, 4] },
                 { text: "DOCUMENTO GERADO", fontSize: 10, color: "#2554c7", alignment: "center", characterSpacing: 1.6, opacity: 0.08 },
               ],
@@ -194,7 +194,7 @@ export function buildDocDefinition(
               columns: [
                 {
                   text: [
-                    { text: "DocFácil", color: headingColor, bold: true },
+                    { text: "Ninhal", color: headingColor, bold: true },
                     { text: "  |", color: "#8993a4" },
                   ],
                   style: "headerContinuation",
@@ -226,7 +226,7 @@ export function buildDocDefinition(
           stack: [
             {
               text: [
-                { text: "DocFácil", color: "#14315c", bold: true },
+                { text: "Ninhal", color: "#14315c", bold: true },
                 { text: " · ", color: "#64748b" },
                 { text: renderedTitle, color: "#64748b" },
               ],
@@ -282,7 +282,7 @@ export function buildDocDefinition(
         },
         {
           columns: [
-            { text: "Gerado por DocFácil", style: "footerText" },
+            { text: "Gerado por Ninhal", style: "footerText" },
             { text: `Página ${currentPage} de ${pageCount}`, style: "footerText", alignment: "right" as const },
           ],
           margin: [0, 4, 0, 0] as [number, number, number, number],

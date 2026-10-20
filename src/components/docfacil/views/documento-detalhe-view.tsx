@@ -548,7 +548,7 @@ function FallbackPreview({ doc }: { doc: Documento }) {
   return (
     <div className="relative w-full max-w-[420px] aspect-[1/1.414] bg-white rounded-sm shadow-[0_18px_44px_-20px_rgba(14,35,64,0.35),0_2px_8px_-4px_rgba(14,35,64,0.18)] overflow-hidden ring-1 ring-black/5 p-8">
       <p className="text-[10px] sm:text-xs uppercase tracking-[0.18em] text-ink/45">
-        DocFacil · ID {doc.id}
+        Ninhal · ID {doc.id}
       </p>
       <h3 className="mt-3 font-[family-name:var(--font-jakarta)] text-base sm:text-lg font-extrabold tracking-tight text-center uppercase">
         {doc.modeloNome}

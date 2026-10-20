@@ -45,7 +45,7 @@ export interface DetalhePreviewProps {
  * truth). A única diferença visual vs PreviewA4 é:
  *  - Sem badge "ao vivo" (não é mais um draft ativo)
  *  - Header da 1ª página mostra o docId
- *  - Footer em cada página com "DocFacil · pág. X/Y"
+ *  - Footer em cada página com "Ninhal · pág. X/Y"
  *  - Padding um pouco maior (px-7 sm:px-9) para leitura confortável
  */
 export function DetalhePreview({
@@ -208,7 +208,7 @@ function DetalhePagina({
       <div className="relative h-full px-7 sm:px-9 py-8 sm:py-10 flex flex-col">
         {numeroPagina === 1 && (
           <p className="text-[10px] sm:text-xs uppercase tracking-[0.18em] text-ink/45">
-            DocFacil · ID {docId}
+            Ninhal · ID {docId}
           </p>
         )}
 
@@ -219,7 +219,7 @@ function DetalhePagina({
         </div>
 
         <div className="mt-3 pt-2 border-t border-ink/10 flex items-center justify-between text-[0.55rem] text-ink/40 uppercase tracking-wider">
-          <span>DocFacil</span>
+          <span>Ninhal</span>
           <span>
             pág. {numeroPagina}/{totalPaginas}
           </span>
